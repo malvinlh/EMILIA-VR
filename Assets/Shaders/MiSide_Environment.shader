@@ -1,0 +1,490 @@
+Shader "MiSide/Environment"
+{
+    Properties
+    {
+        [MainTexture] _BaseMap ("Base Map", 2D) = "white" {}
+        [MainColor]   _BaseColor ("Base Color Tint", Color) = (1,1,1,1)
+
+        [Header(Toon Shading)]
+        _ShadowColor ("Shadow Color", Color) = (0.85, 0.75, 0.72, 1)
+        _ShadowStep ("Shadow Step", Range(0, 1)) = 0.5
+        _ShadowFeather ("Shadow Feather", Range(0.001, 0.5)) = 0.05
+        _ShadowIntensity ("Shadow Receive Intensity", Range(0, 1)) = 0.6
+
+        [Header(Rim Light)]
+        [Toggle(_RIMLIGHT)] _RimLightToggle ("Enable Rim Light", Float) = 0
+        _RimColor ("Rim Color", Color) = (1, 0.9, 0.85, 1)
+        _RimPower ("Rim Power", Range(1, 10)) = 4
+        _RimIntensity ("Rim Intensity", Range(0, 1)) = 0.15
+
+        [Header(Emission)]
+        [Toggle(_EMISSION)] _EmissionToggle ("Enable Emission", Float) = 0
+        _EmissionMap ("Emission Map", 2D) = "black" {}
+        [HDR] _EmissionColor ("Emission Color", Color) = (1,1,1,0)
+
+        [Header(Alpha Cutout)]
+        [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha Clip", Float) = 0
+        _Cutoff ("Alpha Cutoff", Range(0, 1)) = 0.5
+
+        [Header(Rendering)]
+        [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull Mode", Float) = 2
+    }
+
+    SubShader
+    {
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "RenderPipeline" = "UniversalPipeline"
+            "Queue" = "Geometry"
+            "UniversalMaterialType" = "Lit"
+        }
+
+        // =====================================================
+        // FORWARD LIT PASS
+        // =====================================================
+        Pass
+        {
+            Name "ForwardLit"
+            Tags { "LightMode" = "UniversalForward" }
+
+            Cull [_Cull]
+            ZWrite On
+            ZTest LEqual
+
+            HLSLPROGRAM
+            #pragma target 3.0
+
+            // Vertex / Fragment
+            #pragma vertex MiSideVert
+            #pragma fragment MiSideFrag
+
+            // Material keywords (local = only compiled per-material that uses them)
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma shader_feature_local _EMISSION
+            #pragma shader_feature_local _RIMLIGHT
+
+            // URP essential multi_compiles only
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ LIGHTMAP_ON
+            #pragma multi_compile _ DIRLIGHTMAP_COMBINED
+            #pragma multi_compile_fog
+            #pragma multi_compile_instancing
+            #pragma multi_compile _ DOTS_INSTANCING_ON
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            // -----------------------------------------------------------
+            // SRP Batcher compatible CBUFFER
+            // -----------------------------------------------------------
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4  _BaseColor;
+                half4  _ShadowColor;
+                half   _ShadowStep;
+                half   _ShadowFeather;
+                half   _ShadowIntensity;
+                half4  _RimColor;
+                half   _RimPower;
+                half   _RimIntensity;
+                float4 _EmissionMap_ST;
+                half4  _EmissionColor;
+                half   _Cutoff;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap);      SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_EmissionMap);  SAMPLER(sampler_EmissionMap);
+
+            // -----------------------------------------------------------
+            // Structs
+            // -----------------------------------------------------------
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
+                float2 uv         : TEXCOORD0;
+                float2 lightmapUV : TEXCOORD1;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct Varyings
+            {
+                float4 positionCS  : SV_POSITION;
+                float2 uv          : TEXCOORD0;
+                float3 normalWS    : TEXCOORD1;
+                float3 positionWS  : TEXCOORD2;
+                half   fogFactor   : TEXCOORD3;
+
+                #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
+                float4 shadowCoord : TEXCOORD4;
+                #endif
+
+                DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 5);
+
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            // -----------------------------------------------------------
+            // Vertex Shader
+            // -----------------------------------------------------------
+            Varyings MiSideVert(Attributes IN)
+            {
+                Varyings OUT = (Varyings)0;
+
+                UNITY_SETUP_INSTANCE_ID(IN);
+                UNITY_TRANSFER_INSTANCE_ID(IN, OUT);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
+
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(IN.positionOS.xyz);
+                VertexNormalInputs   normalInput = GetVertexNormalInputs(IN.normalOS);
+
+                OUT.positionCS = vertexInput.positionCS;
+                OUT.positionWS = vertexInput.positionWS;
+                OUT.normalWS   = normalInput.normalWS;
+                OUT.uv         = TRANSFORM_TEX(IN.uv, _BaseMap);
+                OUT.fogFactor  = ComputeFogFactor(vertexInput.positionCS.z);
+
+                #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
+                OUT.shadowCoord = GetShadowCoord(vertexInput);
+                #endif
+
+                OUTPUT_LIGHTMAP_UV(IN.lightmapUV, unity_LightmapST, OUT.lightmapUV);
+                OUTPUT_SH(OUT.normalWS, OUT.vertexSH);
+
+                return OUT;
+            }
+
+            // -----------------------------------------------------------
+            // Fragment Shader
+            // -----------------------------------------------------------
+            half4 MiSideFrag(Varyings IN) : SV_Target
+            {
+                UNITY_SETUP_INSTANCE_ID(IN);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+
+                // Sample base texture
+                half4 baseColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * _BaseColor;
+
+                #ifdef _ALPHATEST_ON
+                    clip(baseColor.a - _Cutoff);
+                #endif
+
+                float3 normalWS = normalize(IN.normalWS);
+
+                // Main light
+                #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
+                    float4 shadowCoord = IN.shadowCoord;
+                #elif defined(MAIN_LIGHT_SHADOWS) || defined(MAIN_LIGHT_SHADOWS_CASCADE)
+                    float4 shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
+                #else
+                    float4 shadowCoord = float4(0, 0, 0, 0);
+                #endif
+
+                Light mainLight = GetMainLight(shadowCoord);
+
+                // Half-Lambert for softer shading
+                float NdotL = dot(normalWS, mainLight.direction);
+                float halfLambert = NdotL * 0.5 + 0.5;
+
+                // Soft 2-step toon ramp (MiSide style)
+                float toonRamp = smoothstep(
+                    _ShadowStep - _ShadowFeather,
+                    _ShadowStep + _ShadowFeather,
+                    halfLambert
+                );
+
+                // Blend with realtime shadow attenuation
+                float shadowAtten = mainLight.shadowAttenuation;
+                toonRamp = min(toonRamp, smoothstep(0.0, _ShadowFeather * 2.0, shadowAtten));
+
+                // Mix lit and shadow colors
+                half3 litColor    = baseColor.rgb * mainLight.color;
+                half3 shadowColor = baseColor.rgb * _ShadowColor.rgb * _ShadowIntensity;
+                half3 finalColor  = lerp(shadowColor, litColor, toonRamp);
+
+                // Baked GI / lightmap contribution
+                half3 bakedGI = SAMPLE_GI(IN.lightmapUV, IN.vertexSH, normalWS);
+                finalColor += baseColor.rgb * bakedGI * (1.0 - toonRamp * 0.5);
+
+                // Optional rim light
+                #ifdef _RIMLIGHT
+                    float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
+                    float rim = pow(1.0 - saturate(dot(viewDir, normalWS)), _RimPower);
+                    finalColor += _RimColor.rgb * rim * _RimIntensity;
+                #endif
+
+                // Optional emission
+                #ifdef _EMISSION
+                    half3 emission = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, IN.uv).rgb;
+                    finalColor += emission * _EmissionColor.rgb;
+                #endif
+
+                // Apply fog
+                finalColor = MixFog(finalColor, IN.fogFactor);
+
+                return half4(finalColor, baseColor.a);
+            }
+            ENDHLSL
+        }
+
+        // =====================================================
+        // SHADOW CASTER PASS
+        // =====================================================
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+            Cull [_Cull]
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex ShadowVert
+            #pragma fragment ShadowFrag
+
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma multi_compile_instancing
+            #pragma multi_compile _ DOTS_INSTANCING_ON
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/CommonMaterial.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4  _BaseColor;
+                half4  _ShadowColor;
+                half   _ShadowStep;
+                half   _ShadowFeather;
+                half   _ShadowIntensity;
+                half4  _RimColor;
+                half   _RimPower;
+                half   _RimIntensity;
+                float4 _EmissionMap_ST;
+                half4  _EmissionColor;
+                half   _Cutoff;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+
+            float3 _LightDirection;
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS   : NORMAL;
+                float2 uv         : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv         : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            Varyings ShadowVert(Attributes IN)
+            {
+                Varyings OUT = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(IN);
+                UNITY_TRANSFER_INSTANCE_ID(IN, OUT);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
+
+                float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
+                float3 normalWS   = TransformObjectToWorldNormal(IN.normalOS);
+                positionWS = ApplyShadowBias(positionWS, normalWS, _LightDirection);
+                OUT.positionCS = TransformWorldToHClip(positionWS);
+
+                #if UNITY_REVERSED_Z
+                    OUT.positionCS.z = min(OUT.positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #else
+                    OUT.positionCS.z = max(OUT.positionCS.z, UNITY_NEAR_CLIP_VALUE);
+                #endif
+
+                OUT.uv = TRANSFORM_TEX(IN.uv, _BaseMap);
+                return OUT;
+            }
+
+            half4 ShadowFrag(Varyings IN) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+
+                #ifdef _ALPHATEST_ON
+                    half4 col = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv);
+                    clip(col.a * _BaseColor.a - _Cutoff);
+                #endif
+
+                return 0;
+            }
+            ENDHLSL
+        }
+
+        // =====================================================
+        // DEPTH ONLY PASS
+        // =====================================================
+        Pass
+        {
+            Name "DepthOnly"
+            Tags { "LightMode" = "DepthOnly" }
+
+            ZWrite On
+            ColorMask R
+            Cull [_Cull]
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex DepthVert
+            #pragma fragment DepthFrag
+
+            #pragma shader_feature_local _ALPHATEST_ON
+            #pragma multi_compile_instancing
+            #pragma multi_compile _ DOTS_INSTANCING_ON
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4  _BaseColor;
+                half4  _ShadowColor;
+                half   _ShadowStep;
+                half   _ShadowFeather;
+                half   _ShadowIntensity;
+                half4  _RimColor;
+                half   _RimPower;
+                half   _RimIntensity;
+                float4 _EmissionMap_ST;
+                half4  _EmissionColor;
+                half   _Cutoff;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv         : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv         : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            Varyings DepthVert(Attributes IN)
+            {
+                Varyings OUT = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(IN);
+                UNITY_TRANSFER_INSTANCE_ID(IN, OUT);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
+
+                OUT.positionCS = TransformObjectToHClip(IN.positionOS.xyz);
+                OUT.uv = TRANSFORM_TEX(IN.uv, _BaseMap);
+                return OUT;
+            }
+
+            half4 DepthFrag(Varyings IN) : SV_Target
+            {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+
+                #ifdef _ALPHATEST_ON
+                    half4 col = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv);
+                    clip(col.a * _BaseColor.a - _Cutoff);
+                #endif
+
+                return 0;
+            }
+            ENDHLSL
+        }
+
+        // =====================================================
+        // META PASS (Lightmap Baking)
+        // =====================================================
+        Pass
+        {
+            Name "Meta"
+            Tags { "LightMode" = "Meta" }
+
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma target 3.0
+            #pragma vertex MetaVert
+            #pragma fragment MetaFrag
+
+            #pragma shader_feature_local _EMISSION
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MetaInput.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                half4  _BaseColor;
+                half4  _ShadowColor;
+                half   _ShadowStep;
+                half   _ShadowFeather;
+                half   _ShadowIntensity;
+                half4  _RimColor;
+                half   _RimPower;
+                half   _RimIntensity;
+                float4 _EmissionMap_ST;
+                half4  _EmissionColor;
+                half   _Cutoff;
+            CBUFFER_END
+
+            TEXTURE2D(_BaseMap);      SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_EmissionMap);  SAMPLER(sampler_EmissionMap);
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv         : TEXCOORD0;
+                float2 uvLM       : TEXCOORD1;
+                float2 uvDLM      : TEXCOORD2;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv         : TEXCOORD0;
+            };
+
+            Varyings MetaVert(Attributes IN)
+            {
+                Varyings OUT = (Varyings)0;
+                OUT.positionCS = UnityMetaVertexPosition(IN.positionOS.xyz, IN.uvLM, IN.uvDLM);
+                OUT.uv = TRANSFORM_TEX(IN.uv, _BaseMap);
+                return OUT;
+            }
+
+            half4 MetaFrag(Varyings IN) : SV_Target
+            {
+                half4 baseColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * _BaseColor;
+
+                MetaInput metaInput = (MetaInput)0;
+                metaInput.Albedo = baseColor.rgb;
+
+                #ifdef _EMISSION
+                    half3 emission = SAMPLE_TEXTURE2D(_EmissionMap, sampler_EmissionMap, IN.uv).rgb;
+                    metaInput.Emission = emission * _EmissionColor.rgb;
+                #endif
+
+                return UnityMetaFragment(metaInput);
+            }
+            ENDHLSL
+        }
+    }
+
+    CustomEditor "MiSideShaderGUI"
+    FallBack "Universal Render Pipeline/Lit"
+}
