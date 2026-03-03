@@ -3,7 +3,227 @@ guid: 39506e02eb15898478380ce6b1d4f9e1
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_BeachUmbrella
+    second: {fileID: 2100000, guid: fb844cef7cf38574d9e63da9260e1d88, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Cable
+    second: {fileID: 2100000, guid: 03c954c0f1fc75f43be4a4bbfa2c20d9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Chalkboard
+    second: {fileID: 2100000, guid: b5a0a1bc35695ce429f56e5aa5f0914e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_ChangingCabin
+    second: {fileID: 2100000, guid: 83a12630bdc65ce468f12a3e982ea110, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Coolbox
+    second: {fileID: 2100000, guid: d50715ab3929e934b970d44c76504849, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Decals
+    second: {fileID: 2100000, guid: 487258f83c0e44a40af90108911705a4, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_DoorsWindowsDetails
+    second: {fileID: 2100000, guid: 43efc95309ba11c4b8c8409e6c89952f, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Fillers
+    second: {fileID: 2100000, guid: 47180a160f82f1f4796d990f583cf693, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Fish
+    second: {fileID: 2100000, guid: 58580214cead8fd45a27aec180a520f0, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Floor
+    second: {fileID: 2100000, guid: c2e2a3f02e76e6c49b3531a8404df64b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Frames
+    second: {fileID: 2100000, guid: 7bb8425503161b142844fdc3114eee9f, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_GroundPlaneBottom
+    second: {fileID: 2100000, guid: c81a1274b72129642bb28ad3e2e7aecc, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Hammock
+    second: {fileID: 2100000, guid: c4071442ae5ed0f4e87f30b62d1e256e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Light_Blue
+    second: {fileID: 2100000, guid: ec89f6f1093ee8043a4eaf9ad1b5868e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Light_Green
+    second: {fileID: 2100000, guid: 749429e7d99eae94d9e6a55d801d8943, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Light_Red
+    second: {fileID: 2100000, guid: ef08c2bc8205cf242ad60f2f28d37e1d, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_MountainBike_Variant02
+    second: {fileID: 2100000, guid: a7f608ba55d0fc54f876741bf28fd8b6, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Mountainbike
+    second: {fileID: 2100000, guid: 6c356280fc0aadf4d87c4d058762568e, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_OutdoorSofa
+    second: {fileID: 2100000, guid: 31f69dec5b3d31b4fb1e04f4caf4a41f, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_PalmTree
+    second: {fileID: 2100000, guid: 5f2d760d99596d145aada21561b09e4a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_PalmTreeLeaves
+    second: {fileID: 2100000, guid: 24d48c92abb14404eb30de9502f854ca, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Pier
+    second: {fileID: 2100000, guid: c2a753ee393ad2e478c649206302e698, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Pier_Trim
+    second: {fileID: 2100000, guid: 1574f78d78dd97b40b24313a07157b1c, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Pillow
+    second: {fileID: 2100000, guid: 3375093bb3ff097458c0adc472d1ffb9, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_PlanksWall
+    second: {fileID: 2100000, guid: 60909b05819e16044850c1225d37b820, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Plants
+    second: {fileID: 2100000, guid: d2d97b3dee0b06d42a25874243c0c513, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Rims
+    second: {fileID: 2100000, guid: d693ec25b72e8294889e20850f238447, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Rocks
+    second: {fileID: 2100000, guid: 413cb6d056111fc4e9c346b8727d7f42, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Roof
+    second: {fileID: 2100000, guid: 13771ee35a7cbbe4eb021d6587c7cfce, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_RoofUnderside
+    second: {fileID: 2100000, guid: d19df1843e4cc30459d20e40c6eb6e85, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Ropes
+    second: {fileID: 2100000, guid: 7676080d270364244808ece62ca41870, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_SandTop
+    second: {fileID: 2100000, guid: 0671ef0f44f4b7c4aa5f2e309aab4610, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_SandWater
+    second: {fileID: 2100000, guid: 011965a2d9f17a94b8498577eb64971c, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_SandWaterEdge
+    second: {fileID: 2100000, guid: b35b9194ed63b9742a03466998a95e9b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_SeaScooter
+    second: {fileID: 2100000, guid: 0ae6853fd52fbb6459e8c37914cb2afa, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Seagull
+    second: {fileID: 2100000, guid: 03276b129cbd9e04ba3ad671d897a0a5, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Sponge
+    second: {fileID: 2100000, guid: e08017b11d3844941a842733d951fdc7, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Sunbed
+    second: {fileID: 2100000, guid: 83f1fdcadc3b15048947c6ab982bd72b, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Torch
+    second: {fileID: 2100000, guid: 2184ac03de3d991419693caceebe9269, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Towel_Variant01
+    second: {fileID: 2100000, guid: cabe3f53657c9ee41adf7fc81b6eba79, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Towel_Variant02
+    second: {fileID: 2100000, guid: 4e5548933cd36944c9161ddc4c1361a7, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Walls
+    second: {fileID: 2100000, guid: e9d9050b669baeb469e52e1c69d6ae99, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: M_Water
+    second: {fileID: 2100000, guid: 5b8b7511be71d8b4cb8746c2b82afe39, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: m_Rocks
+    second: {fileID: 2100000, guid: b03610340d19d82448d5d848011e8410, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

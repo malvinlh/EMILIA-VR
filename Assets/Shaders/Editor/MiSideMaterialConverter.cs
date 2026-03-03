@@ -17,6 +17,7 @@ public class MiSideMaterialConverter : EditorWindow
     {
         ChatRoom,
         Beach,
+        BeachDiorama,
         SelectedFolder
     }
 
@@ -89,6 +90,8 @@ public class MiSideMaterialConverter : EditorWindow
                 return "Assets/Graphics/3D/Chat_Room/materials";
             case ConvertTarget.Beach:
                 return "Assets/Graphics/3D/Journal_Beach/Merged/Materials";
+            case ConvertTarget.BeachDiorama:
+                return "Assets/External/beach-related/lets-go-to-the-beach-beach-themed-diorama/materials";
             case ConvertTarget.SelectedFolder:
                 return _customFolder;
             default:
@@ -139,14 +142,24 @@ public class MiSideMaterialConverter : EditorWindow
             Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (mat == null) { errors++; continue; }
 
-            // Only convert URP/Lit or URP/Simple Lit materials
-            if (mat.shader != urpLit && mat.shader != urpSimpleLit)
+            // For BeachDiorama, accept any shader (Autodesk Interactive, etc.)
+            // For other targets, only convert URP/Lit or URP/Simple Lit
+            bool isUrp = mat.shader == urpLit || mat.shader == urpSimpleLit;
+            bool isDiorama = _target == ConvertTarget.BeachDiorama;
+            if (!isUrp && !isDiorama)
             {
                 skipped++;
                 continue;
             }
 
-            MaterialType type = DetectMaterialType(mat.name);
+            // Skip materials already on a MiSide shader
+            if (mat.shader.name.StartsWith("MiSide/"))
+            {
+                skipped++;
+                continue;
+            }
+
+            MaterialType type = DetectMaterialType(mat.name, mat);
 
             string typeLabel;
             switch (type)
@@ -202,13 +215,37 @@ public class MiSideMaterialConverter : EditorWindow
     private static void ConvertSingleMaterial(Material mat, MaterialType type, Shader toonShader, Shader waterShader)
     {
         // Save existing properties before shader switch
-        Texture baseMap = mat.HasProperty("_BaseMap") ? mat.GetTexture("_BaseMap") : null;
+        // Try URP properties first, then Autodesk Interactive properties
+        Texture baseMap = null;
+        if (mat.HasProperty("_BaseMap"))
+            baseMap = mat.GetTexture("_BaseMap");
         if (baseMap == null && mat.HasProperty("_MainTex"))
             baseMap = mat.GetTexture("_MainTex");
+        if (baseMap == null && mat.HasProperty("_BASE_COLOR_MAP"))
+            baseMap = mat.GetTexture("_BASE_COLOR_MAP");
 
-        Color baseColor = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : Color.white;
-        Color emissionColor = mat.HasProperty("_EmissionColor") ? mat.GetColor("_EmissionColor") : Color.black;
-        Texture emissionMap = mat.HasProperty("_EmissionMap") ? mat.GetTexture("_EmissionMap") : null;
+        Color baseColor = Color.white;
+        if (mat.HasProperty("_BaseColor"))
+            baseColor = mat.GetColor("_BaseColor");
+        else if (mat.HasProperty("_BASE_COLOR"))
+            baseColor = mat.GetColor("_BASE_COLOR");
+
+        Color emissionColor = Color.black;
+        if (mat.HasProperty("_EmissionColor"))
+            emissionColor = mat.GetColor("_EmissionColor");
+        else if (mat.HasProperty("_EMISSION_COLOR"))
+            emissionColor = mat.GetColor("_EMISSION_COLOR");
+
+        Texture emissionMap = null;
+        if (mat.HasProperty("_EmissionMap"))
+            emissionMap = mat.GetTexture("_EmissionMap");
+        if (emissionMap == null && mat.HasProperty("_EMISSION_COLOR_MAP"))
+            emissionMap = mat.GetTexture("_EMISSION_COLOR_MAP");
+
+        // Read opacity map for cutout materials (Autodesk Interactive uses _OPACITY_MAP)
+        Texture opacityMap = null;
+        if (mat.HasProperty("_OPACITY_MAP"))
+            opacityMap = mat.GetTexture("_OPACITY_MAP");
 
         // Switch shader
         if (type == MaterialType.Water && waterShader != null)
@@ -263,6 +300,14 @@ public class MiSideMaterialConverter : EditorWindow
                 mat.SetFloat("_Cull", (float)CullMode.Off); // Double-sided for plants
                 mat.SetFloat("_EmissionToggle", 0f);
                 mat.DisableKeyword("_EMISSION");
+                // If an opacity map was present, bake it into the base map's alpha channel
+                // For now, set the base map and let the alpha clip use the texture's alpha
+                if (opacityMap != null)
+                {
+                    // Use opacity map as a hint: the base texture likely already has useful alpha
+                    // or the opacity map is a separate mask. Store reference for manual review.
+                    Debug.Log($"[MiSide Converter] Cutout material '{mat.name}' had separate opacity map: {opacityMap.name}");
+                }
                 mat.renderQueue = 2450;
                 break;
 
@@ -311,7 +356,8 @@ public class MiSideMaterialConverter : EditorWindow
 
     private static readonly string[] CutoutPatterns =
     {
-        "Cutout", "Cut", "_Cut"
+        "Cutout", "Cut", "_Cut", "Leaves", "Plants", "Decals",
+        "Ropes", "Fillers", "Cable", "Hammock"
     };
 
     private static readonly string[] WaterPatterns =
@@ -319,7 +365,11 @@ public class MiSideMaterialConverter : EditorWindow
         "sea", "surf", "water", "ocean", "wave"
     };
 
-    private static MaterialType DetectMaterialType(string name)
+    /// <summary>
+    /// Detect material type by name patterns AND material properties.
+    /// Now also inspects the material's textures and colors for smarter classification.
+    /// </summary>
+    private static MaterialType DetectMaterialType(string name, Material mat = null)
     {
         string lower = name.ToLowerInvariant();
 
@@ -330,18 +380,39 @@ public class MiSideMaterialConverter : EditorWindow
                 return MaterialType.Water;
         }
 
-        // Check cutout
+        // Check emissive by name
+        foreach (string pattern in EmissivePatterns)
+        {
+            if (lower.Contains(pattern.ToLowerInvariant()))
+                return MaterialType.Emissive;
+        }
+
+        // Check emissive by material properties (non-black emission color)
+        if (mat != null)
+        {
+            Color emCol = Color.black;
+            if (mat.HasProperty("_EMISSION_COLOR"))
+                emCol = mat.GetColor("_EMISSION_COLOR");
+            else if (mat.HasProperty("_EmissionColor"))
+                emCol = mat.GetColor("_EmissionColor");
+
+            if (emCol.r + emCol.g + emCol.b > 0.05f)
+                return MaterialType.Emissive;
+        }
+
+        // Check cutout by name
         foreach (string pattern in CutoutPatterns)
         {
             if (lower.Contains(pattern.ToLowerInvariant()))
                 return MaterialType.Cutout;
         }
 
-        // Check emissive
-        foreach (string pattern in EmissivePatterns)
+        // Check cutout by material properties (has opacity map texture)
+        if (mat != null && mat.HasProperty("_OPACITY_MAP"))
         {
-            if (lower.Contains(pattern.ToLowerInvariant()))
-                return MaterialType.Emissive;
+            Texture opacityTex = mat.GetTexture("_OPACITY_MAP");
+            if (opacityTex != null)
+                return MaterialType.Cutout;
         }
 
         return MaterialType.Standard;
