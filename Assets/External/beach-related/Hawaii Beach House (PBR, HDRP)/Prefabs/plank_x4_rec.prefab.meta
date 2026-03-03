@@ -1,14 +1,3 @@
-fileFormatVersion: 2
-guid: 9ff7d630e931e1340b6efabb4835f179
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Prefabs/plank_x4_rec.prefab
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:a8e3b9bfaa25732755a60ec13a39b2acfc1b7daeca7b30a78bad83e288996419
+size 390

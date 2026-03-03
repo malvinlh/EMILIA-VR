@@ -1,14 +1,3 @@
-fileFormatVersion: 2
-guid: 4fecefbce090d964598a936728b056f5
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Prefabs/wooden_stairs_x5_Y Variant.prefab
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:9998e630214bd2497e6853a65bfc31f07455d616122b18f7068c5aa3e86bad0b
+size 404

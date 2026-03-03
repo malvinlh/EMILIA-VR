@@ -1,15 +1,3 @@
-fileFormatVersion: 2
-guid: dc1aaf5f18065f641aa7bf5ab00603b7
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 2100000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Materials/Mat_Leaves_2.mat
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:e683ec6fb0e5b94d0f4ba11deaf52cc5a4ac2971a285bcb22dce526b5fa2cda2
+size 424

@@ -1,15 +1,3 @@
-fileFormatVersion: 2
-guid: 59b1cafee9d7b54479f564d56c5cc0e3
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 2100000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Materials/window.mat
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:8236556451d9d4444a3bb83df90d830d36a8f732b7f863431a6044c9840697c3
+size 418

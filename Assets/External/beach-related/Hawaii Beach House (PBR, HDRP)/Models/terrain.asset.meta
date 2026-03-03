@@ -1,15 +1,3 @@
-fileFormatVersion: 2
-guid: 0a90d0e887775734f8673bf7208c2ced
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 15600000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Models/terrain.asset
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:34041d66be59342571a66df3e7d57e6bbac33ecb212f64ebb12b957fc2501b60
+size 419

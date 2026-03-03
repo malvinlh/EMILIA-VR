@@ -1,14 +1,3 @@
-fileFormatVersion: 2
-guid: b59a3f1981d04e24783207e4ee148c7c
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Prefabs/deck_barrier Variant.prefab
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:62556e7fc5d9992f82f1e9a1a6a3941e428b8d33c447e68ef559da2766457817
+size 398

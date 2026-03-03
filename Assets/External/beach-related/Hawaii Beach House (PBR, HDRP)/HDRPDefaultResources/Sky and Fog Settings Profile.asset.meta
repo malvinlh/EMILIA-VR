@@ -1,16 +1,3 @@
-fileFormatVersion: 2
-guid: b68973d2750765547a4665a356134ea0
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 11400000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/HDRPDefaultResources/Sky and Fog
-    Settings Profile.asset
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:48bf53b5465039af8425744e850edcb1194a616b7c343d6ec0149d54138ce7a3
+size 459

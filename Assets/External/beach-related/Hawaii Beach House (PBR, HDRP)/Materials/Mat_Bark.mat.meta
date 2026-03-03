@@ -1,15 +1,3 @@
-fileFormatVersion: 2
-guid: e52e35c41959ecb4a9de940e0e15b221
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 2100000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Materials/Mat_Bark.mat
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:5148a7f392aa5f99ea1dafb1453891ef0c643f7633fc7efaa4abdf11e7bb069c
+size 420

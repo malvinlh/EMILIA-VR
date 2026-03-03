@@ -1,15 +1,3 @@
-fileFormatVersion: 2
-guid: 87b41356ad3147c42a1b11278c496c41
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 2100000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Materials/Material.002 Base Color.mat
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:54b2e8b72be102219636ff9073feacaba48397b435fe31f61b6406b563e85b2f
+size 435

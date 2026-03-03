@@ -1,14 +1,3 @@
-fileFormatVersion: 2
-guid: 5aba33e74c29523458d99fa409f4a2bf
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Prefabs/sunbed Variant.prefab
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:a576ff3b56e29efd8daa0b9029328c395927a8d57f2e82ceb736af0ef1f5d4fe
+size 392

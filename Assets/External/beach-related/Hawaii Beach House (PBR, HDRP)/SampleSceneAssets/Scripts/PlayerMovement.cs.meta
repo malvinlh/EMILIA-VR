@@ -1,18 +1,3 @@
-fileFormatVersion: 2
-guid: 87f6dfceb3e39a947a312f7eeaa2a113
-MonoImporter:
-  externalObjects: {}
-  serializedVersion: 2
-  defaultReferences: []
-  executionOrder: 0
-  icon: {instanceID: 0}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/SampleSceneAssets/Scripts/PlayerMovement.cs
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:d4d24784eb297dea9c72f2f5e9c9c749d8d754f4915f2d9972f4c151aa9232f4
+size 499

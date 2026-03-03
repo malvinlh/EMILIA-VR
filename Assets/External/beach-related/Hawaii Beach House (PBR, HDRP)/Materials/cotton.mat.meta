@@ -1,15 +1,3 @@
-fileFormatVersion: 2
-guid: ba29cc7cc3e60454ca2705328ab04fee
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 2100000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Materials/cotton.mat
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:d9823ea6bd3e3404195c701563e7bc77ec24840d8625dc6dc9e8bd993542edee
+size 418

@@ -1,14 +1,3 @@
-fileFormatVersion: 2
-guid: 7c29d8ed264a3284299ba1384a2f180c
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Prefabs/Bush_2.prefab
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:893753839537632cd00f860893217851c7165b64e588478cf6388334ef87f888
+size 384

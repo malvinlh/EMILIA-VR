@@ -1,15 +1,3 @@
-fileFormatVersion: 2
-guid: aa422f7dda0c86e40ba8c7076ab30c56
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 11400000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/HDRPDefaultResources/DefaultSettingsVolumeProfile.asset
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:099ba477064deda3bf4b0c5a2810ddfdc4e10c76473e43cd6fbc334a62bc922b
+size 454

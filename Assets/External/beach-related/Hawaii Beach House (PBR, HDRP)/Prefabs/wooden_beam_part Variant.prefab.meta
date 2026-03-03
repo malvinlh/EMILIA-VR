@@ -1,14 +1,3 @@
-fileFormatVersion: 2
-guid: 9c38b767f14b40b4191960d8b7935965
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Prefabs/wooden_beam_part Variant.prefab
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:20fda420f6b0e35a0cd3cf4e77d816e9853eca02f01df87c5a91b04eaabcc7bb
+size 402

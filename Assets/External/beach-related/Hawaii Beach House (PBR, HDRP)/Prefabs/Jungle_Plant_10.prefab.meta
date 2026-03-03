@@ -1,14 +1,3 @@
-fileFormatVersion: 2
-guid: 3e219dd99287ec8469a2452af1276797
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Prefabs/Jungle_Plant_10.prefab
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:adbd92ba14af9872592bd9969dc6f0d2182fa93c0d6978492083808b2d04866c
+size 393

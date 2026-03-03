@@ -1,14 +1,3 @@
-fileFormatVersion: 2
-guid: f27321e9608a6e54caa558538386542e
-PrefabImporter:
-  externalObjects: {}
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Prefabs/grass_single_1.prefab
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:8309536aab36eadeb985e311e08f0153592d74d7179ead31ab90f15681b9e24f
+size 392

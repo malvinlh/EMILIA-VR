@@ -1,15 +1,3 @@
-fileFormatVersion: 2
-guid: c8244e2db296ab14d8053faf1229fe6d
-NativeFormatImporter:
-  externalObjects: {}
-  mainObjectFileID: 2100000
-  userData: 
-  assetBundleName: 
-  assetBundleVariant: 
-AssetOrigin:
-  serializedVersion: 1
-  productId: 245975
-  packageName: Hawaii Beach House (PBR, HDRP)
-  packageVersion: 1.0
-  assetPath: Assets/Hawaii Beach House (PBR, HDRP)/Materials/lamp.mat
-  uploadId: 560191
+version https://git-lfs.github.com/spec/v1
+oid sha256:cec151e4ed9566a5c6cff9a3a08ac540331a827f6127d907b9f9fd094756a762
+size 416
