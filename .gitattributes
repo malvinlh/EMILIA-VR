@@ -1,2 +1,2 @@
 *.wav filter=lfs diff=lfs merge=lfs -text
-Assets/External/beach-related/** filter=lfs diff=lfs merge=lfs -text
+Assets/Graphics/3D/JournalScene/Other/** filter=lfs diff=lfs merge=lfs -text
