@@ -24,7 +24,7 @@ MonoBehaviour:
   m_MinSize: {x: 300, y: 112}
   m_MaxSize: {x: 24288, y: 16192}
   vertical: 0
-  controlID: 40
+  controlID: 4800
   draggingID: 0
 --- !u!114 &2
 MonoBehaviour:
@@ -663,9 +663,9 @@ MonoBehaviour:
   m_AudioPlay: 0
   m_DebugDrawModesUseInteractiveLightBakingData: 0
   m_Position:
-    m_Target: {x: -0.5869209, y: 0.31698048, z: 0.7544525}
+    m_Target: {x: 6.0700474, y: -5.3525295, z: 0.8852277}
     speed: 2
-    m_Value: {x: -0.5869209, y: 0.31698048, z: 0.7544525}
+    m_Value: {x: 6.0700474, y: -5.3525295, z: 0.8852277}
   m_RenderMode: 0
   m_CameraMode:
     drawMode: 0
@@ -711,17 +711,17 @@ MonoBehaviour:
     m_GridAxis: 1
     m_gridOpacity: 0.5
   m_Rotation:
-    m_Target: {x: -0.40995786, y: -0.54129356, z: 0.3415102, w: -0.6498893}
+    m_Target: {x: -0.15119474, y: -0.6733161, z: 0.14351848, w: -0.70940346}
     speed: 2
-    m_Value: {x: -0.42199904, y: -0.53427416, z: 0.35068336, w: -0.6430311}
+    m_Value: {x: -0.1513619, y: -0.67244244, z: 0.14333226, w: -0.71018773}
   m_Size:
-    m_Target: 13.714704
+    m_Target: 9.027093
     speed: 2
-    m_Value: 13.714704
+    m_Value: 9.027093
   m_Ortho:
-    m_Target: 1
+    m_Target: 0
     speed: 2
-    m_Value: 1
+    m_Value: 0
   m_CameraSettings:
     m_Speed: 1.0005
     m_SpeedNormalized: 0.49999997
@@ -775,7 +775,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 112}
   m_MaxSize: {x: 16192, y: 16192}
   vertical: 1
-  controlID: 41
+  controlID: 4801
   draggingID: 0
 --- !u!114 &4
 MonoBehaviour:
@@ -801,7 +801,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 56}
   m_MaxSize: {x: 16192, y: 8096}
   vertical: 0
-  controlID: 42
+  controlID: 4802
   draggingID: 0
 --- !u!114 &5
 MonoBehaviour:
@@ -869,12 +869,15 @@ MonoBehaviour:
     m_DynamicPanelBehavior: 0
   m_SceneHierarchy:
     m_TreeViewState:
-      scrollPos: {x: 0, y: 949.4}
+      scrollPos: {x: 0, y: 5149.4}
       m_SelectedIDs:
-      - m_Data: 54532
+      - m_Data: -103568
       m_LastClickedID:
-        m_Data: 0
+        m_Data: -103568
       m_ExpandedIDs:
+      - m_Data: -101996
+      - m_Data: -101984
+      - m_Data: -101972
       - m_Data: -99568
       - m_Data: -99564
       - m_Data: -98548
@@ -884,8 +887,8 @@ MonoBehaviour:
       - m_Data: -1300
       m_RenameOverlay:
         m_UserAcceptedRename: 0
-        m_Name: dop
-        m_OriginalName: dop
+        m_Name: Cylinder.1083_Cylinder.1211_Material.1128
+        m_OriginalName: Cylinder.1083_Cylinder.1211_Material.1128
         m_EditFieldRect:
           serializedVersion: 2
           x: 0
@@ -893,7 +896,7 @@ MonoBehaviour:
           width: 0
           height: 0
         m_UserData:
-          m_Data: -116240
+          m_Data: -101996
         m_IsWaitingForDelay: 0
         m_IsRenaming: 0
         m_OriginalEventType: 0
@@ -934,7 +937,7 @@ MonoBehaviour:
   - {fileID: 8}
   - {fileID: 9}
   m_Selected: 0
-  m_LastSelected: 2
+  m_LastSelected: 1
 --- !u!114 &8
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -1086,7 +1089,7 @@ MonoBehaviour:
       height: 864
     m_MinimalGUI: 1
   m_defaultScale: 0.36782405
-  m_LastWindowPixelSize: {x: 812.39996, y: 338.8}
+  m_LastWindowPixelSize: {x: 1015.49994, y: 423.5}
   m_ClearInEditMode: 1
   m_NoCameraWarning: 1
   m_LowResolutionForAspectRatios: 01000000000000000000
@@ -1121,7 +1124,7 @@ MonoBehaviour:
   - {fileID: 13}
   - {fileID: 14}
   m_Selected: 2
-  m_LastSelected: 3
+  m_LastSelected: 1
 --- !u!114 &11
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -1243,9 +1246,10 @@ MonoBehaviour:
     - m_Data: 54180
     - m_Data: 54182
     - m_Data: 54184
-    - m_Data: 54186
     - m_Data: 54188
     - m_Data: 54190
+    - m_Data: 54504
+    - m_Data: 1000000000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1356,7 +1360,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Scenes
+    - Assets/Graphics/3D/JournalScene/Main Island/source
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1366,18 +1370,18 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets/Scenes
+  - Assets/Graphics/3D/JournalScene/Main Island/source
   m_LastFoldersGridSize: -1
   m_LastProjectPath: C:\Users\Malvin Leonardo\Documents\UnityProjects\penting\Tugas_Akhir\EMILIA-VR
   m_LockTracker:
     m_IsLocked: 0
   m_LastLocalAssetsSearchArea: 1
   m_FolderTreeState:
-    scrollPos: {x: 0, y: 127}
+    scrollPos: {x: 0, y: 290.80002}
     m_SelectedIDs:
-    - m_Data: 171356
+    - m_Data: 54506
     m_LastClickedID:
-      m_Data: 171356
+      m_Data: 54506
     m_ExpandedIDs:
     - m_Data: 0
     - m_Data: 54174
@@ -1389,6 +1393,9 @@ MonoBehaviour:
     - m_Data: 54186
     - m_Data: 54188
     - m_Data: 54190
+    - m_Data: 54504
+    - m_Data: 54538
+    - m_Data: 1000000000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1427,9 +1434,10 @@ MonoBehaviour:
     - m_Data: 54180
     - m_Data: 54182
     - m_Data: 54184
-    - m_Data: 54186
     - m_Data: 54188
     - m_Data: 54190
+    - m_Data: 54504
+    - m_Data: 1000000000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1456,11 +1464,13 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
   m_ListAreaState:
-    m_SelectedInstanceIDs: []
-    m_LastClickedInstanceID: 0
+    m_SelectedInstanceIDs:
+    - m_Data: -103616
+    m_LastClickedInstanceID: -103616
     m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs:
     - m_Data: 91164
+    - m_Data: 54572
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1486,7 +1496,7 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
     m_NewAssetIndexInList: -1
-    m_ScrollPosition: {x: 0, y: 0}
+    m_ScrollPosition: {x: 0, y: 5542.9}
     m_GridSize: 16
   m_SkipHiddenPackages: 0
   m_DirectoriesAreaWidth: 200
@@ -1539,7 +1549,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Graphics/3D/JournalScene
+    - Assets/Graphics/3D/JournalScene/Main Island/source
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1549,7 +1559,7 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets/Graphics/3D/JournalScene
+  - Assets/Graphics/3D/JournalScene/Main Island/source
   m_LastFoldersGridSize: -1
   m_LastProjectPath: C:\Users\Malvin Leonardo\Documents\UnityProjects\penting\Tugas_Akhir\EMILIA-VR
   m_LockTracker:
@@ -1558,9 +1568,9 @@ MonoBehaviour:
   m_FolderTreeState:
     scrollPos: {x: 0, y: 351}
     m_SelectedIDs:
-    - m_Data: 54180
+    - m_Data: 54506
     m_LastClickedID:
-      m_Data: 54180
+      m_Data: 54506
     m_ExpandedIDs:
     - m_Data: 0
     - m_Data: 54174
@@ -1573,11 +1583,7 @@ MonoBehaviour:
     - m_Data: 54188
     - m_Data: 54190
     - m_Data: 54504
-    - m_Data: 54532
-    - m_Data: 54534
     - m_Data: 54538
-    - m_Data: 54542
-    - m_Data: 79558
     - m_Data: 1000000000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
@@ -1617,9 +1623,10 @@ MonoBehaviour:
     - m_Data: 54180
     - m_Data: 54182
     - m_Data: 54184
-    - m_Data: 54186
     - m_Data: 54188
     - m_Data: 54190
+    - m_Data: 54504
+    - m_Data: 1000000000
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1647,10 +1654,11 @@ MonoBehaviour:
       m_ResourceFile: 
   m_ListAreaState:
     m_SelectedInstanceIDs:
-    - m_Data: 54532
-    m_LastClickedInstanceID: 54532
+    - m_Data: -103568
+    m_LastClickedInstanceID: -103568
     m_HadKeyboardFocusLastEvent: 1
-    m_ExpandedInstanceIDs: []
+    m_ExpandedInstanceIDs:
+    - m_Data: 54572
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1676,7 +1684,7 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
     m_NewAssetIndexInList: -1
-    m_ScrollPosition: {x: 0, y: 0}
+    m_ScrollPosition: {x: 0, y: 5542.9}
     m_GridSize: 16
   m_SkipHiddenPackages: 0
   m_DirectoriesAreaWidth: 158
@@ -1836,4 +1844,4 @@ MonoBehaviour:
     m_DynamicPanelBehavior: 0
   m_LockTracker:
     m_IsLocked: 0
-  m_LastSelectedObjectID: 0
+  m_LastSelectedObjectID: 54532
