@@ -20,8 +20,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: WaterMat
-  m_Shader: {fileID: 4800000, guid: 805c7ee04b94d7b41a346925498e1d2f, type: 3}
+  m_Name: WaterRipple
+  m_Shader: {fileID: 4800000, guid: a0275aefe1e0ccc42914cb88ae9775a9, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -126,8 +126,10 @@ Material:
     - _OcclusionStrength: 1
     - _OutlineWidth: 0.01
     - _Parallax: 0.005
+    - _Progress: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _RingWidth: 0.01
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -144,7 +146,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _Color: {r: 1, g: 1, b: 1, a: 0.50980395}
+    - _Color: {r: 1, g: 1, b: 1, a: 0.2901961}
     - _EdgeColor: {r: 0, g: 0, b: 0, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
