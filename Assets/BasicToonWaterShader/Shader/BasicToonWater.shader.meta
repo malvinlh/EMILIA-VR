@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 805c7ee04b94d7b41a346925498e1d2f
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 303293
+  packageName: Basic Toon Water Shader - Built-In
+  packageVersion: 1.0
+  assetPath: Assets/BasicToonWaterShader/Shader/BasicToonWater.shader
+  uploadId: 711058
