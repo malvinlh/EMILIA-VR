@@ -228,7 +228,9 @@ public class MiSideMaterialConverter : EditorWindow
         mat.SetColor("_ShadowColor", new Color(0.85f, 0.75f, 0.72f, 1f));
         mat.SetFloat("_ShadowStep", 0.5f);
         mat.SetFloat("_ShadowFeather", 0.05f);
-        mat.SetFloat("_ShadowIntensity", 0.6f);
+        mat.SetFloat("_NormalMapToggle", 0f);
+        mat.DisableKeyword("_NORMALMAP");
+        mat.SetFloat("_BumpScale", 1f);
         mat.SetFloat("_RimLightToggle", 0f);
         mat.DisableKeyword("_RIMLIGHT");
         mat.SetColor("_RimColor", new Color(1f, 0.9f, 0.85f, 1f));

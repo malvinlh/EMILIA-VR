@@ -10,7 +10,7 @@ using UnityEngine;
 /// </summary>
 public class MiSideCharacterTuner : EditorWindow
 {
-    private const string CharacterMaterialsPath = "Assets/Graphics/3D/Character_AZKi/materials";
+    private const string CharacterMaterialsPath = "Assets/Graphics/3D/Character/AZKi/materials";
 
     private bool _dryRun = true;
     private bool _deleteRigidMats = true;
@@ -105,8 +105,26 @@ public class MiSideCharacterTuner : EditorWindow
 
             if (!_dryRun)
             {
+                // Switch to MiSide/Character shader if not already using it
+                Shader charShader = Shader.Find("MiSide/Character");
+                if (charShader != null && mat.shader != charShader)
+                {
+                    // Preserve base texture before switch
+                    Texture baseTex = mat.HasProperty("_BaseMap") ? mat.GetTexture("_BaseMap") : null;
+                    if (baseTex == null && mat.HasProperty("_MainTex"))
+                        baseTex = mat.GetTexture("_MainTex");
+                    Color baseCol = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : Color.white;
+
+                    mat.shader = charShader;
+
+                    // Restore base texture
+                    mat.SetTexture("_MainTex", baseTex);
+                    mat.SetColor("_BaseColor", baseCol);
+                }
+
                 ApplyGlobalSettings(mat);
                 ApplyCategorySettings(mat, category);
+                SyncKeywords(mat);
                 EditorUtility.SetDirty(mat);
             }
 
@@ -163,7 +181,6 @@ public class MiSideCharacterTuner : EditorWindow
 
         // Softened feathering (the KEY MiSide change)
         SetFloatIfExists(mat, "_1st_ShadeColor_Feather", _shadeFeather);
-        SetFloatIfExists(mat, "_BaseShade_Feather", _baseShadeFeather);
         SetFloatIfExists(mat, "_2nd_ShadeColor_Step", _secondShadeStep);
         SetFloatIfExists(mat, "_2nd_ShadeColor_Feather", _secondShadeFeather);
 
@@ -172,8 +189,13 @@ public class MiSideCharacterTuner : EditorWindow
         SetFloatIfExists(mat, "_Outline_Width", _outlineWidth);
         SetColorIfExists(mat, "_Outline_Color", _outlineColor);
         SetFloatIfExists(mat, "_Is_LightColor_Outline", 1f);
-        SetFloatIfExists(mat, "_Is_BlendBaseColor", 1f);
-        EnableKeyword(mat, "_OUTLINE_NML");
+        SetFloatIfExists(mat, "_Is_BlendBaseColor", 0f);
+
+        // Sync outline keyword
+        if (mat.HasProperty("_OUTLINE") && mat.GetFloat("_OUTLINE") > 0.5f)
+            mat.EnableKeyword("_OUTLINE_ON");
+        else
+            mat.DisableKeyword("_OUTLINE_ON");
 
         // GI and shadow tweaks
         SetFloatIfExists(mat, "_GI_Intensity", _giIntensity);
@@ -201,7 +223,6 @@ public class MiSideCharacterTuner : EditorWindow
                 SetFloatIfExists(mat, "_RimLight", 1f);
                 SetFloatIfExists(mat, "_RimLight_Power", 8f);
                 SetFloatIfExists(mat, "_RimLight_InsideMask", 0.12f);
-                SetFloatIfExists(mat, "_AngelRing", 0f); // off — not MiSide style
                 break;
 
             case CharacterCategory.Clothing:
@@ -217,19 +238,17 @@ public class MiSideCharacterTuner : EditorWindow
                 break;
 
             case CharacterCategory.Eyes:
-                // Minimal shading on eyes — keep bright and expressive
                 SetFloatIfExists(mat, "_1st_ShadeColor_Step", 0.8f);
                 SetFloatIfExists(mat, "_1st_ShadeColor_Feather", 0.15f);
-                SetFloatIfExists(mat, "_OUTLINE", 0f); // No outline on eyes
+                SetFloatIfExists(mat, "_OUTLINE", 0f);
                 SetFloatIfExists(mat, "_Outline_Width", 0f);
                 SetFloatIfExists(mat, "_RimLight", 0f);
                 break;
 
             case CharacterCategory.Special:
-                // 頬染め (blush), 青褪め (paleness), 眉毛まつ毛 (eyebrows/lashes)
-                // Leave mostly unchanged but ensure outline is off
                 SetFloatIfExists(mat, "_OUTLINE", 0f);
                 SetFloatIfExists(mat, "_Outline_Width", 0f);
+                SetFloatIfExists(mat, "_RimLight", 0f);
                 break;
         }
     }
@@ -287,8 +306,22 @@ public class MiSideCharacterTuner : EditorWindow
             mat.SetColor(property, value);
     }
 
-    private static void EnableKeyword(Material mat, string keyword)
+    private static void SyncKeywords(Material mat)
     {
-        mat.EnableKeyword(keyword);
+        if (mat.HasProperty("_RimLight"))
+        {
+            if (mat.GetFloat("_RimLight") > 0.5f)
+                mat.EnableKeyword("_RIMLIGHT_ON");
+            else
+                mat.DisableKeyword("_RIMLIGHT_ON");
+        }
+
+        if (mat.HasProperty("_OUTLINE"))
+        {
+            if (mat.GetFloat("_OUTLINE") > 0.5f)
+                mat.EnableKeyword("_OUTLINE_ON");
+            else
+                mat.DisableKeyword("_OUTLINE_ON");
+        }
     }
 }

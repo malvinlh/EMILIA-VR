@@ -3,9 +3,12 @@ Shader "MiSide/ToonSkyGradient"
     Properties
     {
         _TopColor ("Top Color", Color) = (0.65, 0.78, 0.92, 1)
+        _HorizonColor ("Horizon Color", Color) = (1, 0.92, 0.82, 1)
         _BottomColor ("Bottom Color", Color) = (1, 0.85, 0.75, 1)
         _GradientOffset ("Gradient Offset", Range(-1, 1)) = 0.0
         _GradientScale ("Gradient Scale", Range(0.1, 5)) = 1.0
+        _HorizonBandWidth ("Horizon Band Width", Range(0.01, 0.5)) = 0.15
+        _HorizonHaze ("Horizon Haze", Range(0, 1)) = 0.3
     }
 
     SubShader
@@ -36,9 +39,12 @@ Shader "MiSide/ToonSkyGradient"
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _TopColor;
+                half4 _HorizonColor;
                 half4 _BottomColor;
                 half  _GradientOffset;
                 half  _GradientScale;
+                half  _HorizonBandWidth;
+                half  _HorizonHaze;
             CBUFFER_END
 
             struct Attributes
@@ -63,7 +69,6 @@ Shader "MiSide/ToonSkyGradient"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
 
                 OUT.positionCS = TransformObjectToHClip(IN.positionOS.xyz);
-                // View direction in world space for gradient computation
                 OUT.viewDir = TransformObjectToWorld(IN.positionOS.xyz) - _WorldSpaceCameraPos.xyz;
 
                 return OUT;
@@ -73,14 +78,37 @@ Shader "MiSide/ToonSkyGradient"
             {
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
 
-                // Normalize view direction and use Y component for vertical gradient
                 float3 viewDir = normalize(IN.viewDir);
-                // Map from [-1, 1] to [0, 1]
+
+                // Base vertical gradient [0,1] with scale and offset
                 float gradientT = viewDir.y * 0.5 + 0.5;
-                // Apply scale and offset
                 gradientT = saturate(gradientT * _GradientScale + _GradientOffset);
 
-                half4 color = lerp(_BottomColor, _TopColor, gradientT);
+                // 3-color gradient: bottom -> horizon -> top
+                // Horizon band centered around gradientT = 0.5
+                half horizonCenter = 0.5;
+                half halfBand = _HorizonBandWidth;
+
+                // Bottom to horizon blend
+                half bottomToHorizon = smoothstep(
+                    horizonCenter - halfBand * 2.0,
+                    horizonCenter - halfBand * 0.5,
+                    gradientT);
+
+                // Horizon to top blend
+                half horizonToTop = smoothstep(
+                    horizonCenter + halfBand * 0.5,
+                    horizonCenter + halfBand * 2.0,
+                    gradientT);
+
+                // Compose: start with bottom, blend to horizon, then to top
+                half4 color = lerp(_BottomColor, _HorizonColor, bottomToHorizon);
+                color = lerp(color, _TopColor, horizonToTop);
+
+                // Atmospheric haze: soft glow near horizon
+                half hazeAmount = exp(-abs(viewDir.y) * (4.0 / max(_HorizonBandWidth, 0.01)));
+                color.rgb = lerp(color.rgb, _HorizonColor.rgb, hazeAmount * _HorizonHaze);
+
                 return color;
             }
             ENDHLSL

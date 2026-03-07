@@ -9,6 +9,7 @@ using UnityEngine.Rendering;
 public class MiSideShaderGUI : ShaderGUI
 {
     private bool _showToon = true;
+    private bool _showNormalMap = true;
     private bool _showRim = true;
     private bool _showEmission = true;
     private bool _showCutout = true;
@@ -34,7 +35,24 @@ public class MiSideShaderGUI : ShaderGUI
             materialEditor.ShaderProperty(FindProperty("_ShadowColor", properties), "Shadow Color");
             materialEditor.ShaderProperty(FindProperty("_ShadowStep", properties), "Shadow Step");
             materialEditor.ShaderProperty(FindProperty("_ShadowFeather", properties), "Shadow Feather");
-            materialEditor.ShaderProperty(FindProperty("_ShadowIntensity", properties), "Shadow Intensity");
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(4);
+
+        // ----- Normal Map -----
+        MaterialProperty normalMapToggle = FindProperty("_NormalMapToggle", properties);
+        _showNormalMap = EditorGUILayout.Foldout(_showNormalMap, "Normal Map", true, EditorStyles.foldoutHeader);
+        if (_showNormalMap)
+        {
+            EditorGUI.indentLevel++;
+            materialEditor.ShaderProperty(normalMapToggle, "Enable Normal Map");
+            if (normalMapToggle.floatValue > 0.5f)
+            {
+                MaterialProperty bumpMap = FindProperty("_BumpMap", properties);
+                MaterialProperty bumpScale = FindProperty("_BumpScale", properties);
+                materialEditor.TexturePropertySingleLine(new GUIContent("Normal Map"), bumpMap, bumpScale);
+            }
             EditorGUI.indentLevel--;
         }
 
@@ -162,7 +180,9 @@ public class MiSideShaderGUI : ShaderGUI
         mat.SetColor("_ShadowColor", new Color(0.85f, 0.75f, 0.72f, 1f));
         mat.SetFloat("_ShadowStep", 0.5f);
         mat.SetFloat("_ShadowFeather", 0.05f);
-        mat.SetFloat("_ShadowIntensity", 0.6f);
+        mat.SetFloat("_NormalMapToggle", 0f);
+        mat.DisableKeyword("_NORMALMAP");
+        mat.SetFloat("_BumpScale", 1f);
         mat.SetFloat("_RimLightToggle", 0f);
         mat.DisableKeyword("_RIMLIGHT");
         mat.SetColor("_RimColor", new Color(1f, 0.9f, 0.85f, 1f));
@@ -182,6 +202,7 @@ public class MiSideShaderGUI : ShaderGUI
         SetKeyword(mat, "_RIMLIGHT", mat.GetFloat("_RimLightToggle") > 0.5f);
         SetKeyword(mat, "_EMISSION", mat.GetFloat("_EmissionToggle") > 0.5f);
         SetKeyword(mat, "_ALPHATEST_ON", mat.GetFloat("_AlphaClip") > 0.5f);
+        SetKeyword(mat, "_NORMALMAP", mat.GetFloat("_NormalMapToggle") > 0.5f);
 
         // Auto render queue
         if (mat.GetFloat("_AlphaClip") > 0.5f)
