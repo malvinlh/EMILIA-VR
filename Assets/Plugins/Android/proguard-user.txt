@@ -1,0 +1,6 @@
+# ── Google ML Kit ──────────────────────────────────────────────────
+-keep class com.google.mlkit.** { *; }
+-dontwarn com.google.mlkit.**
+
+# ── Our Android plugin bridge ─────────────────────────────────────
+-keep class com.vrhandwriting.digitalink.** { *; }

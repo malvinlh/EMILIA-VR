@@ -1,0 +1,51 @@
+// Unity 6 – Custom Main Gradle Template
+// This file is used when "Custom Main Gradle Template" is enabled in
+// Project Settings > Player > Android > Publishing Settings.
+
+apply plugin: 'com.android.library'
+**APPLY_PLUGINS**
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    // ── Google ML Kit Digital Ink Recognition (bundled / standalone) ──
+    // The bundled variant ships the model inside the APK and does NOT
+    // require Google Play Services – essential for Meta Quest 3.
+    implementation 'com.google.mlkit:digital-ink-recognition:18.1.0'
+
+**DEPS**}
+
+android {
+    ndkPath "**NDKPATH**"
+
+    compileSdk **APIVERSION**
+    buildToolsVersion '**BUILDTOOLS**'
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    defaultConfig {
+        minSdk **MINSDKVERSION**
+        targetSdk **TARGETSDKVERSION**
+        ndk {
+            abiFilters **ABIFILTERS**
+        }
+        versionCode **VERSIONCODE**
+        versionName '**VERSIONNAME**'
+        consumerProguardFiles 'proguard-unity.txt'**USER_PROGUARD**
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+
+    aaptOptions {
+        noCompress = **BUILTIN_NOCOMPRESS** + unityStreamingAssets.tokenize(', ')
+        ignoreAssetsPattern = "!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~"
+    }**PACKAGING_OPTIONS**
+}
+**IL_CPP_BUILD_SETUP**
+**SOURCE_BUILD_SETUP**
+**EXTERNAL_SOURCES**
