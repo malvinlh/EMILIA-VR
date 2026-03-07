@@ -3,10 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
-using OpenCVForUnity.CoreModule;
-using OpenCVForUnity.ImgprocModule;
-using OpenCVForUnity.ImgcodecsModule;
-using OpenCVForUnity.UnityIntegration;
+// using OpenCVForUnity.CoreModule;
+// using OpenCVForUnity.ImgprocModule;
+// using OpenCVForUnity.ImgcodecsModule;
+// using OpenCVForUnity.UnityIntegration;
 
 /// <summary>
 /// Three-layer handwriting recognition pipeline:
@@ -235,79 +235,70 @@ public class RecognitionPipeline : MonoBehaviour
 
         Texture2D tex = activeWhiteboard.GetTexture();
 
-        try
-        {
-            return PreprocessWithOpenCV(tex);
-        }
-        catch (Exception e)
-        {
-            Debug.LogWarning($"[RecognitionPipeline] OpenCV preprocessing failed, " +
-                             $"using raw texture: {e.Message}");
-            return tex.EncodeToPNG();
-        }
+        return tex.EncodeToPNG();
     }
 
     /// <summary>
     /// Use OpenCV to produce a clean, cropped, high-contrast image of the
     /// handwritten region for optimal VLM recognition.
     /// </summary>
-    private static byte[] PreprocessWithOpenCV(Texture2D tex)
-    {
-        // 1. Convert Texture2D → Mat (RGBA, flipped to standard top-left origin)
-        Mat rgba = new Mat(tex.height, tex.width, CvType.CV_8UC4);
-        OpenCVMatUtils.Texture2DToMat(tex, rgba, true, 0);
+    // private static byte[] PreprocessWithOpenCV(Texture2D tex)
+    // {
+    //     // 1. Convert Texture2D → Mat (RGBA, flipped to standard top-left origin)
+    //     Mat rgba = new Mat(tex.height, tex.width, CvType.CV_8UC4);
+    //     OpenCVMatUtils.Texture2DToMat(tex, rgba, true, 0);
 
-        // 2. Convert to grayscale
-        Mat gray = new Mat();
-        Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY);
-        rgba.Dispose();
+    //     // 2. Convert to grayscale
+    //     Mat gray = new Mat();
+    //     Imgproc.cvtColor(rgba, gray, Imgproc.COLOR_RGBA2GRAY);
+    //     rgba.Dispose();
 
-        // 3. Invert so ink becomes white (for contour / bounding-box detection)
-        Mat inverted = new Mat();
-        Core.bitwise_not(gray, inverted);
+    //     // 3. Invert so ink becomes white (for contour / bounding-box detection)
+    //     Mat inverted = new Mat();
+    //     Core.bitwise_not(gray, inverted);
 
-        // 4. Threshold to separate ink from background
-        Mat binary = new Mat();
-        Imgproc.threshold(inverted, binary, 30, 255, Imgproc.THRESH_BINARY);
-        inverted.Dispose();
+    //     // 4. Threshold to separate ink from background
+    //     Mat binary = new Mat();
+    //     Imgproc.threshold(inverted, binary, 30, 255, Imgproc.THRESH_BINARY);
+    //     inverted.Dispose();
 
-        // 5. Find bounding rect of all ink pixels
-        Mat nonZero = new Mat();
-        Core.findNonZero(binary, nonZero);
-        binary.Dispose();
+    //     // 5. Find bounding rect of all ink pixels
+    //     Mat nonZero = new Mat();
+    //     Core.findNonZero(binary, nonZero);
+    //     binary.Dispose();
 
-        Mat output;
-        if (nonZero.rows() > 0)
-        {
-            OpenCVForUnity.CoreModule.Rect bbox = Imgproc.boundingRect(nonZero);
-            nonZero.Dispose();
+    //     Mat output;
+    //     if (nonZero.rows() > 0)
+    //     {
+    //         OpenCVForUnity.CoreModule.Rect bbox = Imgproc.boundingRect(nonZero);
+    //         nonZero.Dispose();
 
-            // Add padding around the text region
-            int pad = 30;
-            int x = Mathf.Max(0, bbox.x - pad);
-            int y = Mathf.Max(0, bbox.y - pad);
-            int w = Mathf.Min(gray.cols() - x, bbox.width + 2 * pad);
-            int h = Mathf.Min(gray.rows() - y, bbox.height + 2 * pad);
+    //         // Add padding around the text region
+    //         int pad = 30;
+    //         int x = Mathf.Max(0, bbox.x - pad);
+    //         int y = Mathf.Max(0, bbox.y - pad);
+    //         int w = Mathf.Min(gray.cols() - x, bbox.width + 2 * pad);
+    //         int h = Mathf.Min(gray.rows() - y, bbox.height + 2 * pad);
 
-            output = new Mat(gray, new OpenCVForUnity.CoreModule.Rect(x, y, w, h));
-        }
-        else
-        {
-            // No ink detected — send full image
-            nonZero.Dispose();
-            output = gray;
-        }
+    //         output = new Mat(gray, new OpenCVForUnity.CoreModule.Rect(x, y, w, h));
+    //     }
+    //     else
+    //     {
+    //         // No ink detected — send full image
+    //         nonZero.Dispose();
+    //         output = gray;
+    //     }
 
-        // 6. Encode to PNG
-        MatOfByte buf = new MatOfByte();
-        Imgcodecs.imencode(".png", output, buf);
-        byte[] pngBytes = buf.toArray();
+    //     // 6. Encode to PNG
+    //     MatOfByte buf = new MatOfByte();
+    //     Imgcodecs.imencode(".png", output, buf);
+    //     byte[] pngBytes = buf.toArray();
 
-        // Cleanup
-        buf.Dispose();
-        if (output != gray) output.Dispose();
-        gray.Dispose();
+    //     // Cleanup
+    //     buf.Dispose();
+    //     if (output != gray) output.Dispose();
+    //     gray.Dispose();
 
-        return pngBytes;
-    }
+    //     return pngBytes;
+    // }
 }
