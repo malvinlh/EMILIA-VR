@@ -144,10 +144,10 @@ Click **Add Override** button at the bottom of the Volume component:
 
 | Scene | Top | Horizon | Bottom |
 |---|---|---|---|
-| 3D_Chat | soft blue | peachy | warm peach |
-| 3D_Journal | soft blue-violet | warm horizon band | peach/coral |
-| 3D_LoginArea | deep navy | purple-blue | warm amber glow |
-| 3D_StartArea | clean blue | white-peach | warm |
+| 3D_Chat | `#8AAFC8` soft blue | `#F0C4A0` soft peach | `#E8A880` warm peach |
+| 3D_Journal | `#8878B0` blue-violet | `#E8A06A` warm gold | `#E08870` peach coral |
+| 3D_LoginArea | `#141430` deep navy | `#5C4A88` muted purple | `#C8883C` warm amber |
+| 3D_StartArea | `#68A8D0` clean blue | `#F0DCC8` white-peach | `#D8B890` light warm |
 
 ### Fog (3D_Journal — Beach Scene)
 
@@ -169,7 +169,10 @@ In URP on Unity 6000.3.10f1, fog is configured via a Volume override:
 2. Check **Baked Global Illumination** checkbox
 3. Set **Lighting Mode** to **Baked Indirect** (recommended for performance)
 4. Mark objects as **Static** in their **Inspector** > top-right **Static** checkbox (or specifically **Contribute GI** under the Static dropdown)
-5. Mark lights that should contribute to baking: Light component > **Mode** = **Mixed** or **Baked**
+5. Set light **Mode** (Light component > Inspector > **Mode** dropdown):
+   - **Directional Light → Mixed** — bakes indirect GI bounce into lightmaps while keeping direct lighting realtime, so dynamic objects (AZKi character) still receive light and cast shadows.
+   - **Point Lights / Spot Lights → Realtime** — these are low-intensity accent lights (0.5–1.0) that contribute minimal indirect bounce, so baking them isn't worth the lightmap cost. Realtime keeps them lighting both static and dynamic objects.
+   - The **Baked Indirect** lighting mode (step 3) controls how Mixed lights are baked — it only bakes the indirect GI bounce, keeping all direct lighting realtime.
 6. Click **Generate Lighting** button at bottom of the Lighting window
 7. Scenes that need baking: **3D_Chat**, **3D_Journal**
 
