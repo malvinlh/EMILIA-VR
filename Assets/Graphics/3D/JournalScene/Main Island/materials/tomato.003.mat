@@ -99,7 +99,7 @@ Material:
     - _EmissionToggle: 0
     - _EnvironmentReflections: 1
     - _GlossMapScale: 1
-    - _Glossiness: 0.08295294
+    - _Glossiness: 0.07803273
     - _GlossyReflections: 1
     - _Metallic: 0
     - _Mode: 0
@@ -113,7 +113,7 @@ Material:
     - _RimPower: 4
     - _ShadowFeather: 0.05
     - _ShadowStep: 0.5
-    - _Smoothness: 0.08295294
+    - _Smoothness: 0.07803273
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
@@ -124,15 +124,15 @@ Material:
     - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
-    - _BaseColor: {r: 0.8593749, g: 0.38268974, b: 0.4162077, a: 1}
-    - _Color: {r: 0.8593749, g: 0.3826897, b: 0.41620767, a: 1}
+    - _BaseColor: {r: 0.6210939, g: 0.19572172, b: 0.06550598, a: 1}
+    - _Color: {r: 0.6210939, g: 0.19572169, b: 0.06550595, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _RimColor: {r: 1, g: 0.9, b: 0.85, a: 1}
     - _ShadowColor: {r: 0.85, g: 0.75, b: 0.72, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &7283125357836224502
+--- !u!114 &4062314356288090267
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}

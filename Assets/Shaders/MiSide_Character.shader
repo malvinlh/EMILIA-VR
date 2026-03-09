@@ -73,7 +73,7 @@ Shader "MiSide/Character"
             #pragma shader_feature_local _RIMLIGHT_ON
             #pragma shader_feature_local _OUTLINE_ON
 
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
             #pragma multi_compile _ LIGHTMAP_ON
@@ -179,7 +179,7 @@ Shader "MiSide/Character"
                 // Main light
                 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
                     float4 shadowCoord = IN.shadowCoord;
-                #elif defined(MAIN_LIGHT_SHADOWS) || defined(MAIN_LIGHT_SHADOWS_CASCADE)
+                #elif defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN)
                     float4 shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
                 #else
                     float4 shadowCoord = float4(0, 0, 0, 0);

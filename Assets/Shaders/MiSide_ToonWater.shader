@@ -64,7 +64,7 @@ Shader "MiSide/ToonWater"
             #pragma vertex WaterVert
             #pragma fragment WaterFrag
 
-            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
             #pragma multi_compile _ DOTS_INSTANCING_ON
@@ -168,7 +168,7 @@ Shader "MiSide/ToonWater"
                 half4 waterColor = lerp(_DeepColor, _ShallowColor, gradientT);
 
                 // --- Toon lighting ---
-                #if defined(MAIN_LIGHT_SHADOWS) || defined(MAIN_LIGHT_SHADOWS_CASCADE)
+                #if defined(_MAIN_LIGHT_SHADOWS) || defined(_MAIN_LIGHT_SHADOWS_CASCADE) || defined(_MAIN_LIGHT_SHADOWS_SCREEN)
                     float4 shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
                 #else
                     float4 shadowCoord = float4(0, 0, 0, 0);
