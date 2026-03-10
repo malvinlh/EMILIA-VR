@@ -4,85 +4,165 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Batch applies MiSide-style toon parameters to all AZKi character materials.
-/// Uses name-based category detection (skin, hair, clothing, special) to apply
-/// per-category presets. Also enables outlines with warm-brown color.
+/// Batch-converts and tunes all AZKi character materials to MiSide/Character shader.
+/// Auto-detects material category (skin, hair, eyes, clothing, accessory, special)
+/// using name matching (Japanese and English), texture filename heuristics, and
+/// texture color analysis as fallback.
+///
+/// Access via: Tools > MiSide > Character Material Tuner
 /// </summary>
 public class MiSideCharacterTuner : EditorWindow
 {
-    private const string CharacterMaterialsPath = "Assets/Graphics/3D/Character/AZKi/materials";
+    private const string DefaultMaterialsPath = "Assets/Graphics/3D/Character/AZKi/materials";
+
+    // User-configurable path
+    private string _materialsPath = DefaultMaterialsPath;
 
     private bool _dryRun = true;
     private bool _deleteRigidMats = true;
     private Vector2 _scrollPos;
     private string _logOutput = "";
 
-    // Tunable parameters exposed in the editor window
-    private float _shadeFeather = 0.06f;
-    private float _baseShadeFeather = 0.06f;
-    private float _secondShadeStep = 0.15f;
-    private float _secondShadeFeather = 0.1f;
-    private float _outlineWidth = 0.3f;
-    private Color _outlineColor = new Color(0.2f, 0.15f, 0.15f, 1f);
-    private float _giIntensity = 0.3f;
+    // Per-category override toggles (let user override auto-detection)
+    private Dictionary<string, CharacterCategory> _manualOverrides = new Dictionary<string, CharacterCategory>();
 
-    [MenuItem("Tools/MiSide/Apply Character Toon Preset")]
+    // Preview data
+    private List<MaterialPreview> _previews = new List<MaterialPreview>();
+    private bool _previewGenerated = false;
+
+    [MenuItem("Tools/MiSide/Character Material Tuner")]
     public static void ShowWindow()
     {
-        var window = GetWindow<MiSideCharacterTuner>("MiSide Character Tuner");
-        window.minSize = new Vector2(500, 500);
+        var window = GetWindow<MiSideCharacterTuner>("Character Material Tuner");
+        window.minSize = new Vector2(580, 600);
     }
 
     private void OnGUI()
     {
-        EditorGUILayout.LabelField("MiSide Character Tuner", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("MiSide Character Material Tuner", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Applies MiSide-style toon parameters to all AZKi character materials.\n" +
-            "• Softens shade boundaries (feathering)\n" +
-            "• Enables warm-brown outlines\n" +
-            "• Applies per-category presets (skin, hair, clothing, special)\n" +
-            "• Optionally deletes unused mmd_tools_rigid_* materials",
+            "Converts all materials in the target folder to MiSide/Character shader.\n" +
+            "Auto-detects category (Skin, Hair, Eyes, Clothing, Accessory, Special)\n" +
+            "using material name, texture filename, and texture color analysis.\n\n" +
+            "Step 1: Click 'Scan & Preview' to see detected categories.\n" +
+            "Step 2: Override any incorrect detections using the dropdowns.\n" +
+            "Step 3: Click 'Apply All' to convert.",
             MessageType.Info);
 
         EditorGUILayout.Space();
 
-        _dryRun = EditorGUILayout.Toggle("Dry Run (preview only)", _dryRun);
+        // Materials path
+        EditorGUILayout.BeginHorizontal();
+        _materialsPath = EditorGUILayout.TextField("Materials Folder", _materialsPath);
+        if (GUILayout.Button("Browse", GUILayout.Width(60)))
+        {
+            string selected = EditorUtility.OpenFolderPanel("Select Materials Folder", "Assets", "");
+            if (!string.IsNullOrEmpty(selected))
+            {
+                // Convert absolute path to relative
+                if (selected.Contains("Assets"))
+                    _materialsPath = "Assets" + selected.Substring(selected.IndexOf("Assets") + 6);
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+
         _deleteRigidMats = EditorGUILayout.Toggle("Delete mmd_tools_rigid_* materials", _deleteRigidMats);
 
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Global Parameters", EditorStyles.boldLabel);
-        _shadeFeather = EditorGUILayout.Slider("1st Shade Feather", _shadeFeather, 0.01f, 0.2f);
-        _baseShadeFeather = EditorGUILayout.Slider("Base Shade Feather", _baseShadeFeather, 0.01f, 0.2f);
-        _secondShadeStep = EditorGUILayout.Slider("2nd Shade Step", _secondShadeStep, 0f, 0.5f);
-        _secondShadeFeather = EditorGUILayout.Slider("2nd Shade Feather", _secondShadeFeather, 0.01f, 0.3f);
-        _outlineWidth = EditorGUILayout.Slider("Outline Width", _outlineWidth, 0f, 1f);
-        _outlineColor = EditorGUILayout.ColorField("Outline Color", _outlineColor);
-        _giIntensity = EditorGUILayout.Slider("GI Intensity", _giIntensity, 0f, 1f);
 
-        EditorGUILayout.Space();
-
-        if (GUILayout.Button(_dryRun ? "Preview Changes" : "Apply Preset", GUILayout.Height(30)))
+        // ---- Scan & Preview ----
+        if (GUILayout.Button("Scan & Preview", GUILayout.Height(28)))
         {
-            ApplyPresets();
+            ScanMaterials();
         }
 
-        EditorGUILayout.Space();
+        if (_previewGenerated && _previews.Count > 0)
+        {
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField($"Detected {_previews.Count} materials:", EditorStyles.boldLabel);
 
-        _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos);
-        EditorGUILayout.TextArea(_logOutput, GUILayout.ExpandHeight(true));
-        EditorGUILayout.EndScrollView();
+            // Column headers
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Material Name", EditorStyles.miniLabel, GUILayout.Width(180));
+            EditorGUILayout.LabelField("Auto-Detected", EditorStyles.miniLabel, GUILayout.Width(90));
+            EditorGUILayout.LabelField("Override", EditorStyles.miniLabel, GUILayout.Width(120));
+            EditorGUILayout.LabelField("Detection Method", EditorStyles.miniLabel);
+            EditorGUILayout.EndHorizontal();
+
+            _scrollPos = EditorGUILayout.BeginScrollView(_scrollPos, GUILayout.MaxHeight(300));
+
+            foreach (var preview in _previews)
+            {
+                if (preview.isRigid)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    GUI.color = new Color(1f, 0.6f, 0.6f);
+                    EditorGUILayout.LabelField(preview.materialName, GUILayout.Width(180));
+                    EditorGUILayout.LabelField("[DELETE]", GUILayout.Width(90));
+                    GUI.color = Color.white;
+                    EditorGUILayout.LabelField("", GUILayout.Width(120));
+                    EditorGUILayout.LabelField("rigid body material");
+                    EditorGUILayout.EndHorizontal();
+                    continue;
+                }
+
+                EditorGUILayout.BeginHorizontal();
+
+                // Color-code by category
+                GUI.color = GetCategoryColor(preview.finalCategory);
+                EditorGUILayout.LabelField(preview.materialName, GUILayout.Width(180));
+                GUI.color = Color.white;
+
+                EditorGUILayout.LabelField(preview.autoCategory.ToString(), GUILayout.Width(90));
+
+                // Override dropdown
+                CharacterCategory overrideVal = preview.finalCategory;
+                CharacterCategory newVal = (CharacterCategory)EditorGUILayout.EnumPopup(overrideVal, GUILayout.Width(120));
+                if (newVal != overrideVal)
+                {
+                    _manualOverrides[preview.materialName] = newVal;
+                    preview.finalCategory = newVal;
+                }
+
+                EditorGUILayout.LabelField(preview.detectionMethod, EditorStyles.miniLabel);
+
+                EditorGUILayout.EndHorizontal();
+            }
+
+            EditorGUILayout.EndScrollView();
+
+            EditorGUILayout.Space();
+
+            // ---- Apply ----
+            GUI.backgroundColor = new Color(0.4f, 0.85f, 0.5f);
+            if (GUILayout.Button("Apply All", GUILayout.Height(32)))
+            {
+                _dryRun = false;
+                ApplyPresets();
+            }
+            GUI.backgroundColor = Color.white;
+
+            EditorGUILayout.Space();
+        }
+
+        // Log output
+        if (!string.IsNullOrEmpty(_logOutput))
+        {
+            EditorGUILayout.LabelField("Log:", EditorStyles.boldLabel);
+            EditorGUILayout.BeginScrollView(_scrollPos, GUILayout.MaxHeight(200));
+            EditorGUILayout.TextArea(_logOutput, GUILayout.ExpandHeight(true));
+            EditorGUILayout.EndScrollView();
+        }
     }
 
-    private void ApplyPresets()
+    // ===================================================================
+    // SCAN — Build preview list with auto-detection
+    // ===================================================================
+
+    private void ScanMaterials()
     {
-        var sb = new StringBuilder();
-        sb.AppendLine(_dryRun ? "=== DRY RUN PREVIEW ===" : "=== APPLYING PRESETS ===");
-        sb.AppendLine($"Source: {CharacterMaterialsPath}\n");
-
-        string[] matGuids = AssetDatabase.FindAssets("t:Material", new[] { CharacterMaterialsPath });
-
-        int tuned = 0, deleted = 0, skippedSpecial = 0;
-        var rigidMatsToDelete = new List<string>();
+        _previews.Clear();
+        string[] matGuids = AssetDatabase.FindAssets("t:Material", new[] { _materialsPath });
 
         foreach (string guid in matGuids)
         {
@@ -90,238 +170,512 @@ public class MiSideCharacterTuner : EditorWindow
             Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (mat == null) continue;
 
-            // Handle rigid body materials
-            if (mat.name.StartsWith("mmd_tools_rigid"))
+            var preview = new MaterialPreview
             {
-                rigidMatsToDelete.Add(path);
-                sb.AppendLine($"  [DELETE] {mat.name}");
-                continue;
+                materialName = mat.name,
+                assetPath = path,
+                isRigid = mat.name.StartsWith("mmd_tools_rigid")
+            };
+
+            if (!preview.isRigid)
+            {
+                var (category, method) = DetectCategory(mat);
+                preview.autoCategory = category;
+                preview.detectionMethod = method;
+
+                // Apply manual override if exists
+                if (_manualOverrides.TryGetValue(mat.name, out CharacterCategory overrideCategory))
+                    preview.finalCategory = overrideCategory;
+                else
+                    preview.finalCategory = category;
             }
 
-            CharacterCategory category = DetectCategory(mat.name);
-            string catLabel = category.ToString().ToUpper();
-
-            sb.AppendLine($"  [{catLabel}] {mat.name}");
-
-            if (!_dryRun)
-            {
-                // Switch to MiSide/Character shader if not already using it
-                Shader charShader = Shader.Find("MiSide/Character");
-                if (charShader != null && mat.shader != charShader)
-                {
-                    // Preserve base texture before switch
-                    Texture baseTex = mat.HasProperty("_BaseMap") ? mat.GetTexture("_BaseMap") : null;
-                    if (baseTex == null && mat.HasProperty("_MainTex"))
-                        baseTex = mat.GetTexture("_MainTex");
-                    Color baseCol = mat.HasProperty("_BaseColor") ? mat.GetColor("_BaseColor") : Color.white;
-
-                    mat.shader = charShader;
-
-                    // Restore base texture
-                    mat.SetTexture("_MainTex", baseTex);
-                    mat.SetColor("_BaseColor", baseCol);
-                }
-
-                ApplyGlobalSettings(mat);
-                ApplyCategorySettings(mat, category);
-                SyncKeywords(mat);
-                EditorUtility.SetDirty(mat);
-            }
-
-            if (category == CharacterCategory.Special)
-                skippedSpecial++;
-            else
-                tuned++;
+            _previews.Add(preview);
         }
 
-        // Delete rigid body materials
-        if (_deleteRigidMats && rigidMatsToDelete.Count > 0)
-        {
-            if (!_dryRun)
-            {
-                foreach (string path in rigidMatsToDelete)
-                {
-                    AssetDatabase.DeleteAsset(path);
-                    deleted++;
-                }
-            }
-            else
-            {
-                deleted = rigidMatsToDelete.Count;
-            }
-        }
-
-        if (!_dryRun)
-        {
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-        }
-
-        sb.AppendLine($"\n--- Summary ---");
-        sb.AppendLine($"Tuned: {tuned}");
-        sb.AppendLine($"Special (minimal changes): {skippedSpecial}");
-        sb.AppendLine($"Rigid materials {(_dryRun ? "to delete" : "deleted")}: {deleted}");
-
-        if (_dryRun)
-            sb.AppendLine("\n[DRY RUN] No changes made.");
-        else
-            sb.AppendLine("\n✓ Presets applied!");
-
-        _logOutput = sb.ToString();
+        _previewGenerated = true;
         Repaint();
     }
 
-    private void ApplyGlobalSettings(Material mat)
+    // ===================================================================
+    // APPLY — Convert materials and apply presets
+    // ===================================================================
+
+    private void ApplyPresets()
     {
-        CharacterCategory category = DetectCategory(mat.name);
+        var sb = new StringBuilder();
+        sb.AppendLine("=== APPLYING CHARACTER PRESETS ===");
+        sb.AppendLine($"Source: {_materialsPath}\n");
 
-        // Skip most settings for special materials
-        if (category == CharacterCategory.Special)
+        Shader charShader = Shader.Find("MiSide/Character");
+        if (charShader == null)
+        {
+            sb.AppendLine("ERROR: Could not find MiSide/Character shader!");
+            _logOutput = sb.ToString();
+            Repaint();
             return;
+        }
 
-        // Softened feathering (the KEY MiSide change)
-        SetFloatIfExists(mat, "_1st_ShadeColor_Feather", _shadeFeather);
-        SetFloatIfExists(mat, "_2nd_ShadeColor_Step", _secondShadeStep);
-        SetFloatIfExists(mat, "_2nd_ShadeColor_Feather", _secondShadeFeather);
+        int tuned = 0, deleted = 0;
+        var rigidToDelete = new List<string>();
 
-        // Enable outlines (inverted hull)
-        SetFloatIfExists(mat, "_OUTLINE", 1f);
-        SetFloatIfExists(mat, "_Outline_Width", _outlineWidth);
-        SetColorIfExists(mat, "_Outline_Color", _outlineColor);
-        SetFloatIfExists(mat, "_Is_LightColor_Outline", 1f);
-        SetFloatIfExists(mat, "_Is_BlendBaseColor", 0f);
+        foreach (var preview in _previews)
+        {
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(preview.assetPath);
+            if (mat == null) continue;
 
-        // Sync outline keyword
-        if (mat.HasProperty("_OUTLINE") && mat.GetFloat("_OUTLINE") > 0.5f)
-            mat.EnableKeyword("_OUTLINE_ON");
-        else
-            mat.DisableKeyword("_OUTLINE_ON");
+            if (preview.isRigid)
+            {
+                if (_deleteRigidMats)
+                {
+                    rigidToDelete.Add(preview.assetPath);
+                    sb.AppendLine($"  [DELETE] {preview.materialName}");
+                }
+                continue;
+            }
 
-        // GI and shadow tweaks
-        SetFloatIfExists(mat, "_GI_Intensity", _giIntensity);
-        SetFloatIfExists(mat, "_Tweak_SystemShadowsLevel", 0.1f);
+            CharacterCategory category = preview.finalCategory;
+            sb.AppendLine($"  [{category.ToString().ToUpper()}] {preview.materialName} ({preview.detectionMethod})");
 
-        // Keep matte (no specular)
-        SetFloatIfExists(mat, "_HighColor_Power", 0f);
+            Undo.RecordObject(mat, "MiSide Character Tuner");
+
+            // Switch shader — preserve base texture
+            if (mat.shader != charShader)
+            {
+                Texture baseTex = TryGetBaseTexture(mat);
+                Color baseCol = TryGetBaseColor(mat);
+
+                mat.shader = charShader;
+
+                mat.SetTexture("_MainTex", baseTex);
+                mat.SetColor("_BaseColor", baseCol);
+            }
+
+            ApplyCategorySettings(mat, category);
+            SyncKeywords(mat);
+            EditorUtility.SetDirty(mat);
+            tuned++;
+        }
+
+        // Delete rigid materials
+        if (_deleteRigidMats)
+        {
+            foreach (string path in rigidToDelete)
+            {
+                AssetDatabase.DeleteAsset(path);
+                deleted++;
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        sb.AppendLine($"\n--- Summary ---");
+        sb.AppendLine($"Converted & tuned: {tuned}");
+        sb.AppendLine($"Deleted rigid materials: {deleted}");
+        sb.AppendLine("\nDone! Check materials in Inspector.");
+
+        _logOutput = sb.ToString();
+
+        // Refresh preview
+        ScanMaterials();
     }
 
-    private void ApplyCategorySettings(Material mat, CharacterCategory category)
+    // ===================================================================
+    // CATEGORY DETECTION — multi-strategy
+    // ===================================================================
+
+    public enum CharacterCategory
     {
+        Skin,
+        Hair,
+        Eyes,
+        Clothing,
+        Accessory,
+        Special
+    }
+
+    /// <summary>
+    /// Auto-detect material category using three strategies in order:
+    /// 1. Japanese material name matching
+    /// 2. Texture filename heuristics
+    /// 3. Texture average color analysis (skin tone detection)
+    /// Returns (category, detection method description).
+    /// </summary>
+    private static (CharacterCategory, string) DetectCategory(Material mat)
+    {
+        string name = mat.name.ToLowerInvariant();
+
+        // --- Strategy 1: Japanese name matching ---
+        var jpResult = DetectByJapaneseName(mat.name);
+        if (jpResult.HasValue)
+            return (jpResult.Value, "name (JP)");
+
+        // --- Strategy 2: English/romanized name matching ---
+        var enResult = DetectByEnglishName(name);
+        if (enResult.HasValue)
+            return (enResult.Value, "name (EN)");
+
+        // --- Strategy 3: Texture filename heuristics ---
+        Texture tex = TryGetBaseTexture(mat);
+        if (tex != null)
+        {
+            string texName = tex.name.ToLowerInvariant();
+            string texPath = AssetDatabase.GetAssetPath(tex).ToLowerInvariant();
+
+            var texResult = DetectByTextureName(texName, texPath);
+            if (texResult.HasValue)
+                return (texResult.Value, $"texture: {tex.name}");
+
+            // --- Strategy 4: Texture color analysis ---
+            if (tex is Texture2D tex2D)
+            {
+                var colorResult = DetectByTextureColor(tex2D);
+                if (colorResult.HasValue)
+                    return (colorResult.Value, "color analysis");
+            }
+        }
+
+        // Default: clothing (safest assumption for unknown materials)
+        return (CharacterCategory.Clothing, "default");
+    }
+
+    private static CharacterCategory? DetectByJapaneseName(string name)
+    {
+        // Skin
+        if (name == "\u4F53" || name == "\u982D") // 体, 頭
+            return CharacterCategory.Skin;
+
+        // Hair
+        if (name == "\u9AEA" || name == "\u9AEA\u5F71" || name == "\u9AEA\u98FE\u308A") // 髪, 髪影, 髪飾り
+            return CharacterCategory.Hair;
+
+        // Eyes
+        if (name == "\u76EE") // 目
+            return CharacterCategory.Eyes;
+
+        // Special: blush, paleness, eyebrows/lashes
+        if (name == "\u982C\u67D3\u3081" || name == "\u9752\u8930\u3081" || name == "\u7709\u6BDB\u307E\u3064\u6BDB")
+            return CharacterCategory.Special; // 頬染め, 青褪め, 眉毛まつ毛
+
+        // Accessories
+        if (name == "\u30E1\u30AC\u30CD" || name == "\u30AA\u30D7\u30B7\u30E7\u30F3" ||
+            name == "\u30D6\u30ED\u30FC\u30C1" || name == "\u8155\u8F2A")
+            return CharacterCategory.Accessory; // メガネ, オプション, ブローチ, 腕輪
+
+        // Clothing keywords
+        if (name == "\u670D" || name == "\u30B9\u30AB\u30FC\u30C8" ||
+            name.Contains("\u30B9\u30AB\u30FC\u30C8") || // スカート
+            name == "\u30D6\u30FC\u30C4" || // ブーツ
+            name == "\u30BF\u30A4" || // タイ
+            name == "\u30EA\u30DC\u30F3" || // リボン
+            name == "\u30B8\u30C3\u30D1\u30FC") // ジッパー
+            return CharacterCategory.Clothing;
+
+        return null;
+    }
+
+    private static CharacterCategory? DetectByEnglishName(string nameLower)
+    {
+        // Skin
+        if (nameLower.Contains("skin") || nameLower.Contains("body") || nameLower.Contains("face") ||
+            nameLower.Contains("head") || nameLower.Contains("arm") || nameLower.Contains("leg") ||
+            nameLower.Contains("hand") || nameLower.Contains("neck"))
+            return CharacterCategory.Skin;
+
+        // Hair
+        if (nameLower.Contains("hair") || nameLower.Contains("bangs") || nameLower.Contains("ponytail") ||
+            nameLower.Contains("ahoge") || nameLower.Contains("hairshadow"))
+            return CharacterCategory.Hair;
+
+        // Eyes
+        if (nameLower.Contains("eye") && !nameLower.Contains("eyebrow") && !nameLower.Contains("eyelash"))
+            return CharacterCategory.Eyes;
+
+        // Special
+        if (nameLower.Contains("blush") || nameLower.Contains("eyebrow") || nameLower.Contains("eyelash") ||
+            nameLower.Contains("lash") || nameLower.Contains("brow") || nameLower.Contains("pale") ||
+            nameLower.Contains("cheek") || nameLower.Contains("tear"))
+            return CharacterCategory.Special;
+
+        // Accessories
+        if (nameLower.Contains("glass") || nameLower.Contains("ring") || nameLower.Contains("earring") ||
+            nameLower.Contains("necklace") || nameLower.Contains("brooch") || nameLower.Contains("bracelet") ||
+            nameLower.Contains("accessory") || nameLower.Contains("option") || nameLower.Contains("jewel"))
+            return CharacterCategory.Accessory;
+
+        // Clothing
+        if (nameLower.Contains("cloth") || nameLower.Contains("shirt") || nameLower.Contains("skirt") ||
+            nameLower.Contains("dress") || nameLower.Contains("pants") || nameLower.Contains("boot") ||
+            nameLower.Contains("shoe") || nameLower.Contains("jacket") || nameLower.Contains("coat") ||
+            nameLower.Contains("ribbon") || nameLower.Contains("tie") || nameLower.Contains("zipper") ||
+            nameLower.Contains("sock") || nameLower.Contains("glove") || nameLower.Contains("belt") ||
+            nameLower.Contains("hat") || nameLower.Contains("cape") || nameLower.Contains("collar"))
+            return CharacterCategory.Clothing;
+
+        return null;
+    }
+
+    private static CharacterCategory? DetectByTextureName(string texNameLower, string texPathLower)
+    {
+        string combined = texNameLower + " " + texPathLower;
+
+        if (combined.Contains("eye") && !combined.Contains("eyebrow") && !combined.Contains("eyelash"))
+            return CharacterCategory.Eyes;
+        if (combined.Contains("skin") || combined.Contains("body") || combined.Contains("face"))
+            return CharacterCategory.Skin;
+        if (combined.Contains("hair"))
+            return CharacterCategory.Hair;
+        if (combined.Contains("blush") || combined.Contains("cheek") || combined.Contains("brow") || combined.Contains("lash"))
+            return CharacterCategory.Special;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Analyze the average color of the texture to detect skin tones.
+    /// Samples a grid of pixels and checks for warm skin-tone hue ranges.
+    /// </summary>
+    private static CharacterCategory? DetectByTextureColor(Texture2D tex)
+    {
+        // Need readable texture
+        if (!tex.isReadable)
+            return null;
+
+        int sampleCount = 0;
+        float avgR = 0, avgG = 0, avgB = 0, avgA = 0;
+        int stepX = Mathf.Max(1, tex.width / 8);
+        int stepY = Mathf.Max(1, tex.height / 8);
+
+        for (int x = stepX / 2; x < tex.width; x += stepX)
+        {
+            for (int y = stepY / 2; y < tex.height; y += stepY)
+            {
+                Color pixel = tex.GetPixel(x, y);
+                if (pixel.a < 0.1f) continue; // Skip transparent
+                avgR += pixel.r;
+                avgG += pixel.g;
+                avgB += pixel.b;
+                avgA += pixel.a;
+                sampleCount++;
+            }
+        }
+
+        if (sampleCount < 4) return null;
+
+        avgR /= sampleCount;
+        avgG /= sampleCount;
+        avgB /= sampleCount;
+        avgA /= sampleCount;
+
+        // Mostly transparent = likely special (blush overlay, etc.)
+        if (avgA < 0.3f)
+            return CharacterCategory.Special;
+
+        // Skin detection: warm tone where R > G > B, with specific ranges
+        float hue, sat, val;
+        Color.RGBToHSV(new Color(avgR, avgG, avgB), out hue, out sat, out val);
+
+        // Skin tones: hue 0-40 degrees (0.0-0.11 normalized), moderate saturation
+        if (hue < 0.12f && sat > 0.15f && sat < 0.7f && val > 0.5f)
+            return CharacterCategory.Skin;
+
+        // Very saturated + specific hue ranges might be eyes
+        if (sat > 0.5f && val > 0.4f)
+            return CharacterCategory.Eyes;
+
+        return null;
+    }
+
+    // ===================================================================
+    // PRESET APPLICATION
+    // ===================================================================
+
+    private static void ApplyCategorySettings(Material mat, CharacterCategory category)
+    {
+        // --- Common settings — shade colors are TINTS of base texture ---
+        mat.SetFloat("_GI_Intensity", 0.35f);
+        mat.SetFloat("_Tweak_SystemShadowsLevel", 0.1f);
+        mat.SetFloat("_HighColor_Power", 0f);
+        mat.SetFloat("_ShadowSaturation", 1.0f);
+        mat.SetFloat("_UnlitBlend", 0f);
+        mat.SetFloat("_MinBrightness", 0.04f);
+
         switch (category)
         {
             case CharacterCategory.Skin:
-                SetColorIfExists(mat, "_1st_ShadeColor", new Color(0.90f, 0.80f, 0.77f, 1f));
-                SetColorIfExists(mat, "_2nd_ShadeColor", new Color(0.80f, 0.68f, 0.65f, 1f));
-                SetFloatIfExists(mat, "_RimLight", 1f);
-                SetColorIfExists(mat, "_RimLightColor", new Color(1.0f, 0.85f, 0.80f, 1f));
-                SetFloatIfExists(mat, "_RimLight_Power", 6f);
-                SetFloatIfExists(mat, "_RimLight_InsideMask", 0.15f);
+                mat.SetColor("_1st_ShadeColor", new Color(0.88f, 0.76f, 0.73f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.5f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.08f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.75f, 0.62f, 0.60f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.15f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.08f);
+                mat.SetFloat("_RimLight", 1f);
+                mat.SetColor("_RimLightColor", new Color(1f, 0.92f, 0.88f, 1f));
+                mat.SetFloat("_RimLight_Power", 6f);
+                mat.SetFloat("_RimLight_InsideMask", 0.15f);
+                mat.SetFloat("_OUTLINE", 1f);
+                mat.SetFloat("_Outline_Width", 0.3f);
+                mat.SetColor("_Outline_Color", new Color(0.18f, 0.12f, 0.11f, 1f));
+                mat.SetFloat("_Is_BlendBaseColor", 0f);
+                mat.SetFloat("_Is_LightColor_Outline", 1f);
+                mat.SetFloat("_MinBrightness", 0.06f);
+                mat.SetFloat("_ShadowSaturation", 1.1f);
                 break;
 
             case CharacterCategory.Hair:
-                SetFloatIfExists(mat, "_1st_ShadeColor_Feather", 0.06f);
-                SetFloatIfExists(mat, "_RimLight", 1f);
-                SetFloatIfExists(mat, "_RimLight_Power", 8f);
-                SetFloatIfExists(mat, "_RimLight_InsideMask", 0.12f);
-                break;
-
-            case CharacterCategory.Clothing:
-                SetFloatIfExists(mat, "_1st_ShadeColor_Feather", 0.06f);
-                SetFloatIfExists(mat, "_1st_ShadeColor_Step", 0.48f);
-                SetFloatIfExists(mat, "_RimLight", 1f);
-                SetFloatIfExists(mat, "_RimLight_Power", 8f);
-                SetFloatIfExists(mat, "_RimLight_InsideMask", 0.1f);
-                break;
-
-            case CharacterCategory.Accessory:
-                SetFloatIfExists(mat, "_RimLight", 0f);
+                mat.SetColor("_1st_ShadeColor", new Color(0.82f, 0.72f, 0.70f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.5f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.06f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.68f, 0.58f, 0.56f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.15f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.08f);
+                mat.SetFloat("_RimLight", 1f);
+                mat.SetColor("_RimLightColor", new Color(1f, 0.92f, 0.88f, 1f));
+                mat.SetFloat("_RimLight_Power", 5f);
+                mat.SetFloat("_RimLight_InsideMask", 0.10f);
+                mat.SetFloat("_OUTLINE", 1f);
+                mat.SetFloat("_Outline_Width", 0.3f);
+                mat.SetColor("_Outline_Color", new Color(0.15f, 0.10f, 0.10f, 1f));
+                mat.SetFloat("_Is_BlendBaseColor", 0f);
+                mat.SetFloat("_Is_LightColor_Outline", 1f);
+                mat.SetFloat("_MinBrightness", 0.04f);
                 break;
 
             case CharacterCategory.Eyes:
-                SetFloatIfExists(mat, "_1st_ShadeColor_Step", 0.8f);
-                SetFloatIfExists(mat, "_1st_ShadeColor_Feather", 0.15f);
-                SetFloatIfExists(mat, "_OUTLINE", 0f);
-                SetFloatIfExists(mat, "_Outline_Width", 0f);
-                SetFloatIfExists(mat, "_RimLight", 0f);
+                mat.SetColor("_1st_ShadeColor", new Color(0.90f, 0.88f, 0.86f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.2f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.15f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.82f, 0.80f, 0.78f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.05f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.10f);
+                mat.SetFloat("_RimLight", 0f);
+                mat.SetFloat("_OUTLINE", 0f);
+                mat.SetFloat("_Outline_Width", 0f);
+                mat.SetFloat("_UnlitBlend", 0.6f);
+                mat.SetFloat("_MinBrightness", 0.15f);
+                mat.SetFloat("_GI_Intensity", 0.4f);
+                mat.SetFloat("_Tweak_SystemShadowsLevel", 0.3f);
+                break;
+
+            case CharacterCategory.Clothing:
+                mat.SetColor("_1st_ShadeColor", new Color(0.82f, 0.74f, 0.72f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.48f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.06f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.68f, 0.60f, 0.58f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.15f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.08f);
+                mat.SetFloat("_RimLight", 1f);
+                mat.SetColor("_RimLightColor", new Color(1f, 0.92f, 0.88f, 1f));
+                mat.SetFloat("_RimLight_Power", 7f);
+                mat.SetFloat("_RimLight_InsideMask", 0.10f);
+                mat.SetFloat("_OUTLINE", 1f);
+                mat.SetFloat("_Outline_Width", 0.3f);
+                mat.SetColor("_Outline_Color", new Color(0.15f, 0.10f, 0.10f, 1f));
+                mat.SetFloat("_Is_BlendBaseColor", 0f);
+                mat.SetFloat("_Is_LightColor_Outline", 1f);
+                mat.SetFloat("_MinBrightness", 0.04f);
+                break;
+
+            case CharacterCategory.Accessory:
+                mat.SetColor("_1st_ShadeColor", new Color(0.80f, 0.72f, 0.70f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.45f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.06f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.65f, 0.58f, 0.56f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.12f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.06f);
+                mat.SetFloat("_RimLight", 0f);
+                mat.SetFloat("_OUTLINE", 1f);
+                mat.SetFloat("_Outline_Width", 0.2f);
+                mat.SetColor("_Outline_Color", new Color(0.15f, 0.10f, 0.10f, 1f));
+                mat.SetFloat("_Is_BlendBaseColor", 0f);
+                mat.SetFloat("_Is_LightColor_Outline", 1f);
+                mat.SetFloat("_MinBrightness", 0.04f);
                 break;
 
             case CharacterCategory.Special:
-                SetFloatIfExists(mat, "_OUTLINE", 0f);
-                SetFloatIfExists(mat, "_Outline_Width", 0f);
-                SetFloatIfExists(mat, "_RimLight", 0f);
+                mat.SetColor("_1st_ShadeColor", new Color(0.92f, 0.88f, 0.86f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.2f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.12f);
+                mat.SetFloat("_RimLight", 0f);
+                mat.SetFloat("_OUTLINE", 0f);
+                mat.SetFloat("_Outline_Width", 0f);
+                mat.SetFloat("_UnlitBlend", 0.5f);
+                mat.SetFloat("_MinBrightness", 0.10f);
                 break;
         }
     }
 
-    // --------- Category detection ---------
+    // ===================================================================
+    // UTILITIES
+    // ===================================================================
 
-    private enum CharacterCategory
+    private static Texture TryGetBaseTexture(Material mat)
     {
-        Skin,
-        Hair,
-        Clothing,
-        Accessory,
-        Eyes,
-        Special
+        // Try common texture property names in order of likelihood
+        string[] texProps = { "_MainTex", "_BaseMap", "_BaseColorMap", "_Diffuse", "_Albedo" };
+        foreach (string prop in texProps)
+        {
+            if (mat.HasProperty(prop))
+            {
+                Texture tex = mat.GetTexture(prop);
+                if (tex != null) return tex;
+            }
+        }
+        return null;
     }
 
-    private static CharacterCategory DetectCategory(string name)
+    private static Color TryGetBaseColor(Material mat)
     {
-        // Skin
-        if (name == "体" || name == "頭")
-            return CharacterCategory.Skin;
-
-        // Hair
-        if (name == "髪" || name == "髪影" || name == "髪飾り")
-            return CharacterCategory.Hair;
-
-        // Eyes
-        if (name == "目")
-            return CharacterCategory.Eyes;
-
-        // Special (blush, paleness, eyebrows — leave mostly unchanged)
-        if (name == "頬染め" || name == "青褪め" || name == "眉毛まつ毛")
-            return CharacterCategory.Special;
-
-        // Accessories
-        if (name == "メガネ" || name == "オプション" || name == "ブローチ" || name == "腕輪")
-            return CharacterCategory.Accessory;
-
-        // Everything else is clothing
-        // 服, スカート, 左/右スカート, 左/右スカート裏, ブーツ, タイ, リボン, ジッパー
-        return CharacterCategory.Clothing;
-    }
-
-    // --------- Utility ---------
-
-    private static void SetFloatIfExists(Material mat, string property, float value)
-    {
-        if (mat.HasProperty(property))
-            mat.SetFloat(property, value);
-    }
-
-    private static void SetColorIfExists(Material mat, string property, Color value)
-    {
-        if (mat.HasProperty(property))
-            mat.SetColor(property, value);
+        string[] colorProps = { "_BaseColor", "_Color", "_MainColor" };
+        foreach (string prop in colorProps)
+        {
+            if (mat.HasProperty(prop))
+                return mat.GetColor(prop);
+        }
+        return Color.white;
     }
 
     private static void SyncKeywords(Material mat)
     {
-        if (mat.HasProperty("_RimLight"))
-        {
-            if (mat.GetFloat("_RimLight") > 0.5f)
-                mat.EnableKeyword("_RIMLIGHT_ON");
-            else
-                mat.DisableKeyword("_RIMLIGHT_ON");
-        }
+        SetKeyword(mat, "_RIMLIGHT_ON", mat.HasProperty("_RimLight") && mat.GetFloat("_RimLight") > 0.5f);
+        SetKeyword(mat, "_OUTLINE_ON", mat.HasProperty("_OUTLINE") && mat.GetFloat("_OUTLINE") > 0.5f);
+        SetKeyword(mat, "_ALPHATEST_ON", mat.HasProperty("_AlphaClip") && mat.GetFloat("_AlphaClip") > 0.5f);
+    }
 
-        if (mat.HasProperty("_OUTLINE"))
+    private static void SetKeyword(Material mat, string keyword, bool enabled)
+    {
+        if (enabled)
+            mat.EnableKeyword(keyword);
+        else
+            mat.DisableKeyword(keyword);
+    }
+
+    private static Color GetCategoryColor(CharacterCategory cat)
+    {
+        switch (cat)
         {
-            if (mat.GetFloat("_OUTLINE") > 0.5f)
-                mat.EnableKeyword("_OUTLINE_ON");
-            else
-                mat.DisableKeyword("_OUTLINE_ON");
+            case CharacterCategory.Skin:      return new Color(1.0f, 0.85f, 0.8f);
+            case CharacterCategory.Hair:      return new Color(0.85f, 0.75f, 1.0f);
+            case CharacterCategory.Eyes:      return new Color(0.8f, 1.0f, 0.9f);
+            case CharacterCategory.Clothing:  return new Color(0.85f, 0.9f, 1.0f);
+            case CharacterCategory.Accessory: return new Color(1.0f, 1.0f, 0.8f);
+            case CharacterCategory.Special:   return new Color(1.0f, 0.9f, 0.85f);
+            default: return Color.white;
         }
+    }
+
+    // ===================================================================
+    // PREVIEW DATA
+    // ===================================================================
+
+    private class MaterialPreview
+    {
+        public string materialName;
+        public string assetPath;
+        public bool isRigid;
+        public CharacterCategory autoCategory;
+        public CharacterCategory finalCategory;
+        public string detectionMethod;
     }
 }

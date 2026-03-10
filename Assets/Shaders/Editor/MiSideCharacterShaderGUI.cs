@@ -14,6 +14,7 @@ public class MiSideCharacterShaderGUI : ShaderGUI
     private bool _showRim = true;
     private bool _showOutline = true;
     private bool _showLighting = true;
+    private bool _showUnlit = true;
     private bool _showCutout = true;
     private bool _showRendering = true;
 
@@ -110,6 +111,19 @@ public class MiSideCharacterShaderGUI : ShaderGUI
 
         EditorGUILayout.Space(4);
 
+        // ----- Unlit & Brightness -----
+        _showUnlit = EditorGUILayout.Foldout(_showUnlit, "Unlit & Brightness", true, EditorStyles.foldoutHeader);
+        if (_showUnlit)
+        {
+            EditorGUI.indentLevel++;
+            materialEditor.ShaderProperty(FindProperty("_UnlitBlend", properties), "Unlit Blend (eyes/glow)");
+            materialEditor.ShaderProperty(FindProperty("_MinBrightness", properties), "Min Brightness Floor");
+            materialEditor.ShaderProperty(FindProperty("_ShadowSaturation", properties), "Shadow Saturation");
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(4);
+
         // ----- Alpha Cutout -----
         MaterialProperty alphaClip = FindProperty("_AlphaClip", properties);
         _showCutout = EditorGUILayout.Foldout(_showCutout, "Alpha Cutout", true, EditorStyles.foldoutHeader);
@@ -140,6 +154,12 @@ public class MiSideCharacterShaderGUI : ShaderGUI
 
         // ----- Category Presets -----
         EditorGUILayout.LabelField("Category Presets", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Apply tuned presets for each material type. " +
+            "Eyes use high Unlit Blend to stay vibrant. " +
+            "Skin gets warm rim and soft shadows.",
+            MessageType.None);
+
         EditorGUILayout.BeginHorizontal();
 
         if (GUILayout.Button("Skin"))
@@ -184,61 +204,106 @@ public class MiSideCharacterShaderGUI : ShaderGUI
 
     private static void ApplyPreset(Material mat, Category category)
     {
-        // Common base settings
-        mat.SetFloat("_1st_ShadeColor_Feather", 0.06f);
-        mat.SetFloat("_2nd_ShadeColor_Step", 0.15f);
-        mat.SetFloat("_2nd_ShadeColor_Feather", 0.1f);
-        mat.SetFloat("_GI_Intensity", 0.3f);
+        Undo.RecordObject(mat, "Apply MiSide Character Preset");
+
+        // Common base settings — shade colors are now TINTS of base texture
+        mat.SetFloat("_GI_Intensity", 0.35f);
         mat.SetFloat("_Tweak_SystemShadowsLevel", 0.1f);
         mat.SetFloat("_HighColor_Power", 0f);
+        mat.SetFloat("_ShadowSaturation", 1.0f);
+        mat.SetFloat("_UnlitBlend", 0f);
+        mat.SetFloat("_MinBrightness", 0.04f);
 
         switch (category)
         {
             case Category.Skin:
-                mat.SetColor("_1st_ShadeColor", new Color(0.90f, 0.80f, 0.77f, 1f));
-                mat.SetColor("_2nd_ShadeColor", new Color(0.80f, 0.68f, 0.65f, 1f));
+                // Warm skin: shadow tints slightly toward pink/peach
+                mat.SetColor("_1st_ShadeColor", new Color(0.88f, 0.76f, 0.73f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.5f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.08f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.75f, 0.62f, 0.60f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.15f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.08f);
                 mat.SetFloat("_RimLight", 1f);
-                mat.SetColor("_RimLightColor", new Color(1f, 0.85f, 0.80f, 1f));
+                mat.SetColor("_RimLightColor", new Color(1f, 0.92f, 0.88f, 1f));
                 mat.SetFloat("_RimLight_Power", 6f);
                 mat.SetFloat("_RimLight_InsideMask", 0.15f);
                 mat.SetFloat("_OUTLINE", 1f);
                 mat.SetFloat("_Outline_Width", 0.3f);
-                mat.SetColor("_Outline_Color", new Color(0.2f, 0.15f, 0.15f, 1f));
+                mat.SetColor("_Outline_Color", new Color(0.18f, 0.12f, 0.11f, 1f));
+                mat.SetFloat("_Is_BlendBaseColor", 0f);
+                mat.SetFloat("_Is_LightColor_Outline", 1f);
+                mat.SetFloat("_MinBrightness", 0.06f);
+                mat.SetFloat("_ShadowSaturation", 1.1f);
                 break;
 
             case Category.Hair:
+                // Hair: slightly cooler shadow tint for depth
+                mat.SetColor("_1st_ShadeColor", new Color(0.82f, 0.72f, 0.70f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.5f);
                 mat.SetFloat("_1st_ShadeColor_Feather", 0.06f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.68f, 0.58f, 0.56f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.15f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.08f);
                 mat.SetFloat("_RimLight", 1f);
-                mat.SetFloat("_RimLight_Power", 8f);
-                mat.SetFloat("_RimLight_InsideMask", 0.12f);
+                mat.SetColor("_RimLightColor", new Color(1f, 0.92f, 0.88f, 1f));
+                mat.SetFloat("_RimLight_Power", 5f);
+                mat.SetFloat("_RimLight_InsideMask", 0.10f);
                 mat.SetFloat("_OUTLINE", 1f);
                 mat.SetFloat("_Outline_Width", 0.3f);
-                mat.SetColor("_Outline_Color", new Color(0.2f, 0.15f, 0.15f, 1f));
+                mat.SetColor("_Outline_Color", new Color(0.15f, 0.10f, 0.10f, 1f));
+                mat.SetFloat("_Is_BlendBaseColor", 0f);
+                mat.SetFloat("_Is_LightColor_Outline", 1f);
+                mat.SetFloat("_MinBrightness", 0.04f);
                 break;
 
             case Category.Eyes:
-                mat.SetFloat("_1st_ShadeColor_Step", 0.8f);
+                // Eyes: mostly unlit so base texture color is preserved
+                mat.SetColor("_1st_ShadeColor", new Color(0.90f, 0.88f, 0.86f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.2f);
                 mat.SetFloat("_1st_ShadeColor_Feather", 0.15f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.82f, 0.80f, 0.78f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.05f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.10f);
                 mat.SetFloat("_RimLight", 0f);
                 mat.SetFloat("_OUTLINE", 0f);
                 mat.SetFloat("_Outline_Width", 0f);
+                mat.SetFloat("_UnlitBlend", 0.6f);
+                mat.SetFloat("_MinBrightness", 0.15f);
+                mat.SetFloat("_GI_Intensity", 0.4f);
+                mat.SetFloat("_Tweak_SystemShadowsLevel", 0.3f);
                 break;
 
             case Category.Clothing:
-                mat.SetFloat("_1st_ShadeColor_Feather", 0.06f);
+                // Clothing: standard toon shading
+                mat.SetColor("_1st_ShadeColor", new Color(0.82f, 0.74f, 0.72f, 1f));
                 mat.SetFloat("_1st_ShadeColor_Step", 0.48f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.06f);
+                mat.SetColor("_2nd_ShadeColor", new Color(0.68f, 0.60f, 0.58f, 1f));
+                mat.SetFloat("_2nd_ShadeColor_Step", 0.15f);
+                mat.SetFloat("_2nd_ShadeColor_Feather", 0.08f);
                 mat.SetFloat("_RimLight", 1f);
-                mat.SetFloat("_RimLight_Power", 8f);
-                mat.SetFloat("_RimLight_InsideMask", 0.1f);
+                mat.SetColor("_RimLightColor", new Color(1f, 0.92f, 0.88f, 1f));
+                mat.SetFloat("_RimLight_Power", 7f);
+                mat.SetFloat("_RimLight_InsideMask", 0.10f);
                 mat.SetFloat("_OUTLINE", 1f);
                 mat.SetFloat("_Outline_Width", 0.3f);
-                mat.SetColor("_Outline_Color", new Color(0.2f, 0.15f, 0.15f, 1f));
+                mat.SetColor("_Outline_Color", new Color(0.15f, 0.10f, 0.10f, 1f));
+                mat.SetFloat("_Is_BlendBaseColor", 0f);
+                mat.SetFloat("_Is_LightColor_Outline", 1f);
+                mat.SetFloat("_MinBrightness", 0.04f);
                 break;
 
             case Category.Special:
+                // Blush, lashes, eyebrows — mostly unlit overlay
+                mat.SetColor("_1st_ShadeColor", new Color(0.92f, 0.88f, 0.86f, 1f));
+                mat.SetFloat("_1st_ShadeColor_Step", 0.2f);
+                mat.SetFloat("_1st_ShadeColor_Feather", 0.12f);
                 mat.SetFloat("_RimLight", 0f);
                 mat.SetFloat("_OUTLINE", 0f);
                 mat.SetFloat("_Outline_Width", 0f);
+                mat.SetFloat("_UnlitBlend", 0.5f);
+                mat.SetFloat("_MinBrightness", 0.10f);
                 break;
         }
 

@@ -6,32 +6,37 @@ Shader "MiSide/Character"
         [MainColor]   _BaseColor ("Base Color", Color) = (1,1,1,1)
 
         [Header(1st Shade)]
-        _1st_ShadeColor ("1st Shade Color", Color) = (0.9, 0.85, 0.82, 1)
+        _1st_ShadeColor ("1st Shade Tint", Color) = (0.85, 0.75, 0.72, 1)
         _1st_ShadeColor_Step ("1st Shade Step", Range(0, 1)) = 0.5
         _1st_ShadeColor_Feather ("1st Shade Feather", Range(0.001, 0.3)) = 0.06
 
         [Header(2nd Shade)]
-        _2nd_ShadeColor ("2nd Shade Color", Color) = (0.8, 0.72, 0.68, 1)
+        _2nd_ShadeColor ("2nd Shade Tint", Color) = (0.72, 0.62, 0.60, 1)
         _2nd_ShadeColor_Step ("2nd Shade Step", Range(0, 1)) = 0.15
-        _2nd_ShadeColor_Feather ("2nd Shade Feather", Range(0.001, 0.3)) = 0.1
+        _2nd_ShadeColor_Feather ("2nd Shade Feather", Range(0.001, 0.3)) = 0.08
 
         [Header(Rim Light)]
         [Toggle(_RIMLIGHT_ON)] _RimLight ("Enable Rim Light", Float) = 1
-        _RimLightColor ("Rim Light Color", Color) = (1, 0.85, 0.8, 1)
+        _RimLightColor ("Rim Light Color", Color) = (1, 0.92, 0.88, 1)
         _RimLight_Power ("Rim Light Power", Range(1, 20)) = 6
         _RimLight_InsideMask ("Rim Inside Mask", Range(0, 1)) = 0.15
 
         [Header(Outline)]
         [Toggle(_OUTLINE_ON)] _OUTLINE ("Enable Outline", Float) = 1
         _Outline_Width ("Outline Width", Range(0, 2)) = 0.3
-        _Outline_Color ("Outline Color", Color) = (0.2, 0.15, 0.15, 1)
+        _Outline_Color ("Outline Color", Color) = (0.15, 0.10, 0.10, 1)
         [Toggle] _Is_BlendBaseColor ("Blend Base Color into Outline", Float) = 0
         [Toggle] _Is_LightColor_Outline ("Light Color Outline", Float) = 1
 
         [Header(Lighting)]
-        _GI_Intensity ("GI Intensity", Range(0, 1)) = 0.3
+        _GI_Intensity ("GI Intensity", Range(0, 1)) = 0.35
         _Tweak_SystemShadowsLevel ("Shadow Level Tweak", Range(-1, 1)) = 0.1
         _HighColor_Power ("Specular Power (0=off)", Range(0, 1)) = 0
+
+        [Header(Unlit and Brightness)]
+        _UnlitBlend ("Unlit Blend", Range(0, 1)) = 0
+        _MinBrightness ("Min Brightness", Range(0, 1)) = 0.04
+        _ShadowSaturation ("Shadow Saturation", Range(0, 2)) = 1.0
 
         [Header(Alpha Cutout)]
         [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha Clip", Float) = 0
@@ -104,6 +109,9 @@ Shader "MiSide/Character"
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
                 half   _HighColor_Power;
+                half   _UnlitBlend;
+                half   _MinBrightness;
+                half   _ShadowSaturation;
                 half   _Cutoff;
             CBUFFER_END
 
@@ -194,29 +202,41 @@ Shader "MiSide/Character"
                 // Shadow attenuation with tweak
                 float shadowAtten = saturate(mainLight.shadowAttenuation + _Tweak_SystemShadowsLevel);
 
+                // Baked GI / SH ambient
+                half3 bakedGI = SAMPLE_GI(IN.lightmapUV, IN.vertexSH, normalWS);
+
                 // ---- 2-zone toon ramp ----
-                // Zone 1: Base → 1st Shade
+                // Zone 1: lit vs 1st shade
                 float ramp1 = smoothstep(
                     _1st_ShadeColor_Step - _1st_ShadeColor_Feather,
                     _1st_ShadeColor_Step + _1st_ShadeColor_Feather,
                     halfLambert);
                 ramp1 = min(ramp1, shadowAtten);
 
-                // Zone 2: 1st Shade → 2nd Shade
+                // Zone 2: 1st shade vs 2nd shade
                 float ramp2 = smoothstep(
                     _2nd_ShadeColor_Step - _2nd_ShadeColor_Feather,
                     _2nd_ShadeColor_Step + _2nd_ShadeColor_Feather,
                     halfLambert);
                 ramp2 = min(ramp2, shadowAtten);
 
-                // Compose color: 2nd shade → 1st shade → base
-                half3 shadeColor = lerp(_2nd_ShadeColor.rgb, _1st_ShadeColor.rgb, ramp2);
-                half3 finalColor = lerp(shadeColor, baseColor.rgb, ramp1);
-                finalColor *= mainLight.color;
+                // ---- Environment-style lighting (base color always preserved) ----
+                // Shade tint: blend between 2nd and 1st shade tint colors
+                half3 shadeTint = lerp(_2nd_ShadeColor.rgb, _1st_ShadeColor.rgb, ramp2);
 
-                // GI contribution
-                half3 bakedGI = SAMPLE_GI(IN.lightmapUV, IN.vertexSH, normalWS);
-                finalColor += baseColor.rgb * bakedGI * _GI_Intensity;
+                // Apply shadow saturation to the tint
+                half shadeLuma = dot(shadeTint, half3(0.299, 0.587, 0.114));
+                shadeTint = lerp(half3(shadeLuma, shadeLuma, shadeLuma), shadeTint, _ShadowSaturation);
+
+                // Lit path: base color * (light + GI) — same as environment shader
+                half3 litColor = baseColor.rgb * (mainLight.color + bakedGI * _GI_Intensity);
+
+                // Shadow path: base color * shade tint * ambient floor
+                // The shade tint darkens/warms the base color but never replaces it
+                half3 shadowColor = baseColor.rgb * shadeTint * saturate(bakedGI * _GI_Intensity + 0.4);
+
+                // Final toon blend: shadow path <-> lit path
+                half3 finalColor = lerp(shadowColor, litColor, ramp1);
 
                 // Additional lights
                 finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step);
@@ -229,6 +249,15 @@ Shader "MiSide/Character"
                         _RimLightColor, _RimLight_Power, _RimLight_InsideMask);
                 }
                 #endif
+
+                // ---- Unlit blend (eyes/special): preserve base color with soft ambient ----
+                half3 unlitColor = baseColor.rgb * saturate(bakedGI * _GI_Intensity + 0.6);
+                finalColor = lerp(finalColor, unlitColor, _UnlitBlend);
+
+                // ---- Min brightness floor ----
+                half luma = dot(finalColor, half3(0.299, 0.587, 0.114));
+                half brightnessFactor = max(luma, _MinBrightness) / max(luma, 0.001);
+                finalColor *= brightnessFactor;
 
                 // Apply fog
                 finalColor = MixFog(finalColor, IN.fogFactor);
@@ -282,6 +311,9 @@ Shader "MiSide/Character"
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
                 half   _HighColor_Power;
+                half   _UnlitBlend;
+                half   _MinBrightness;
+                half   _ShadowSaturation;
                 half   _Cutoff;
             CBUFFER_END
 
@@ -411,6 +443,9 @@ Shader "MiSide/Character"
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
                 half   _HighColor_Power;
+                half   _UnlitBlend;
+                half   _MinBrightness;
+                half   _ShadowSaturation;
                 half   _Cutoff;
             CBUFFER_END
 
@@ -512,6 +547,9 @@ Shader "MiSide/Character"
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
                 half   _HighColor_Power;
+                half   _UnlitBlend;
+                half   _MinBrightness;
+                half   _ShadowSaturation;
                 half   _Cutoff;
             CBUFFER_END
 
@@ -599,6 +637,9 @@ Shader "MiSide/Character"
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
                 half   _HighColor_Power;
+                half   _UnlitBlend;
+                half   _MinBrightness;
+                half   _ShadowSaturation;
                 half   _Cutoff;
             CBUFFER_END
 
@@ -686,6 +727,9 @@ Shader "MiSide/Character"
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
                 half   _HighColor_Power;
+                half   _UnlitBlend;
+                half   _MinBrightness;
+                half   _ShadowSaturation;
                 half   _Cutoff;
             CBUFFER_END
 
