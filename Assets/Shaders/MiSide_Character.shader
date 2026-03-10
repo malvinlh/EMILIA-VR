@@ -220,7 +220,7 @@ Shader "MiSide/Character"
                     halfLambert);
                 ramp2 = min(ramp2, shadowAtten);
 
-                // ---- Environment-style lighting (base color always preserved) ----
+                // ---- HSR-style lighting: base color is king ----
                 // Shade tint: blend between 2nd and 1st shade tint colors
                 half3 shadeTint = lerp(_2nd_ShadeColor.rgb, _1st_ShadeColor.rgb, ramp2);
 
@@ -228,18 +228,21 @@ Shader "MiSide/Character"
                 half shadeLuma = dot(shadeTint, half3(0.299, 0.587, 0.114));
                 shadeTint = lerp(half3(shadeLuma, shadeLuma, shadeLuma), shadeTint, _ShadowSaturation);
 
-                // Lit path: base color * (light + GI) — same as environment shader
-                half3 litColor = baseColor.rgb * (mainLight.color + bakedGI * _GI_Intensity);
+                // Lit path: base color with CLAMPED light — never overbright
+                // Light determines toon zone, not brightness multiplier.
+                // mainLight.color * 0.6 + ambient bias keeps white clothes white.
+                half3 litColor = baseColor.rgb * saturate(
+                    mainLight.color * 0.6 + bakedGI * _GI_Intensity * 0.4 + 0.35);
 
                 // Shadow path: base color * shade tint * ambient floor
-                // The shade tint darkens/warms the base color but never replaces it
-                half3 shadowColor = baseColor.rgb * shadeTint * saturate(bakedGI * _GI_Intensity + 0.4);
+                half3 shadowColor = baseColor.rgb * shadeTint * saturate(
+                    bakedGI * _GI_Intensity * 0.5 + 0.35);
 
                 // Final toon blend: shadow path <-> lit path
                 half3 finalColor = lerp(shadowColor, litColor, ramp1);
 
-                // Additional lights
-                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step);
+                // Additional lights (subtle — avoid overbright)
+                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step) * 0.5;
 
                 // Rim light
                 #ifdef _RIMLIGHT_ON
@@ -251,7 +254,7 @@ Shader "MiSide/Character"
                 #endif
 
                 // ---- Unlit blend (eyes/special): preserve base color with soft ambient ----
-                half3 unlitColor = baseColor.rgb * saturate(bakedGI * _GI_Intensity + 0.6);
+                half3 unlitColor = baseColor.rgb * saturate(bakedGI * _GI_Intensity + 0.5);
                 finalColor = lerp(finalColor, unlitColor, _UnlitBlend);
 
                 // ---- Min brightness floor ----
