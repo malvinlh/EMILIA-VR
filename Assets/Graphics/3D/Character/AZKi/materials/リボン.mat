@@ -28,7 +28,7 @@ Material:
   - _OUTLINE_ON
   - _RIMLIGHT_ON
   m_InvalidKeywords:
-  - _IS_LIGHTCOLOR_OUTLINE_ON
+  - _IS_BLENDBASECOLOR_ON
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
@@ -372,7 +372,7 @@ Material:
     - _Is_BakedNormal: 0
     - _Is_BlendAddToHiColor: 0
     - _Is_BlendAddToMatCap: 1
-    - _Is_BlendBaseColor: 0
+    - _Is_BlendBaseColor: 1
     - _Is_ColorShift: 0
     - _Is_Filter_HiCutPointLightColor: 1
     - _Is_Filter_LightColor: 1
@@ -383,7 +383,7 @@ Material:
     - _Is_LightColor_Base: 1
     - _Is_LightColor_HighColor: 1
     - _Is_LightColor_MatCap: 1
-    - _Is_LightColor_Outline: 1
+    - _Is_LightColor_Outline: 0
     - _Is_LightColor_RimLight: 1
     - _Is_NormalMapForMatCap: 0
     - _Is_NormalMapToBase: 0
@@ -430,8 +430,8 @@ Material:
     - _RimLightOverridden: 0
     - _RimLightVisible: 1
     - _RimLight_FeatherOff: 0
-    - _RimLight_InsideMask: 0.1
-    - _RimLight_Power: 7
+    - _RimLight_InsideMask: 0.15
+    - _RimLight_Power: 9
     - _Rotate_EmissiveUV: 0
     - _Rotate_MatCapUV: 0
     - _Rotate_NormalMapForMatCapUV: 0
@@ -444,7 +444,7 @@ Material:
     - _SecondShadeVisible: 1
     - _Set_SystemShadowsToBase: 1
     - _ShadeColor_Step: 0
-    - _ShadowSaturation: 1
+    - _ShadowSaturation: 1.2
     - _Smoothness: 0.44870877
     - _SmoothnessRemapMax: 1
     - _SmoothnessRemapMin: 0
@@ -520,8 +520,8 @@ Material:
     - _simpleUI: 0
     - _utsTechnique: 0
     m_Colors:
-    - _1st_ShadeColor: {r: 0.82, g: 0.74, b: 0.72, a: 1}
-    - _2nd_ShadeColor: {r: 0.68, g: 0.6, b: 0.58, a: 1}
+    - _1st_ShadeColor: {r: 0.76, g: 0.68, b: 0.65, a: 1}
+    - _2nd_ShadeColor: {r: 0.62, g: 0.54, b: 0.52, a: 1}
     - _AngelRingMaskColor: {r: 0, g: 1, b: 0, a: 1}
     - _AngelRing_Color: {r: 1, g: 1, b: 1, a: 1}
     - _Ap_RimLightColor: {r: 1, g: 1, b: 1, a: 1}
@@ -543,8 +543,8 @@ Material:
     - _IridescenceThicknessRemap: {r: 0, g: 1, b: 0, a: 0}
     - _MatCapColor: {r: 1, g: 1, b: 1, a: 1}
     - _OutlineMaskColor: {r: 0, g: 0, b: 0, a: 1}
-    - _Outline_Color: {r: 0.15, g: 0.1, b: 0.1, a: 1}
-    - _RimLightColor: {r: 1, g: 0.92, b: 0.88, a: 1}
+    - _Outline_Color: {r: 0.32, g: 0.25, b: 0.23, a: 1}
+    - _RimLightColor: {r: 0.85, g: 0.75, b: 0.68, a: 1}
     - _RimLightMaskColor: {r: 1, g: 0, b: 1, a: 1}
     - _SecondShadeMaskColor: {r: 0, g: 0, b: 1, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}

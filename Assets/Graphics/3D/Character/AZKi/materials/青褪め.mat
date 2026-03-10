@@ -441,7 +441,7 @@ Material:
     - _SecondShadeVisible: 1
     - _Set_SystemShadowsToBase: 1
     - _ShadeColor_Step: 0
-    - _ShadowSaturation: 1
+    - _ShadowSaturation: 1.2
     - _Smoothness: 0.44870877
     - _SmoothnessRemapMax: 1
     - _SmoothnessRemapMin: 0
@@ -499,7 +499,7 @@ Material:
     - _UVDetail: 0
     - _UVEmissive: 0
     - _UVSec: 0
-    - _UnlitBlend: 0.6
+    - _UnlitBlend: 0.7
     - _Unlit_Intensity: 0
     - _UseEmissiveIntensity: 0
     - _UseShadowThreshold: 0
@@ -517,8 +517,8 @@ Material:
     - _simpleUI: 0
     - _utsTechnique: 0
     m_Colors:
-    - _1st_ShadeColor: {r: 0.9, g: 0.88, b: 0.86, a: 1}
-    - _2nd_ShadeColor: {r: 0.82, g: 0.8, b: 0.78, a: 1}
+    - _1st_ShadeColor: {r: 0.88, g: 0.85, b: 0.82, a: 1}
+    - _2nd_ShadeColor: {r: 0.78, g: 0.75, b: 0.72, a: 1}
     - _AngelRingMaskColor: {r: 0, g: 1, b: 0, a: 1}
     - _AngelRing_Color: {r: 1, g: 1, b: 1, a: 1}
     - _Ap_RimLightColor: {r: 1, g: 1, b: 1, a: 1}
