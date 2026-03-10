@@ -130,6 +130,10 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _MatCapTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _MatCap_Sampler:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -332,6 +336,9 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0
     - _GlossyReflections: 1
+    - _HairSpec: 0
+    - _HairSpecShift: 0.1
+    - _HairSpecWidth: 0.5
     - _HeightAmplitude: 0.02
     - _HeightCenter: 0.5
     - _HeightMapParametrization: 0
@@ -341,7 +348,9 @@ Material:
     - _HeightPoMAmplitude: 2
     - _HeightTessAmplitude: 2
     - _HeightTessCenter: 0.5
+    - _HighColor_Feather: 0.05
     - _HighColor_Power: 0
+    - _HighColor_Step: 0.55
     - _HighlightOverridden: 0
     - _HighlightVisible: 1
     - _InvTilingScale: 1
@@ -384,6 +393,7 @@ Material:
     - _LightDirection_MaskOn: 0
     - _LinkDetailsWithBase: 1
     - _MatCap: 0
+    - _MatCap_Intensity: 0.3
     - _MaterialID: 1
     - _Metallic: 0
     - _MinBrightness: 0.1
@@ -413,6 +423,7 @@ Material:
     - _RimLight: 0
     - _RimLightOverridden: 0
     - _RimLightVisible: 1
+    - _RimLight_DirBias: 0.5
     - _RimLight_FeatherOff: 0
     - _RimLight_InsideMask: 0.0001
     - _RimLight_Power: 0.1
@@ -489,6 +500,8 @@ Material:
     - _UnlitBlend: 0.6
     - _Unlit_Intensity: 0
     - _UseEmissiveIntensity: 0
+    - _UseMatCap: 0
+    - _UseNormalMap: 0
     - _UseShadowThreshold: 0
     - _Use_1stAs2nd: 0
     - _Use_BaseAs1st: 1

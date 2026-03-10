@@ -13,6 +13,9 @@ public class MiSideCharacterShaderGUI : ShaderGUI
     private bool _show2ndShade = true;
     private bool _showRim = true;
     private bool _showOutline = true;
+    private bool _showSpecular = true;
+    private bool _showNormalMap = false;
+    private bool _showMatCap = false;
     private bool _showLighting = true;
     private bool _showUnlit = true;
     private bool _showCutout = true;
@@ -98,6 +101,53 @@ public class MiSideCharacterShaderGUI : ShaderGUI
 
         EditorGUILayout.Space(4);
 
+        // ----- Specular / High Color -----
+        _showSpecular = EditorGUILayout.Foldout(_showSpecular, "Specular / High Color", true, EditorStyles.foldoutHeader);
+        if (_showSpecular)
+        {
+            EditorGUI.indentLevel++;
+            materialEditor.ShaderProperty(FindProperty("_HighColor", properties), "Specular Color");
+            materialEditor.ShaderProperty(FindProperty("_HighColor_Power", properties), "Specular Power");
+            materialEditor.ShaderProperty(FindProperty("_HighColor_Step", properties), "Step");
+            materialEditor.ShaderProperty(FindProperty("_HighColor_Feather", properties), "Feather");
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(4);
+
+        // ----- Normal Map -----
+        MaterialProperty normalToggle = FindProperty("_UseNormalMap", properties);
+        _showNormalMap = EditorGUILayout.Foldout(_showNormalMap, "Normal Map", true, EditorStyles.foldoutHeader);
+        if (_showNormalMap)
+        {
+            EditorGUI.indentLevel++;
+            materialEditor.ShaderProperty(normalToggle, "Enable Normal Map");
+            if (normalToggle.floatValue > 0.5f)
+            {
+                materialEditor.TexturePropertySingleLine(new GUIContent("Normal Map"), FindProperty("_BumpMap", properties), FindProperty("_BumpScale", properties));
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(4);
+
+        // ----- MatCap -----
+        MaterialProperty matCapToggle = FindProperty("_UseMatCap", properties);
+        _showMatCap = EditorGUILayout.Foldout(_showMatCap, "MatCap", true, EditorStyles.foldoutHeader);
+        if (_showMatCap)
+        {
+            EditorGUI.indentLevel++;
+            materialEditor.ShaderProperty(matCapToggle, "Enable MatCap");
+            if (matCapToggle.floatValue > 0.5f)
+            {
+                materialEditor.TexturePropertySingleLine(new GUIContent("MatCap Texture"), FindProperty("_MatCapTex", properties));
+                materialEditor.ShaderProperty(FindProperty("_MatCap_Intensity", properties), "Intensity");
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(4);
+
         // ----- Lighting -----
         _showLighting = EditorGUILayout.Foldout(_showLighting, "Lighting", true, EditorStyles.foldoutHeader);
         if (_showLighting)
@@ -105,7 +155,6 @@ public class MiSideCharacterShaderGUI : ShaderGUI
             EditorGUI.indentLevel++;
             materialEditor.ShaderProperty(FindProperty("_GI_Intensity", properties), "GI Intensity");
             materialEditor.ShaderProperty(FindProperty("_Tweak_SystemShadowsLevel", properties), "Shadow Level Tweak");
-            materialEditor.ShaderProperty(FindProperty("_HighColor_Power", properties), "Specular Power (0=off)");
             EditorGUI.indentLevel--;
         }
 
@@ -209,7 +258,10 @@ public class MiSideCharacterShaderGUI : ShaderGUI
         // Common base — HSR-style: rich shadows, color-matched outlines
         mat.SetFloat("_GI_Intensity", 0.35f);
         mat.SetFloat("_Tweak_SystemShadowsLevel", 0.1f);
+        mat.SetColor("_HighColor", new Color(0.95f, 0.95f, 0.95f, 1f));
         mat.SetFloat("_HighColor_Power", 0f);
+        mat.SetFloat("_HighColor_Step", 0.55f);
+        mat.SetFloat("_HighColor_Feather", 0.05f);
         mat.SetFloat("_ShadowSaturation", 1.2f);
         mat.SetFloat("_UnlitBlend", 0f);
         mat.SetFloat("_MinBrightness", 0.04f);
@@ -235,10 +287,12 @@ public class MiSideCharacterShaderGUI : ShaderGUI
                 mat.SetFloat("_Is_LightColor_Outline", 0f);
                 mat.SetFloat("_MinBrightness", 0.05f);
                 mat.SetFloat("_ShadowSaturation", 1.3f);
+                mat.SetFloat("_HighColor_Power", 0.15f);
+                mat.SetFloat("_HighColor_Step", 0.6f);
                 break;
 
             case Category.Hair:
-                // Hair: rich shadow depth with color-matched outline
+                // Hair: rich shadow depth with specular highlight band
                 mat.SetColor("_1st_ShadeColor", new Color(0.75f, 0.65f, 0.62f, 1f));
                 mat.SetFloat("_1st_ShadeColor_Step", 0.5f);
                 mat.SetFloat("_1st_ShadeColor_Feather", 0.06f);
@@ -256,6 +310,10 @@ public class MiSideCharacterShaderGUI : ShaderGUI
                 mat.SetFloat("_Is_LightColor_Outline", 0f);
                 mat.SetFloat("_MinBrightness", 0.04f);
                 mat.SetFloat("_ShadowSaturation", 1.2f);
+                mat.SetColor("_HighColor", new Color(1f, 0.98f, 0.95f, 1f));
+                mat.SetFloat("_HighColor_Power", 0.55f);
+                mat.SetFloat("_HighColor_Step", 0.5f);
+                mat.SetFloat("_HighColor_Feather", 0.06f);
                 break;
 
             case Category.Eyes:
@@ -293,6 +351,9 @@ public class MiSideCharacterShaderGUI : ShaderGUI
                 mat.SetFloat("_Is_BlendBaseColor", 1f);
                 mat.SetFloat("_Is_LightColor_Outline", 0f);
                 mat.SetFloat("_MinBrightness", 0.04f);
+                mat.SetFloat("_HighColor_Power", 0.25f);
+                mat.SetFloat("_HighColor_Step", 0.6f);
+                mat.SetFloat("_HighColor_Feather", 0.04f);
                 break;
 
             case Category.Special:
@@ -317,6 +378,8 @@ public class MiSideCharacterShaderGUI : ShaderGUI
         SetKeyword(mat, "_RIMLIGHT_ON", mat.GetFloat("_RimLight") > 0.5f);
         SetKeyword(mat, "_OUTLINE_ON", mat.GetFloat("_OUTLINE") > 0.5f);
         SetKeyword(mat, "_ALPHATEST_ON", mat.GetFloat("_AlphaClip") > 0.5f);
+        SetKeyword(mat, "_NORMALMAP", mat.GetFloat("_UseNormalMap") > 0.5f);
+        SetKeyword(mat, "_MATCAP_ON", mat.GetFloat("_UseMatCap") > 0.5f);
     }
 
     private static void SetKeyword(Material mat, string keyword, bool enabled)

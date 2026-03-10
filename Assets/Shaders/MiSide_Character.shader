@@ -28,10 +28,25 @@ Shader "MiSide/Character"
         [Toggle] _Is_BlendBaseColor ("Blend Base Color into Outline", Float) = 1
         [Toggle] _Is_LightColor_Outline ("Light Color Outline", Float) = 0
 
+        [Header(Specular and High Color)]
+        _HighColor ("Specular Color", Color) = (0.95, 0.95, 0.95, 1)
+        _HighColor_Power ("Specular Power", Range(0, 1)) = 0.5
+        _HighColor_Step ("Specular Step", Range(0, 1)) = 0.55
+        _HighColor_Feather ("Specular Feather", Range(0.001, 0.5)) = 0.05
+
+        [Header(Normal Map)]
+        [Toggle(_NORMALMAP)] _UseNormalMap ("Enable Normal Map", Float) = 0
+        _BumpMap ("Normal Map", 2D) = "bump" {}
+        _BumpScale ("Normal Scale", Range(0, 2)) = 1.0
+
+        [Header(MatCap)]
+        [Toggle(_MATCAP_ON)] _UseMatCap ("Enable MatCap", Float) = 0
+        _MatCapTex ("MatCap Texture", 2D) = "black" {}
+        _MatCap_Intensity ("MatCap Intensity", Range(0, 1)) = 0.3
+
         [Header(Lighting)]
         _GI_Intensity ("GI Intensity", Range(0, 1)) = 0.45
         _Tweak_SystemShadowsLevel ("Shadow Level Tweak", Range(-1, 1)) = 0.15
-        _HighColor_Power ("Specular Power (0=off)", Range(0, 1)) = 0
 
         [Header(Unlit and Brightness)]
         _UnlitBlend ("Unlit Blend", Range(0, 1)) = 0
@@ -77,6 +92,8 @@ Shader "MiSide/Character"
             #pragma shader_feature_local _ALPHATEST_ON
             #pragma shader_feature_local _RIMLIGHT_ON
             #pragma shader_feature_local _OUTLINE_ON
+            #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local _MATCAP_ON
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
@@ -102,13 +119,19 @@ Shader "MiSide/Character"
                 half4  _RimLightColor;
                 half   _RimLight_Power;
                 half   _RimLight_InsideMask;
+                half4  _HighColor;
+                half   _HighColor_Power;
+                half   _HighColor_Step;
+                half   _HighColor_Feather;
+                float4 _BumpMap_ST;
+                half   _BumpScale;
+                half   _MatCap_Intensity;
                 half   _Outline_Width;
                 half4  _Outline_Color;
                 half   _Is_BlendBaseColor;
                 half   _Is_LightColor_Outline;
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
-                half   _HighColor_Power;
                 half   _UnlitBlend;
                 half   _MinBrightness;
                 half   _ShadowSaturation;
@@ -116,11 +139,14 @@ Shader "MiSide/Character"
             CBUFFER_END
 
             TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);
+            TEXTURE2D(_BumpMap); SAMPLER(sampler_BumpMap);
+            TEXTURE2D(_MatCapTex); SAMPLER(sampler_MatCapTex);
 
             struct Attributes
             {
                 float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
+                float4 tangentOS  : TANGENT;
                 float2 uv         : TEXCOORD0;
                 float2 lightmapUV : TEXCOORD1;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -140,6 +166,10 @@ Shader "MiSide/Character"
 
                 DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 5);
 
+                #ifdef _NORMALMAP
+                half4  tangentWS   : TEXCOORD6;
+                #endif
+
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -153,13 +183,17 @@ Shader "MiSide/Character"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
 
                 VertexPositionInputs vertexInput = GetVertexPositionInputs(IN.positionOS.xyz);
-                VertexNormalInputs   normalInput = GetVertexNormalInputs(IN.normalOS);
+                VertexNormalInputs   normalInput = GetVertexNormalInputs(IN.normalOS, IN.tangentOS);
 
                 OUT.positionCS = vertexInput.positionCS;
                 OUT.positionWS = vertexInput.positionWS;
                 OUT.normalWS   = normalInput.normalWS;
                 OUT.uv         = TRANSFORM_TEX(IN.uv, _MainTex);
                 OUT.fogFactor  = ComputeFogFactor(vertexInput.positionCS.z);
+
+                #ifdef _NORMALMAP
+                OUT.tangentWS  = half4(normalInput.tangentWS, IN.tangentOS.w * GetOddNegativeScale());
+                #endif
 
                 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
                 OUT.shadowCoord = GetShadowCoord(vertexInput);
@@ -183,6 +217,17 @@ Shader "MiSide/Character"
                 #endif
 
                 float3 normalWS = normalize(IN.normalWS);
+
+                // Normal mapping
+                #ifdef _NORMALMAP
+                {
+                    half3 normalTS = UnpackNormalScale(SAMPLE_TEXTURE2D(_BumpMap, sampler_BumpMap, IN.uv), _BumpScale);
+                    float sgn = IN.tangentWS.w;
+                    float3 bitangent = sgn * cross(normalWS, IN.tangentWS.xyz);
+                    half3x3 tangentToWorld = half3x3(IN.tangentWS.xyz, bitangent, normalWS);
+                    normalWS = normalize(mul(normalTS, tangentToWorld));
+                }
+                #endif
 
                 // Main light
                 #if defined(REQUIRES_VERTEX_SHADOW_COORD_INTERPOLATOR)
@@ -238,12 +283,36 @@ Shader "MiSide/Character"
                 // Additional lights (toon-shaded, matching environment contribution)
                 finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step) * 0.85;
 
+                float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
+
+                // Specular highlight (Blinn-Phong with toon step)
+                if (_HighColor_Power > 0.001)
+                {
+                    float3 halfDir = normalize(mainLight.direction + viewDir);
+                    half NdotH = saturate(dot(normalWS, halfDir));
+                    half specExponent = exp2(10 * _HighColor_Power + 1);
+                    half spec = pow(NdotH, specExponent);
+                    half specMask = smoothstep(_HighColor_Step - _HighColor_Feather,
+                                               _HighColor_Step + _HighColor_Feather, spec);
+                    specMask *= ramp1; // Only in lit areas
+                    finalColor += _HighColor.rgb * specMask * mainLight.color;
+                }
+
                 // Rim light
                 #ifdef _RIMLIGHT_ON
                 {
-                    float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
                     finalColor += MiSideRimLightMasked(viewDir, normalWS,
                         _RimLightColor, _RimLight_Power, _RimLight_InsideMask);
+                }
+                #endif
+
+                // MatCap reflection
+                #ifdef _MATCAP_ON
+                {
+                    float3 viewNormal = mul((float3x3)UNITY_MATRIX_V, normalWS);
+                    float2 matCapUV = viewNormal.xy * 0.5 + 0.5;
+                    half3 matCapColor = SAMPLE_TEXTURE2D(_MatCapTex, sampler_MatCapTex, matCapUV).rgb;
+                    finalColor += matCapColor * _MatCap_Intensity * ramp1;
                 }
                 #endif
 
@@ -302,13 +371,19 @@ Shader "MiSide/Character"
                 half4  _RimLightColor;
                 half   _RimLight_Power;
                 half   _RimLight_InsideMask;
+                half4  _HighColor;
+                half   _HighColor_Power;
+                half   _HighColor_Step;
+                half   _HighColor_Feather;
+                float4 _BumpMap_ST;
+                half   _BumpScale;
+                half   _MatCap_Intensity;
                 half   _Outline_Width;
                 half4  _Outline_Color;
                 half   _Is_BlendBaseColor;
                 half   _Is_LightColor_Outline;
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
-                half   _HighColor_Power;
                 half   _UnlitBlend;
                 half   _MinBrightness;
                 half   _ShadowSaturation;
@@ -440,13 +515,19 @@ Shader "MiSide/Character"
                 half4  _RimLightColor;
                 half   _RimLight_Power;
                 half   _RimLight_InsideMask;
+                half4  _HighColor;
+                half   _HighColor_Power;
+                half   _HighColor_Step;
+                half   _HighColor_Feather;
+                float4 _BumpMap_ST;
+                half   _BumpScale;
+                half   _MatCap_Intensity;
                 half   _Outline_Width;
                 half4  _Outline_Color;
                 half   _Is_BlendBaseColor;
                 half   _Is_LightColor_Outline;
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
-                half   _HighColor_Power;
                 half   _UnlitBlend;
                 half   _MinBrightness;
                 half   _ShadowSaturation;
@@ -544,13 +625,19 @@ Shader "MiSide/Character"
                 half4  _RimLightColor;
                 half   _RimLight_Power;
                 half   _RimLight_InsideMask;
+                half4  _HighColor;
+                half   _HighColor_Power;
+                half   _HighColor_Step;
+                half   _HighColor_Feather;
+                float4 _BumpMap_ST;
+                half   _BumpScale;
+                half   _MatCap_Intensity;
                 half   _Outline_Width;
                 half4  _Outline_Color;
                 half   _Is_BlendBaseColor;
                 half   _Is_LightColor_Outline;
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
-                half   _HighColor_Power;
                 half   _UnlitBlend;
                 half   _MinBrightness;
                 half   _ShadowSaturation;
@@ -634,13 +721,19 @@ Shader "MiSide/Character"
                 half4  _RimLightColor;
                 half   _RimLight_Power;
                 half   _RimLight_InsideMask;
+                half4  _HighColor;
+                half   _HighColor_Power;
+                half   _HighColor_Step;
+                half   _HighColor_Feather;
+                float4 _BumpMap_ST;
+                half   _BumpScale;
+                half   _MatCap_Intensity;
                 half   _Outline_Width;
                 half4  _Outline_Color;
                 half   _Is_BlendBaseColor;
                 half   _Is_LightColor_Outline;
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
-                half   _HighColor_Power;
                 half   _UnlitBlend;
                 half   _MinBrightness;
                 half   _ShadowSaturation;
@@ -724,13 +817,19 @@ Shader "MiSide/Character"
                 half4  _RimLightColor;
                 half   _RimLight_Power;
                 half   _RimLight_InsideMask;
+                half4  _HighColor;
+                half   _HighColor_Power;
+                half   _HighColor_Step;
+                half   _HighColor_Feather;
+                float4 _BumpMap_ST;
+                half   _BumpScale;
+                half   _MatCap_Intensity;
                 half   _Outline_Width;
                 half4  _Outline_Color;
                 half   _Is_BlendBaseColor;
                 half   _Is_LightColor_Outline;
                 half   _GI_Intensity;
                 half   _Tweak_SystemShadowsLevel;
-                half   _HighColor_Power;
                 half   _UnlitBlend;
                 half   _MinBrightness;
                 half   _ShadowSaturation;
