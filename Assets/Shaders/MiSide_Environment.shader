@@ -73,6 +73,7 @@ Shader "MiSide/Environment"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile _ LIGHTMAP_ON
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED
             #pragma multi_compile_fog
@@ -243,7 +244,7 @@ Shader "MiSide/Environment"
                 half3 finalColor  = lerp(shadowColor, litColor, toonRamp);
 
                 // Additional lights (toon-shaded)
-                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _ShadowStep);
+                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _ShadowStep, IN.positionCS);
 
                 // Optional rim light
                 #ifdef _RIMLIGHT

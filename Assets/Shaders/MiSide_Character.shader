@@ -98,6 +98,7 @@ Shader "MiSide/Character"
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
             #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
             #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile _ LIGHTMAP_ON
             #pragma multi_compile _ DIRLIGHTMAP_COMBINED
             #pragma multi_compile_fog
@@ -281,7 +282,7 @@ Shader "MiSide/Character"
                 half3 finalColor = lerp(shadowColor, litColor, ramp1);
 
                 // Additional lights (toon-shaded, matching environment contribution)
-                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step) * 0.85;
+                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step, IN.positionCS) * 0.85;
 
                 float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
 

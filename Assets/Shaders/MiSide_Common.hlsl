@@ -47,36 +47,29 @@ half3 MiSideRimLightMasked(float3 viewDir, float3 normalWS, half4 rimColor, half
 // -----------------------------------------------------------
 // Additional Lights — Toon-shaded loop
 // Applies a simplified single-step toon ramp per light
-// Capped to 3 lights on standard Forward for VR performance
+// Supports both standard Forward and Forward+ rendering paths
 // -----------------------------------------------------------
-half3 MiSideAdditionalLights(float3 positionWS, float3 normalWS, half3 baseColor, half shadowStep)
+half3 MiSideAdditionalLights(float3 positionWS, float3 normalWS, half3 baseColor, half shadowStep, float4 positionCS)
 {
     half3 additionalColor = half3(0, 0, 0);
 
-#ifdef _ADDITIONAL_LIGHTS
+#if defined(_ADDITIONAL_LIGHTS) || defined(_FORWARD_PLUS)
+    // Set up inputData for Forward+ cluster-based light culling
+    InputData inputData = (InputData)0;
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(positionCS);
+    inputData.positionWS = positionWS;
+
     uint lightsCount = GetAdditionalLightsCount();
-    // Cap on standard Forward for VR perf (Forward+ handles its own culling)
-    #if !defined(_FORWARD_PLUS)
-        lightsCount = min(lightsCount, 3u);
-    #endif
 
-    for (uint i = 0u; i < lightsCount; i++)
-    {
-        #if defined(_FORWARD_PLUS)
-        // Forward+ uses different indexing
-        uint lightIndex = i;
-        #else
-        uint lightIndex = GetPerObjectLightIndex(i);
-        #endif
-
-        Light light = GetAdditionalPerObjectLight(lightIndex, positionWS);
+    LIGHT_LOOP_BEGIN(lightsCount)
+        Light light = GetAdditionalLight(lightIndex, positionWS);
 
         half NdotL = dot(normalWS, light.direction);
         half ramp = step(shadowStep, NdotL * 0.5 + 0.5);
 
         half attenuation = light.distanceAttenuation * light.shadowAttenuation;
         additionalColor += baseColor * light.color * ramp * attenuation;
-    }
+    LIGHT_LOOP_END
 #endif
 
     return additionalColor;
