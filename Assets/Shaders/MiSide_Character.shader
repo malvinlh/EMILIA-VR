@@ -6,37 +6,37 @@ Shader "MiSide/Character"
         [MainColor]   _BaseColor ("Base Color", Color) = (1,1,1,1)
 
         [Header(1st Shade)]
-        _1st_ShadeColor ("1st Shade Tint", Color) = (0.85, 0.75, 0.72, 1)
-        _1st_ShadeColor_Step ("1st Shade Step", Range(0, 1)) = 0.5
-        _1st_ShadeColor_Feather ("1st Shade Feather", Range(0.001, 0.3)) = 0.06
+        _1st_ShadeColor ("1st Shade Tint", Color) = (0.88, 0.78, 0.78, 1)
+        _1st_ShadeColor_Step ("1st Shade Step", Range(0, 1)) = 0.45
+        _1st_ShadeColor_Feather ("1st Shade Feather", Range(0.001, 0.3)) = 0.10
 
         [Header(2nd Shade)]
-        _2nd_ShadeColor ("2nd Shade Tint", Color) = (0.72, 0.62, 0.60, 1)
-        _2nd_ShadeColor_Step ("2nd Shade Step", Range(0, 1)) = 0.15
-        _2nd_ShadeColor_Feather ("2nd Shade Feather", Range(0.001, 0.3)) = 0.08
+        _2nd_ShadeColor ("2nd Shade Tint", Color) = (0.78, 0.68, 0.70, 1)
+        _2nd_ShadeColor_Step ("2nd Shade Step", Range(0, 1)) = 0.12
+        _2nd_ShadeColor_Feather ("2nd Shade Feather", Range(0.001, 0.3)) = 0.12
 
         [Header(Rim Light)]
         [Toggle(_RIMLIGHT_ON)] _RimLight ("Enable Rim Light", Float) = 1
-        _RimLightColor ("Rim Light Color", Color) = (0.85, 0.75, 0.68, 1)
-        _RimLight_Power ("Rim Light Power", Range(1, 20)) = 8
-        _RimLight_InsideMask ("Rim Inside Mask", Range(0, 1)) = 0.2
+        _RimLightColor ("Rim Light Color", Color) = (1.0, 0.92, 0.88, 1)
+        _RimLight_Power ("Rim Light Power", Range(1, 20)) = 5
+        _RimLight_InsideMask ("Rim Inside Mask", Range(0, 1)) = 0.15
 
         [Header(Outline)]
         [Toggle(_OUTLINE_ON)] _OUTLINE ("Enable Outline", Float) = 1
-        _Outline_Width ("Outline Width", Range(0, 2)) = 0.3
-        _Outline_Color ("Outline Color", Color) = (0.35, 0.30, 0.28, 1)
+        _Outline_Width ("Outline Width", Range(0, 2)) = 0.25
+        _Outline_Color ("Outline Color", Color) = (0.40, 0.34, 0.36, 1)
         [Toggle] _Is_BlendBaseColor ("Blend Base Color into Outline", Float) = 1
         [Toggle] _Is_LightColor_Outline ("Light Color Outline", Float) = 0
 
         [Header(Lighting)]
-        _GI_Intensity ("GI Intensity", Range(0, 1)) = 0.35
-        _Tweak_SystemShadowsLevel ("Shadow Level Tweak", Range(-1, 1)) = 0.1
+        _GI_Intensity ("GI Intensity", Range(0, 1)) = 0.45
+        _Tweak_SystemShadowsLevel ("Shadow Level Tweak", Range(-1, 1)) = 0.15
         _HighColor_Power ("Specular Power (0=off)", Range(0, 1)) = 0
 
         [Header(Unlit and Brightness)]
         _UnlitBlend ("Unlit Blend", Range(0, 1)) = 0
-        _MinBrightness ("Min Brightness", Range(0, 1)) = 0.04
-        _ShadowSaturation ("Shadow Saturation", Range(0, 2)) = 1.2
+        _MinBrightness ("Min Brightness", Range(0, 1)) = 0.10
+        _ShadowSaturation ("Shadow Saturation", Range(0, 2)) = 1.15
 
         [Header(Alpha Cutout)]
         [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha Clip", Float) = 0
@@ -220,7 +220,6 @@ Shader "MiSide/Character"
                     halfLambert);
                 ramp2 = min(ramp2, shadowAtten);
 
-                // ---- HSR-style lighting: base color is king ----
                 // Shade tint: blend between 2nd and 1st shade tint colors
                 half3 shadeTint = lerp(_2nd_ShadeColor.rgb, _1st_ShadeColor.rgb, ramp2);
 
@@ -228,27 +227,16 @@ Shader "MiSide/Character"
                 half shadeLuma = dot(shadeTint, half3(0.299, 0.587, 0.114));
                 shadeTint = lerp(half3(shadeLuma, shadeLuma, shadeLuma), shadeTint, _ShadowSaturation);
 
-                // Combine direct + indirect light (same as environment shader)
-                // then soft-clamp to prevent overbright while PRESERVING
-                // the environment's color temperature on the character.
-                half3 totalLight = mainLight.color + bakedGI * _GI_Intensity;
-                half peakLight = max(max(totalLight.r, totalLight.g), totalLight.b);
-                // Proportional normalization: if peak > 1 scale down evenly
-                // (keeps color ratio intact — pink room stays pink, not clipped)
-                totalLight *= rcp(max(peakLight, 1.0));
-
-                // Lit path: base color tinted by environment light
-                half3 litColor = baseColor.rgb * totalLight;
-
-                // Shadow path: base color * shade tint, lifted by ambient
-                half3 shadowColor = baseColor.rgb * shadeTint * saturate(
-                    bakedGI * _GI_Intensity + 0.3);
+                // Integrated GI: match environment shader's lighting model
+                // Lit path gets direct + GI, shadow path gets warm tint + ambient lift
+                half3 litColor    = baseColor.rgb * (mainLight.color + bakedGI * _GI_Intensity);
+                half3 shadowColor = baseColor.rgb * shadeTint * saturate(bakedGI * _GI_Intensity + 0.35);
 
                 // Final toon blend: shadow path <-> lit path
                 half3 finalColor = lerp(shadowColor, litColor, ramp1);
 
-                // Additional lights
-                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step) * 0.6;
+                // Additional lights (toon-shaded, matching environment contribution)
+                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step) * 0.85;
 
                 // Rim light
                 #ifdef _RIMLIGHT_ON
@@ -259,8 +247,9 @@ Shader "MiSide/Character"
                 }
                 #endif
 
-                // ---- Unlit blend (eyes/special): preserve base color with environment tint ----
-                half3 unlitColor = baseColor.rgb * saturate(totalLight * 0.8 + 0.15);
+                // ---- Unlit blend (eyes/special): preserve base color with gentle ambient ----
+                half3 totalLight = mainLight.color + bakedGI * _GI_Intensity;
+                half3 unlitColor = baseColor.rgb * saturate(totalLight * 0.75 + 0.2);
                 finalColor = lerp(finalColor, unlitColor, _UnlitBlend);
 
                 // ---- Min brightness floor ----
