@@ -65,6 +65,9 @@ Shader "MiSide/ToonWater"
             #pragma fragment WaterFrag
 
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile _ _ADDITIONAL_LIGHTS_VERTEX _ADDITIONAL_LIGHTS
+            #pragma multi_compile _ _ADDITIONAL_LIGHT_SHADOWS
+            #pragma multi_compile _ _FORWARD_PLUS
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
             #pragma multi_compile _ DOTS_INSTANCING_ON
@@ -195,6 +198,32 @@ Shader "MiSide/ToonWater"
                 // Hard-step toon specular
                 float toonSpec = smoothstep(_SpecThreshold - 0.05, _SpecThreshold + 0.05, specular);
                 waterColor.rgb += _WaterSpecColor.rgb * toonSpec * toonRamp * 0.5;
+
+                // --- Additional lights (point/spot reflections on water) ---
+                #if defined(_ADDITIONAL_LIGHTS) || defined(_FORWARD_PLUS)
+                {
+                    InputData inputData = (InputData)0;
+                    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionCS);
+                    inputData.positionWS = IN.positionWS;
+
+                    uint lightsCount = GetAdditionalLightsCount();
+                    LIGHT_LOOP_BEGIN(lightsCount)
+                        Light light = GetAdditionalLight(lightIndex, IN.positionWS);
+                        half atten = light.distanceAttenuation * light.shadowAttenuation;
+
+                        // Toon diffuse contribution
+                        half addNdotL = dot(normalWS, light.direction) * 0.5 + 0.5;
+                        half addRamp = smoothstep(_ShadowStep - _ShadowFeather, _ShadowStep + _ShadowFeather, addNdotL);
+                        waterColor.rgb += waterColor.rgb * light.color * addRamp * atten * 0.5;
+
+                        // Toon specular from additional lights
+                        float3 addHalf = normalize(viewDir + light.direction);
+                        half addSpec = pow(saturate(dot(normalWS, addHalf)), _SpecPower);
+                        half addToonSpec = smoothstep(_SpecThreshold - 0.05, _SpecThreshold + 0.05, addSpec);
+                        waterColor.rgb += _WaterSpecColor.rgb * addToonSpec * atten * 0.35;
+                    LIGHT_LOOP_END
+                }
+                #endif
 
                 // --- Scrolling foam overlay ---
                 float2 foamUV = IN.worldXZ * _FoamScale

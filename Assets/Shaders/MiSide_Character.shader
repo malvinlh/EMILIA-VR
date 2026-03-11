@@ -289,14 +289,37 @@ Shader "MiSide/Character"
                 // Specular highlight (Blinn-Phong with toon step)
                 if (_HighColor_Power > 0.001)
                 {
+                    half specExponent = exp2(10 * _HighColor_Power + 1);
+
+                    // Main light specular
                     float3 halfDir = normalize(mainLight.direction + viewDir);
                     half NdotH = saturate(dot(normalWS, halfDir));
-                    half specExponent = exp2(10 * _HighColor_Power + 1);
                     half spec = pow(NdotH, specExponent);
                     half specMask = smoothstep(_HighColor_Step - _HighColor_Feather,
                                                _HighColor_Step + _HighColor_Feather, spec);
                     specMask *= ramp1; // Only in lit areas
                     finalColor += _HighColor.rgb * specMask * mainLight.color;
+
+                    // Additional light specular (eye/hair glints from point lights)
+                    #if defined(_ADDITIONAL_LIGHTS) || defined(_FORWARD_PLUS)
+                    {
+                        InputData inputData = (InputData)0;
+                        inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(IN.positionCS);
+                        inputData.positionWS = IN.positionWS;
+
+                        uint specLightsCount = GetAdditionalLightsCount();
+                        LIGHT_LOOP_BEGIN(specLightsCount)
+                            Light addLight = GetAdditionalLight(lightIndex, IN.positionWS);
+                            half addAtten = addLight.distanceAttenuation * addLight.shadowAttenuation;
+                            float3 addHalfDir = normalize(addLight.direction + viewDir);
+                            half addNdotH = saturate(dot(normalWS, addHalfDir));
+                            half addSpec = pow(addNdotH, specExponent);
+                            half addSpecMask = smoothstep(_HighColor_Step - _HighColor_Feather,
+                                                          _HighColor_Step + _HighColor_Feather, addSpec);
+                            finalColor += _HighColor.rgb * addSpecMask * addLight.color * addAtten * 0.7;
+                        LIGHT_LOOP_END
+                    }
+                    #endif
                 }
 
                 // Rim light
