@@ -21,7 +21,7 @@ Shader "MiSide/ToonWater"
         [Header(Foam)]
         _FoamTex ("Foam Texture", 2D) = "white" {}
         _FoamColor ("Foam Color", Color) = (1, 1, 1, 0.5)
-        _FoamSpeed ("Foam Scroll Speed", Range(0, 0.5)) = 0.08
+        _FoamSpeed ("Foam Scroll Speed", Range(0, 0.5)) = 0.03
         _FoamScale ("Foam UV Scale", Range(0.1, 5)) = 1.0
         _FoamIntensity ("Foam Intensity", Range(0, 1)) = 0.3
 
@@ -30,9 +30,14 @@ Shader "MiSide/ToonWater"
         _ShorelineFoamColor ("Shoreline Foam Color", Color) = (1, 1, 1, 0.8)
 
         [Header(Waves)]
-        _WaveAmplitude ("Wave Amplitude", Range(0, 0.2)) = 0.03
+        _WaveAmplitude ("Wave Amplitude", Range(0, 0.2)) = 0.015
         _WaveFrequency ("Wave Frequency", Range(0.5, 10)) = 2.0
-        _WaveSpeed ("Wave Speed", Range(0, 5)) = 1.5
+        _WaveSpeed ("Wave Speed", Range(0, 5)) = 0.4
+
+        [Header(Fresnel Reflection)]
+        _ReflectionColor ("Reflection Color", Color) = (0.7, 0.85, 1.0, 1)
+        _ReflectionStrength ("Reflection Strength", Range(0, 1)) = 0.25
+        _FresnelPower ("Fresnel Power", Range(1, 10)) = 3.0
 
         [Header(Rendering)]
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull Mode", Float) = 2
@@ -97,6 +102,9 @@ Shader "MiSide/ToonWater"
                 half   _WaveAmplitude;
                 half   _WaveFrequency;
                 half   _WaveSpeed;
+                half4  _ReflectionColor;
+                half   _ReflectionStrength;
+                half   _FresnelPower;
             CBUFFER_END
 
             TEXTURE2D(_FoamTex); SAMPLER(sampler_FoamTex);
@@ -249,6 +257,13 @@ Shader "MiSide/ToonWater"
                     waterColor.a = saturate(waterColor.a + shorelineMask * 0.15);
                 }
                 #endif
+
+                // --- Fresnel reflection ---
+                {
+                    float NdotV = saturate(dot(normalWS, viewDir));
+                    float fresnel = pow(1.0 - NdotV, _FresnelPower);
+                    waterColor.rgb += _ReflectionColor.rgb * fresnel * _ReflectionStrength * toonRamp;
+                }
 
                 // Apply fog
                 waterColor.rgb = MixFog(waterColor.rgb, IN.fogFactor);

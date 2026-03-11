@@ -23,7 +23,7 @@ Shader "MiSide/Character"
 
         [Header(Outline)]
         [Toggle(_OUTLINE_ON)] _OUTLINE ("Enable Outline", Float) = 1
-        _Outline_Width ("Outline Width", Range(0, 2)) = 0.25
+        _Outline_Width ("Outline Width", Range(0, 2)) = 0.18
         _Outline_Color ("Outline Color", Color) = (0.40, 0.34, 0.36, 1)
         [Toggle] _Is_BlendBaseColor ("Blend Base Color into Outline", Float) = 1
         [Toggle] _Is_LightColor_Outline ("Light Color Outline", Float) = 0
@@ -45,7 +45,7 @@ Shader "MiSide/Character"
         _MatCap_Intensity ("MatCap Intensity", Range(0, 1)) = 0.3
 
         [Header(Lighting)]
-        _GI_Intensity ("GI Intensity", Range(0, 1)) = 0.45
+        _GI_Intensity ("GI Intensity", Range(0, 1)) = 0.55
         _Tweak_SystemShadowsLevel ("Shadow Level Tweak", Range(-1, 1)) = 0.15
 
         [Header(Unlit and Brightness)]

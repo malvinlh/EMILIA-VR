@@ -8,7 +8,13 @@ Shader "MiSide/Environment"
         [Header(Toon Shading)]
         _ShadowColor ("Shadow Color", Color) = (0.85, 0.75, 0.72, 1)
         _ShadowStep ("Shadow Step", Range(0, 1)) = 0.5
-        _ShadowFeather ("Shadow Feather", Range(0.001, 0.5)) = 0.05
+        _ShadowFeather ("Shadow Feather", Range(0.001, 0.5)) = 0.10
+
+        [Header(Translucency)]
+        [Toggle(_TRANSLUCENCY)] _TranslucencyToggle ("Enable Translucency", Float) = 0
+        _TranslucencyColor ("Translucency Color", Color) = (0.85, 0.95, 0.75, 1)
+        _TranslucencyPower ("Translucency Power", Range(1, 10)) = 4
+        _TranslucencyStrength ("Translucency Strength", Range(0, 1)) = 0.3
 
         [Header(Normal Map)]
         [Toggle(_NORMALMAP)] _NormalMapToggle ("Enable Normal Map", Float) = 0
@@ -68,6 +74,7 @@ Shader "MiSide/Environment"
             #pragma shader_feature_local _EMISSION
             #pragma shader_feature_local _RIMLIGHT
             #pragma shader_feature_local _NORMALMAP
+            #pragma shader_feature_local _TRANSLUCENCY
 
             // URP multi_compiles
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
@@ -99,6 +106,9 @@ Shader "MiSide/Environment"
                 float4 _EmissionMap_ST;
                 half4  _EmissionColor;
                 half   _Cutoff;
+                half4  _TranslucencyColor;
+                half   _TranslucencyPower;
+                half   _TranslucencyStrength;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);      SAMPLER(sampler_BaseMap);
@@ -117,6 +127,7 @@ Shader "MiSide/Environment"
                 #endif
                 float2 uv         : TEXCOORD0;
                 float2 lightmapUV : TEXCOORD1;
+                half4  color      : COLOR;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
@@ -138,6 +149,8 @@ Shader "MiSide/Environment"
                 float3 tangentWS   : TEXCOORD6;
                 float3 bitangentWS : TEXCOORD7;
                 #endif
+
+                half4  vertexColor : COLOR;
 
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
@@ -179,6 +192,8 @@ Shader "MiSide/Environment"
                 OUTPUT_LIGHTMAP_UV(IN.lightmapUV, unity_LightmapST, OUT.lightmapUV);
                 OUTPUT_SH(OUT.normalWS, OUT.vertexSH);
 
+                OUT.vertexColor = IN.color;
+
                 return OUT;
             }
 
@@ -192,6 +207,7 @@ Shader "MiSide/Environment"
 
                 // Sample base texture
                 half4 baseColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv) * _BaseColor;
+                baseColor *= IN.vertexColor; // Vertex color tint
 
                 #ifdef _ALPHATEST_ON
                     clip(baseColor.a - _Cutoff);
@@ -258,6 +274,16 @@ Shader "MiSide/Environment"
                     finalColor += emission * _EmissionColor.rgb;
                 #endif
 
+                // Translucency (foliage backlighting)
+                #ifdef _TRANSLUCENCY
+                {
+                    float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
+                    half VdotL = saturate(dot(viewDir, -mainLight.direction));
+                    half backlight = pow(VdotL, _TranslucencyPower) * _TranslucencyStrength;
+                    finalColor += baseColor.rgb * _TranslucencyColor.rgb * backlight * mainLight.color * shadowAtten;
+                }
+                #endif
+
                 // Apply fog
                 finalColor = MixFog(finalColor, IN.fogFactor);
 
@@ -305,6 +331,9 @@ Shader "MiSide/Environment"
                 float4 _EmissionMap_ST;
                 half4  _EmissionColor;
                 half   _Cutoff;
+                half4  _TranslucencyColor;
+                half   _TranslucencyPower;
+                half   _TranslucencyStrength;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -399,6 +428,9 @@ Shader "MiSide/Environment"
                 float4 _EmissionMap_ST;
                 half4  _EmissionColor;
                 half   _Cutoff;
+                half4  _TranslucencyColor;
+                half   _TranslucencyPower;
+                half   _TranslucencyStrength;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -480,6 +512,9 @@ Shader "MiSide/Environment"
                 float4 _EmissionMap_ST;
                 half4  _EmissionColor;
                 half   _Cutoff;
+                half4  _TranslucencyColor;
+                half   _TranslucencyPower;
+                half   _TranslucencyStrength;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -592,6 +627,9 @@ Shader "MiSide/Environment"
                 float4 _EmissionMap_ST;
                 half4  _EmissionColor;
                 half   _Cutoff;
+                half4  _TranslucencyColor;
+                half   _TranslucencyPower;
+                half   _TranslucencyStrength;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);      SAMPLER(sampler_BaseMap);
