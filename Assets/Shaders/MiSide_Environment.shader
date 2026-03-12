@@ -32,12 +32,24 @@ Shader "MiSide/Environment"
         _EmissionMap ("Emission Map", 2D) = "black" {}
         [HDR] _EmissionColor ("Emission Color", Color) = (1,1,1,0)
 
+        [Header(Glass Reflection)]
+        [Toggle(_GLASS)] _GlassToggle ("Enable Glass", Float) = 0
+        _GlassColor ("Glass Tint", Color) = (0.85, 0.92, 1.0, 0.15)
+        _GlassReflectivity ("Reflectivity", Range(0, 1)) = 0.4
+        _GlassSmoothness ("Smoothness", Range(0, 1)) = 0.85
+        _GlassFresnelPower ("Fresnel Power", Range(1, 10)) = 3.0
+
         [Header(Alpha Cutout)]
         [Toggle(_ALPHATEST_ON)] _AlphaClip ("Alpha Clip", Float) = 0
         _Cutoff ("Alpha Cutoff", Range(0, 1)) = 0.5
 
         [Header(Rendering)]
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull Mode", Float) = 2
+
+        // Hidden blend properties — controlled by ShaderGUI
+        [HideInInspector] _SrcBlend ("SrcBlend", Float) = 1
+        [HideInInspector] _DstBlend ("DstBlend", Float) = 0
+        [HideInInspector] _ZWrite ("ZWrite", Float) = 1
     }
 
     SubShader
@@ -59,7 +71,8 @@ Shader "MiSide/Environment"
             Tags { "LightMode" = "UniversalForward" }
 
             Cull [_Cull]
-            ZWrite On
+            Blend [_SrcBlend] [_DstBlend]
+            ZWrite [_ZWrite]
             ZTest LEqual
 
             HLSLPROGRAM
@@ -75,6 +88,7 @@ Shader "MiSide/Environment"
             #pragma shader_feature_local _RIMLIGHT
             #pragma shader_feature_local _NORMALMAP
             #pragma shader_feature_local _TRANSLUCENCY
+            #pragma shader_feature_local _GLASS
 
             // URP multi_compiles
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
@@ -109,6 +123,10 @@ Shader "MiSide/Environment"
                 half4  _TranslucencyColor;
                 half   _TranslucencyPower;
                 half   _TranslucencyStrength;
+                half4  _GlassColor;
+                half   _GlassReflectivity;
+                half   _GlassSmoothness;
+                half   _GlassFresnelPower;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);      SAMPLER(sampler_BaseMap);
@@ -284,10 +302,39 @@ Shader "MiSide/Environment"
                 }
                 #endif
 
+                // Glass reflection (Fresnel + reflection probe)
+                half finalAlpha = baseColor.a;
+                #ifdef _GLASS
+                {
+                    float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
+                    float3 reflectDir = reflect(-viewDir, normalWS);
+
+                    // Fresnel: edges are more reflective
+                    half NdotV = saturate(dot(normalWS, viewDir));
+                    half fresnel = pow(1.0 - NdotV, _GlassFresnelPower);
+                    half reflStrength = lerp(_GlassReflectivity * 0.3, _GlassReflectivity, fresnel);
+
+                    // Sample reflection probe cubemap (roughness from smoothness)
+                    half perceptualRoughness = 1.0 - _GlassSmoothness;
+                    half mip = perceptualRoughness * 6.0; // UNITY_SPECCUBE_LOD_STEPS
+                    half4 encodedIrradiance = SAMPLE_TEXTURECUBE_LOD(unity_SpecCube0, samplerunity_SpecCube0, reflectDir, mip);
+                    half3 reflColor = DecodeHDREnvironment(encodedIrradiance, unity_SpecCube0_HDR);
+
+                    // Tint the reflection
+                    reflColor *= _GlassColor.rgb;
+
+                    // Blend reflection onto the surface
+                    finalColor = lerp(finalColor, reflColor, reflStrength);
+
+                    // Alpha: glass base transparency + Fresnel makes edges more opaque
+                    finalAlpha = lerp(_GlassColor.a, saturate(_GlassColor.a + 0.6), fresnel);
+                }
+                #endif
+
                 // Apply fog
                 finalColor = MixFog(finalColor, IN.fogFactor);
 
-                return half4(finalColor, baseColor.a);
+                return half4(finalColor, finalAlpha);
             }
             ENDHLSL
         }
@@ -334,6 +381,10 @@ Shader "MiSide/Environment"
                 half4  _TranslucencyColor;
                 half   _TranslucencyPower;
                 half   _TranslucencyStrength;
+                half4  _GlassColor;
+                half   _GlassReflectivity;
+                half   _GlassSmoothness;
+                half   _GlassFresnelPower;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -431,6 +482,10 @@ Shader "MiSide/Environment"
                 half4  _TranslucencyColor;
                 half   _TranslucencyPower;
                 half   _TranslucencyStrength;
+                half4  _GlassColor;
+                half   _GlassReflectivity;
+                half   _GlassSmoothness;
+                half   _GlassFresnelPower;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -515,6 +570,10 @@ Shader "MiSide/Environment"
                 half4  _TranslucencyColor;
                 half   _TranslucencyPower;
                 half   _TranslucencyStrength;
+                half4  _GlassColor;
+                half   _GlassReflectivity;
+                half   _GlassSmoothness;
+                half   _GlassFresnelPower;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
@@ -630,6 +689,10 @@ Shader "MiSide/Environment"
                 half4  _TranslucencyColor;
                 half   _TranslucencyPower;
                 half   _TranslucencyStrength;
+                half4  _GlassColor;
+                half   _GlassReflectivity;
+                half   _GlassSmoothness;
+                half   _GlassFresnelPower;
             CBUFFER_END
 
             TEXTURE2D(_BaseMap);      SAMPLER(sampler_BaseMap);

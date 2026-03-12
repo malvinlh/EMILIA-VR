@@ -24,8 +24,7 @@ Material:
   m_Shader: {fileID: 4800000, guid: 18e0032a4e875e5488cee334127ac8b4, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _EMISSION
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -110,8 +109,12 @@ Material:
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
     - _DstBlendAlpha: 0
-    - _EmissionToggle: 1
+    - _EmissionToggle: 0
     - _EnvironmentReflections: 1
+    - _GlassFresnelPower: 3
+    - _GlassReflectivity: 0.4
+    - _GlassSmoothness: 0.85
+    - _GlassToggle: 0
     - _GlossMapScale: 1
     - _Glossiness: 0.4472136
     - _GlossyReflections: 1
@@ -144,6 +147,7 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _GlassColor: {r: 0.85, g: 0.92, b: 1, a: 0.15}
     - _RimColor: {r: 1, g: 0.9, b: 0.85, a: 1}
     - _ShadowColor: {r: 0.85, g: 0.75, b: 0.72, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}

@@ -12,6 +12,7 @@ public class MiSideShaderGUI : ShaderGUI
     private bool _showNormalMap = true;
     private bool _showRim = true;
     private bool _showEmission = true;
+    private bool _showGlass = true;
     private bool _showCutout = true;
     private bool _showRendering = true;
 
@@ -110,6 +111,25 @@ public class MiSideShaderGUI : ShaderGUI
 
         EditorGUILayout.Space(4);
 
+        // ----- Glass Reflection -----
+        MaterialProperty glassToggle = FindProperty("_GlassToggle", properties);
+        _showGlass = EditorGUILayout.Foldout(_showGlass, "Glass / Reflection", true, EditorStyles.foldoutHeader);
+        if (_showGlass)
+        {
+            EditorGUI.indentLevel++;
+            materialEditor.ShaderProperty(glassToggle, "Enable Glass");
+            if (glassToggle.floatValue > 0.5f)
+            {
+                materialEditor.ShaderProperty(FindProperty("_GlassColor", properties), "Glass Tint");
+                materialEditor.ShaderProperty(FindProperty("_GlassReflectivity", properties), "Reflectivity");
+                materialEditor.ShaderProperty(FindProperty("_GlassSmoothness", properties), "Smoothness");
+                materialEditor.ShaderProperty(FindProperty("_GlassFresnelPower", properties), "Fresnel Power");
+            }
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space(4);
+
         // ----- Rendering -----
         _showRendering = EditorGUILayout.Foldout(_showRendering, "Rendering", true, EditorStyles.foldoutHeader);
         if (_showRendering)
@@ -144,6 +164,22 @@ public class MiSideShaderGUI : ShaderGUI
                 ApplyMiSideDefaults(mat);
                 mat.SetFloat("_EmissionToggle", 1f);
                 mat.EnableKeyword("_EMISSION");
+                EditorUtility.SetDirty(mat);
+            }
+        }
+
+        if (GUILayout.Button("Set Glass Preset"))
+        {
+            foreach (Object target in materialEditor.targets)
+            {
+                Material mat = target as Material;
+                ApplyMiSideDefaults(mat);
+                mat.SetFloat("_GlassToggle", 1f);
+                mat.EnableKeyword("_GLASS");
+                mat.SetColor("_GlassColor", new Color(0.85f, 0.92f, 1.0f, 0.15f));
+                mat.SetFloat("_GlassReflectivity", 0.4f);
+                mat.SetFloat("_GlassSmoothness", 0.85f);
+                mat.SetFloat("_GlassFresnelPower", 3.0f);
                 EditorUtility.SetDirty(mat);
             }
         }
@@ -190,10 +226,16 @@ public class MiSideShaderGUI : ShaderGUI
         mat.SetFloat("_RimIntensity", 0.15f);
         mat.SetFloat("_EmissionToggle", 0f);
         mat.DisableKeyword("_EMISSION");
+        mat.SetFloat("_GlassToggle", 0f);
+        mat.DisableKeyword("_GLASS");
         mat.SetFloat("_AlphaClip", 0f);
         mat.DisableKeyword("_ALPHATEST_ON");
         mat.SetFloat("_Cull", (float)CullMode.Back);
         mat.renderQueue = 2000;
+        // Reset blend to opaque
+        mat.SetFloat("_SrcBlend", (float)BlendMode.One);
+        mat.SetFloat("_DstBlend", (float)BlendMode.Zero);
+        mat.SetFloat("_ZWrite", 1f);
     }
 
     private static void UpdateKeywordsAndQueue(Material mat)
@@ -204,16 +246,40 @@ public class MiSideShaderGUI : ShaderGUI
         SetKeyword(mat, "_ALPHATEST_ON", mat.GetFloat("_AlphaClip") > 0.5f);
         SetKeyword(mat, "_NORMALMAP", mat.GetFloat("_NormalMapToggle") > 0.5f);
 
-        // Auto render queue
-        if (mat.GetFloat("_AlphaClip") > 0.5f)
+        bool glass = mat.GetFloat("_GlassToggle") > 0.5f;
+        SetKeyword(mat, "_GLASS", glass);
+
+        // Glass: enable alpha blending and transparent queue
+        if (glass)
         {
-            if (mat.renderQueue < 2450)
-                mat.renderQueue = 2450;
+            mat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.SetOverrideTag("RenderType", "Transparent");
+            if (mat.renderQueue < 3000)
+                mat.renderQueue = 3000;
         }
         else
         {
-            if (mat.renderQueue == 2450)
-                mat.renderQueue = 2000;
+            mat.SetFloat("_SrcBlend", (float)BlendMode.One);
+            mat.SetFloat("_DstBlend", (float)BlendMode.Zero);
+            mat.SetFloat("_ZWrite", 1f);
+            mat.SetOverrideTag("RenderType", "");
+        }
+
+        // Auto render queue (glass takes priority over cutout)
+        if (!glass)
+        {
+            if (mat.GetFloat("_AlphaClip") > 0.5f)
+            {
+                if (mat.renderQueue < 2450)
+                    mat.renderQueue = 2450;
+            }
+            else
+            {
+                if (mat.renderQueue == 2450 || mat.renderQueue >= 3000)
+                    mat.renderQueue = 2000;
+            }
         }
     }
 
