@@ -152,6 +152,50 @@ public class VRChatBridge : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns a read-only snapshot of messages for any conversation by id.
+    /// Returns null if the conversation has not been fetched into the cache yet.
+    /// </summary>
+    public IReadOnlyList<Message> GetMessagesForConversation(string conversationId)
+    {
+        if (!string.IsNullOrEmpty(conversationId) && _messageCache.TryGetValue(conversationId, out var msgs))
+            return msgs;
+        return null;
+    }
+
+    /// <summary>
+    /// Fetches a conversation's messages into the local cache and fires
+    /// <see cref="OnMessagesChanged"/> when ready, WITHOUT altering the active
+    /// conversation or touching the dialogue panel.
+    /// Use this from the history panel so the dialogue panel is undisturbed.
+    /// </summary>
+    public void FetchMessagesForHistory(string conversationId)
+    {
+        if (string.IsNullOrEmpty(conversationId)) return;
+        StartCoroutine(CoFetchForHistory(conversationId));
+    }
+
+    private IEnumerator CoFetchForHistory(string convoId)
+    {
+        if (!_messageCache.ContainsKey(convoId))
+        {
+            Message[] fetched = null;
+            yield return ServiceManager.Instance.ChatService.FetchConversationWithMessages(
+                convoId,
+                _userId,
+                msgs => fetched = msgs,
+                err  => Debug.LogError($"[VRChatBridge] FetchForHistory failed: {err}")
+            );
+
+            if (fetched != null)
+                _messageCache[convoId] = new List<Message>(fetched);
+            else
+                yield break;
+        }
+
+        OnMessagesChanged?.Invoke();
+    }
+
+    /// <summary>
     /// Gets the display title for a conversation (topic or fallback).
     /// </summary>
     public string GetConversationTitle(string convoId)

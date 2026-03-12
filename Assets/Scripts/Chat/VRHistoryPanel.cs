@@ -53,6 +53,12 @@ public class VRHistoryPanel : MonoBehaviour
     [Header("Empty State")]
     [SerializeField] private GameObject _emptyStateLabel;
 
+    [Header("Scroll Buttons")]
+    [SerializeField] private Button _scrollUpButton;
+    [SerializeField] private Button _scrollDownButton;
+    [Tooltip("Canvas-units per second imparted to the scroll rect when a scroll button is poked.")]
+    [SerializeField] private float _scrollSpeed = 900f;
+
     [Header("Animation")]
     [SerializeField] private float _fadeSpeed = 4f;
 
@@ -113,6 +119,11 @@ public class VRHistoryPanel : MonoBehaviour
             _backButton.onClick.AddListener(GoBackToList);
             _backButton.gameObject.SetActive(false);
         }
+
+        if (_scrollUpButton != null)
+            _scrollUpButton.onClick.AddListener(OnScrollUp);
+        if (_scrollDownButton != null)
+            _scrollDownButton.onClick.AddListener(OnScrollDown);
     }
 
     private void OnEnable()
@@ -281,8 +292,10 @@ public class VRHistoryPanel : MonoBehaviour
         if (_backButton != null)
             _backButton.gameObject.SetActive(true);
 
-        // Load conversation into bridge cache (triggers OnMessagesChanged → RebuildChatLog)
-        _chatBridge.LoadConversation(conversationId);
+        // Fetch messages into cache without touching the dialogue panel.
+        // If already cached, OnMessagesChanged fires immediately and RebuildChatLog refreshes;
+        // if not yet cached, the coroutine fires OnMessagesChanged when done.
+        _chatBridge.FetchMessagesForHistory(conversationId);
 
         // Also build immediately from cache if already loaded
         RebuildChatLog();
@@ -292,7 +305,7 @@ public class VRHistoryPanel : MonoBehaviour
     {
         ClearItems();
 
-        var messages = _chatBridge.GetCurrentMessages();
+        var messages = _chatBridge.GetMessagesForConversation(_viewingConversationId);
         if (messages == null || messages.Count == 0)
         {
             if (_emptyStateLabel != null)
@@ -369,6 +382,9 @@ public class VRHistoryPanel : MonoBehaviour
         }
         _spawnedItems.Clear();
     }
+
+    private void OnScrollUp()   { if (_scrollRect != null) _scrollRect.velocity = new Vector2(0,  _scrollSpeed); }
+    private void OnScrollDown() { if (_scrollRect != null) _scrollRect.velocity = new Vector2(0, -_scrollSpeed); }
 
     private void ForceLayoutAndScrollTop()    => StartCoroutine(RebuildLayoutAndScroll(1f));
     private void ForceLayoutAndScrollBottom() => StartCoroutine(RebuildLayoutAndScroll(0f));

@@ -1086,11 +1086,23 @@ PrefabInstance:
       value: VRHistoryItem
       objectReference: {fileID: 0}
     - target: {fileID: 6516965676218652882, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6516965676218652882, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6516965676218652882, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6516965676218652882, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
       propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6516965676218652882, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
+      propertyPath: m_SizeDelta.y
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6516965676218652882, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
@@ -1102,7 +1114,15 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7969233137172170556, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7969233137172170556, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
       propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7969233137172170556, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
+      propertyPath: m_AnchorMin.x
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7969233137172170556, guid: 5b539eb473da6a048bbfe968f62e0f2c, type: 3}
@@ -1248,10 +1268,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 1360252613230026095, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
-      propertyPath: m_ChildControlWidth
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 2068312883183762047, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
       propertyPath: m_text
       value: X
@@ -1261,6 +1277,22 @@ PrefabInstance:
       value: 4294110187
       objectReference: {fileID: 0}
     - target: {fileID: 2068312883183762047, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 3213070546204120410, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294110187
+      objectReference: {fileID: 0}
+    - target: {fileID: 3213070546204120410, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 3407789218041532373, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294110187
+      objectReference: {fileID: 0}
+    - target: {fileID: 3407789218041532373, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
       objectReference: {fileID: 0}
@@ -1303,6 +1335,14 @@ PrefabInstance:
     - target: {fileID: 6034947740007872661, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
       propertyPath: m_AdditionalShaderChannelsFlag
       value: 25
+      objectReference: {fileID: 0}
+    - target: {fileID: 6608886371579788952, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294110187
+      objectReference: {fileID: 0}
+    - target: {fileID: 6608886371579788952, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
       objectReference: {fileID: 0}
     - target: {fileID: 7056708566119426438, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
       propertyPath: m_Name
@@ -4780,6 +4820,14 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 1039649077116847442, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294110187
+      objectReference: {fileID: 0}
+    - target: {fileID: 1039649077116847442, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 1630373565182942717, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4294110187
@@ -4856,6 +4904,14 @@ PrefabInstance:
       propertyPath: m_TextStyleHashCode
       value: -1183493901
       objectReference: {fileID: 0}
+    - target: {fileID: 3048454878730307025, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294110187
+      objectReference: {fileID: 0}
+    - target: {fileID: 3048454878730307025, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
     - target: {fileID: 3616270502365738218, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
       propertyPath: m_fontColor32.rgba
       value: 4294110187
@@ -4869,6 +4925,14 @@ PrefabInstance:
       value: 4294110187
       objectReference: {fileID: 0}
     - target: {fileID: 3830728161504720002, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
+      propertyPath: m_TextStyleHashCode
+      value: -1183493901
+      objectReference: {fileID: 0}
+    - target: {fileID: 4435864058536713255, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294110187
+      objectReference: {fileID: 0}
+    - target: {fileID: 4435864058536713255, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
       propertyPath: m_TextStyleHashCode
       value: -1183493901
       objectReference: {fileID: 0}

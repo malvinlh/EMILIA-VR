@@ -448,6 +448,12 @@ public static class ChatPrefabBuilder
         svRect.offsetMin = new Vector2(0, 0);
         svRect.offsetMax = new Vector2(0, -52); // below header + accent line
 
+        // Transparent hit-area so controller rays always have something to hit inside
+        // the scroll area, enabling thumbstick scroll even over TMP-only content.
+        var scrollBg = scrollViewGo.AddComponent<Image>();
+        scrollBg.color = new Color(0, 0, 0, 0);
+        scrollBg.raycastTarget = true;
+
         // Viewport
         var viewport = CreateUIChild(scrollViewGo, "Viewport");
         viewport.AddComponent<RectMask2D>();
@@ -479,6 +485,50 @@ public static class ChatPrefabBuilder
         emptyGo.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
         emptyGo.SetActive(false);
 
+        // ── Scroll Buttons (▲/▼ overlaid on the right edge of the scroll area) ──
+        // The scroll area spans from y=0 (bottom) to y=-52 (just below the accent line).
+        const float scrollBtnSize = 44f;
+
+        var scrollUpGo = CreateUIChild(bg, "ScrollUpButton");
+        var scrollUpRect = scrollUpGo.GetComponent<RectTransform>();
+        SetAnchors(scrollUpRect, new Vector2(1, 1), new Vector2(1, 1));
+        scrollUpRect.pivot = new Vector2(1, 1);
+        scrollUpRect.anchoredPosition = new Vector2(0, -52); // flush against accent line
+        scrollUpRect.sizeDelta = new Vector2(scrollBtnSize, scrollBtnSize);
+        var scrollUpImg = scrollUpGo.AddComponent<Image>();
+        scrollUpImg.color = new Color(1f, 1f, 1f, 0.12f);
+        scrollUpImg.raycastTarget = true;
+        var scrollUpBtn = scrollUpGo.AddComponent<Button>();
+        scrollUpBtn.targetGraphic = scrollUpImg;
+        var scrollUpColors = scrollUpBtn.colors;
+        scrollUpColors.normalColor      = new Color(1f, 1f, 1f, 0.12f);
+        scrollUpColors.highlightedColor = new Color(1f, 1f, 1f, 0.25f);
+        scrollUpColors.pressedColor     = new Color(1f, 1f, 1f, 0.40f);
+        scrollUpBtn.colors = scrollUpColors;
+        var scrollUpLabel = CreateTMP(scrollUpGo, "Label", "\u25b2", inter, 22f, BodyTextColor);
+        Stretch(scrollUpLabel);
+        scrollUpLabel.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+
+        var scrollDownGo = CreateUIChild(bg, "ScrollDownButton");
+        var scrollDownRect = scrollDownGo.GetComponent<RectTransform>();
+        SetAnchors(scrollDownRect, new Vector2(1, 0), new Vector2(1, 0));
+        scrollDownRect.pivot = new Vector2(1, 0);
+        scrollDownRect.anchoredPosition = Vector2.zero;
+        scrollDownRect.sizeDelta = new Vector2(scrollBtnSize, scrollBtnSize);
+        var scrollDownImg = scrollDownGo.AddComponent<Image>();
+        scrollDownImg.color = new Color(1f, 1f, 1f, 0.12f);
+        scrollDownImg.raycastTarget = true;
+        var scrollDownBtn = scrollDownGo.AddComponent<Button>();
+        scrollDownBtn.targetGraphic = scrollDownImg;
+        var scrollDownColors = scrollDownBtn.colors;
+        scrollDownColors.normalColor      = new Color(1f, 1f, 1f, 0.12f);
+        scrollDownColors.highlightedColor = new Color(1f, 1f, 1f, 0.25f);
+        scrollDownColors.pressedColor     = new Color(1f, 1f, 1f, 0.40f);
+        scrollDownBtn.colors = scrollDownColors;
+        var scrollDownLabel = CreateTMP(scrollDownGo, "Label", "\u25bc", inter, 22f, BodyTextColor);
+        Stretch(scrollDownLabel);
+        scrollDownLabel.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+
         // ── Wire serialized fields ──
         var so = new SerializedObject(histPanelComp);
         so.FindProperty("_contentParent").objectReferenceValue     = content.transform;
@@ -489,6 +539,8 @@ public static class ChatPrefabBuilder
         so.FindProperty("_backButton").objectReferenceValue        = backBtn;
         so.FindProperty("_closeButton").objectReferenceValue       = closeBtn;
         so.FindProperty("_emptyStateLabel").objectReferenceValue   = emptyGo;
+        so.FindProperty("_scrollUpButton").objectReferenceValue    = scrollUpBtn;
+        so.FindProperty("_scrollDownButton").objectReferenceValue  = scrollDownBtn;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         SavePrefab(root, path);
