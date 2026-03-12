@@ -2,8 +2,6 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.XR.Interaction.Toolkit;
-using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
 /// VR-native conversation history panel that shows a list of past conversations.
@@ -53,7 +51,6 @@ public class VRHistoryPanel : MonoBehaviour
 
     [Header("Panel Controls")]
     [SerializeField] private Button _closeButton;
-    [SerializeField] private XRSimpleInteractable _closePoke;
 
     [Header("Empty State")]
     [Tooltip("Text shown when there are no conversations.")]
@@ -90,8 +87,6 @@ public class VRHistoryPanel : MonoBehaviour
 
         if (_closeButton != null)
             _closeButton.onClick.AddListener(Hide);
-        if (_closePoke != null)
-            _closePoke.selectEntered.AddListener(_ => Hide());
     }
 
     private void OnEnable()
@@ -181,6 +176,10 @@ public class VRHistoryPanel : MonoBehaviour
             string convoId = convIds[i];
             CreateItem(convoId, convoId == activeId);
         }
+
+        // Force layout recalculation so items get correct width immediately
+        if (_contentParent is RectTransform contentRect)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
     }
 
     private void CreateItem(string convoId, bool isActive)
@@ -190,12 +189,16 @@ public class VRHistoryPanel : MonoBehaviour
         var go = Instantiate(_historyItemPrefab, _contentParent);
         _spawnedItems.Add(go);
 
-        // Set title text
-        var titleTmp = go.GetComponentInChildren<TMP_Text>();
-        if (titleTmp != null)
+        // Set title text — find by child name to avoid hitting DeleteButton's label
+        var titleTransform = go.transform.Find("TitleLabel");
+        if (titleTransform != null)
         {
-            string title = _chatBridge.GetConversationTitle(convoId);
-            titleTmp.text = title;
+            var titleTmp = titleTransform.GetComponent<TMP_Text>();
+            if (titleTmp != null)
+            {
+                string title = _chatBridge.GetConversationTitle(convoId);
+                titleTmp.text = string.IsNullOrEmpty(title) ? convoId : title;
+            }
         }
 
         // Highlight active conversation
@@ -203,18 +206,7 @@ public class VRHistoryPanel : MonoBehaviour
         if (bg != null && isActive)
             bg.color = new Color(bg.color.r, bg.color.g, bg.color.b, 0.3f);
 
-        // Wire poke/click to load this conversation
-        var interactable = go.GetComponent<XRSimpleInteractable>();
-        if (interactable != null)
-        {
-            interactable.selectEntered.AddListener(_ =>
-            {
-                _chatBridge.LoadConversation(convoId);
-                Hide();
-            });
-        }
-
-        // Also support standard Button click (for controller ray)
+        // Wire Button click to load this conversation
         var button = go.GetComponent<Button>();
         if (button != null)
         {

@@ -3,8 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.XR.Interaction.Toolkit;
-using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.UI;
 
 /// <summary>
 /// Core VR dialogue display with typewriter effect and page-based pagination.
@@ -31,7 +30,7 @@ public class VRDialoguePanel : MonoBehaviour
     [Header("Pagination UI")]
     [SerializeField] private TMP_Text   _pageIndicator;   // "1/3"
     [SerializeField] private TMP_Text   _continuePrompt;  // "▼"
-    [SerializeField] private XRSimpleInteractable _pokeTarget;
+    [SerializeField] private Button      _pokeTarget;
 
     [Header("Typewriter")]
     [SerializeField] private float _charsPerSecond = 30f;
@@ -78,13 +77,13 @@ public class VRDialoguePanel : MonoBehaviour
         if (_pageIndicator != null) _pageIndicator.gameObject.SetActive(false);
 
         if (_pokeTarget != null)
-            _pokeTarget.selectEntered.AddListener(OnPokeSelect);
+            _pokeTarget.onClick.AddListener(AdvancePage);
     }
 
     private void OnDestroy()
     {
         if (_pokeTarget != null)
-            _pokeTarget.selectEntered.RemoveListener(OnPokeSelect);
+            _pokeTarget.onClick.RemoveListener(AdvancePage);
     }
 
     #endregion
@@ -355,15 +354,6 @@ public class VRDialoguePanel : MonoBehaviour
     private IEnumerator CoAutoAdvance()
     {
         yield return new WaitForSeconds(_autoAdvanceDelay);
-        AdvancePage();
-    }
-
-    #endregion
-
-    #region Poke Handler
-
-    private void OnPokeSelect(SelectEnterEventArgs args)
-    {
         AdvancePage();
     }
 

@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Samples.SpatialKeyboard;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 
 /// <summary>
 /// Editor tool that programmatically builds the VR chat prefabs:
@@ -86,7 +87,7 @@ public static class ChatPrefabBuilder
         var canvasGo = CreateChild(root, "Canvas");
         var canvas   = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
-        canvasGo.AddComponent<GraphicRaycaster>();
+        canvasGo.AddComponent<TrackedDeviceGraphicRaycaster>();
         var canvasGroup = canvasGo.AddComponent<CanvasGroup>();
 
         var canvasRect = canvasGo.GetComponent<RectTransform>();
@@ -183,14 +184,15 @@ public static class ChatPrefabBuilder
         var cpLayout   = continueGo.AddComponent<LayoutElement>();
         cpLayout.preferredWidth = 30;
 
-        // ── PokeTarget ──
+        // ── PokeTarget (transparent full-panel button for pagination advance) ──
         var pokeTarget = CreateUIChild(panel, "PokeTarget");
         Stretch(pokeTarget);
-        var pokeCol = pokeTarget.AddComponent<BoxCollider>();
-        pokeCol.isTrigger = true;
-        pokeCol.size = new Vector3(600, 250, 20);
-        pokeCol.center = Vector3.zero;
-        var pokeInteractable = pokeTarget.AddComponent<XRSimpleInteractable>();
+        var pokeImg = pokeTarget.AddComponent<Image>();
+        pokeImg.color = new Color(0, 0, 0, 0); // invisible but catches raycasts
+        pokeImg.raycastTarget = true;
+        var pokeBtn = pokeTarget.AddComponent<Button>();
+        pokeBtn.targetGraphic = pokeImg;
+        pokeBtn.transition = Selectable.Transition.None; // no visual change on click
 
         // ── Wire serialized fields ──
         var so = new SerializedObject(panelComp);
@@ -200,7 +202,7 @@ public static class ChatPrefabBuilder
         so.FindProperty("_quoteText").objectReferenceValue       = quoteTextGo.GetComponent<TMP_Text>();
         so.FindProperty("_pageIndicator").objectReferenceValue   = pageIndGo.GetComponent<TMP_Text>();
         so.FindProperty("_continuePrompt").objectReferenceValue  = continueGo.GetComponent<TMP_Text>();
-        so.FindProperty("_pokeTarget").objectReferenceValue      = pokeInteractable;
+        so.FindProperty("_pokeTarget").objectReferenceValue      = pokeBtn;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         // ── Save ──
@@ -224,7 +226,7 @@ public static class ChatPrefabBuilder
         var canvasGo = CreateChild(root, "Canvas");
         var canvas   = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
-        canvasGo.AddComponent<GraphicRaycaster>();
+        canvasGo.AddComponent<TrackedDeviceGraphicRaycaster>();
 
         var canvasRect = canvasGo.GetComponent<RectTransform>();
         canvasRect.sizeDelta     = new Vector2(440, 120);
@@ -299,30 +301,26 @@ public static class ChatPrefabBuilder
         var rootRect = root.AddComponent<RectTransform>();
         rootRect.sizeDelta = new Vector2(0, 50);
 
-        // Layout element so the VerticalLayoutGroup in the scroll content can control width
+        // Layout element — VLG in scroll content controls width and height
         var rootLE = root.AddComponent<LayoutElement>();
-        rootLE.minHeight = 50;
-        rootLE.flexibleWidth = 1;
+        rootLE.minHeight       = 50;
+        rootLE.preferredHeight = 50;
+        rootLE.flexibleWidth   = 1;
 
-        // Background
+        // Background (raycastTarget for TrackedDeviceGraphicRaycaster)
         var bgImg = root.AddComponent<Image>();
-        bgImg.color = new Color(1f, 1f, 1f, 0.04f); // very subtle highlight
+        bgImg.color = new Color(1f, 1f, 1f, 0.06f);
+        bgImg.raycastTarget = true;
 
-        // Button component (for controller ray selection)
+        // Button component (receives all XR input via TrackedDeviceGraphicRaycaster)
         var button = root.AddComponent<Button>();
         button.targetGraphic = bgImg;
         var colors = button.colors;
-        colors.normalColor      = new Color(1f, 1f, 1f, 0.04f);
-        colors.highlightedColor = new Color(1f, 1f, 1f, 0.12f);
-        colors.pressedColor     = new Color(1f, 1f, 1f, 0.2f);
-        colors.selectedColor    = new Color(1f, 1f, 1f, 0.1f);
+        colors.normalColor      = new Color(1f, 1f, 1f, 0.06f);
+        colors.highlightedColor = new Color(1f, 1f, 1f, 0.15f);
+        colors.pressedColor     = new Color(1f, 1f, 1f, 0.25f);
+        colors.selectedColor    = new Color(1f, 1f, 1f, 0.12f);
         button.colors = colors;
-
-        // Poke interactable + trigger collider
-        var col = root.AddComponent<BoxCollider>();
-        col.isTrigger = true;
-        col.size = new Vector3(350, 50, 10);
-        root.AddComponent<XRSimpleInteractable>();
 
         // ── TitleLabel ──
         var titleGo = CreateTMP(root, "TitleLabel", "Conversation", inter, 22f, BodyTextColor);
@@ -334,6 +332,7 @@ public static class ChatPrefabBuilder
         titleTmp.alignment = TextAlignmentOptions.MidlineLeft;
         titleTmp.overflowMode = TextOverflowModes.Ellipsis;
         titleTmp.enableWordWrapping = false;
+        titleTmp.raycastTarget = false;
 
         // ── DeleteButton ──
         var deleteGo = CreateUIChild(root, "DeleteButton");
@@ -383,7 +382,7 @@ public static class ChatPrefabBuilder
         var canvasGo = CreateChild(root, "Canvas");
         var canvas   = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
-        canvasGo.AddComponent<GraphicRaycaster>();
+        canvasGo.AddComponent<TrackedDeviceGraphicRaycaster>();
 
         var canvasRect = canvasGo.GetComponent<RectTransform>();
         canvasRect.sizeDelta     = new Vector2(400, 500);
@@ -419,15 +418,12 @@ public static class ChatPrefabBuilder
         var closeGo = CreateUIChild(header, "CloseButton");
         var closeImg = closeGo.AddComponent<Image>();
         closeImg.color = new Color(1f, 1f, 1f, 0.1f);
+        closeImg.raycastTarget = true;
         var closeBtn = closeGo.AddComponent<Button>();
         closeBtn.targetGraphic = closeImg;
         var closeLE = closeGo.AddComponent<LayoutElement>();
         closeLE.preferredWidth = 40;
         closeLE.preferredHeight = 40;
-        var closeCol = closeGo.AddComponent<BoxCollider>();
-        closeCol.isTrigger = true;
-        closeCol.size = new Vector3(40, 40, 10);
-        var closePoke = closeGo.AddComponent<XRSimpleInteractable>();
 
         var closeLabelGo = CreateTMP(closeGo, "Label", "✕", inter, 24f, BodyTextColor);
         Stretch(closeLabelGo);
@@ -481,7 +477,6 @@ public static class ChatPrefabBuilder
         so.FindProperty("_contentParent").objectReferenceValue    = content.transform;
         so.FindProperty("_historyItemPrefab").objectReferenceValue = historyItemPrefab;
         so.FindProperty("_closeButton").objectReferenceValue       = closeBtn;
-        so.FindProperty("_closePoke").objectReferenceValue         = closePoke;
         so.FindProperty("_emptyStateLabel").objectReferenceValue   = emptyGo;
         so.ApplyModifiedPropertiesWithoutUndo();
 
@@ -505,7 +500,7 @@ public static class ChatPrefabBuilder
         var canvasGo = CreateChild(root, "Canvas");
         var canvas   = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
-        canvasGo.AddComponent<GraphicRaycaster>();
+        canvasGo.AddComponent<TrackedDeviceGraphicRaycaster>();
 
         var canvasRect = canvasGo.GetComponent<RectTransform>();
         canvasRect.sizeDelta     = new Vector2(400, 70);
