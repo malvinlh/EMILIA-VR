@@ -147,9 +147,9 @@ Material:
     - _NumLayersCount: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.02
-    - _RimIntensity: 0.3
+    - _RimIntensity: 0.05
     - _RimLightToggle: 1
-    - _RimPower: 4
+    - _RimPower: 5
     - _ShadowFeather: 0.05
     - _ShadowStep: 0.2
     - _Smoothness0: 1
