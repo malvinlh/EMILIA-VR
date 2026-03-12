@@ -9,8 +9,8 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 /// <summary>
 /// Core VR dialogue display with typewriter effect and page-based pagination.
 ///
-/// When the AI response exceeds <see cref="_maxVisibleLines"/> lines the text is split
-/// into pages at clean line boundaries. The user pokes a continue-target (or waits for
+/// Uses TMP's built-in Page overflow mode to automatically split text into pages
+/// that fit the visible rect. The user pokes a continue-target (or waits for
 /// auto-advance) to progress through pages. A "▼" prompt pulses while waiting.
 ///
 /// Attach to the VRDialoguePanel root alongside <see cref="VRDialogueFader"/>
@@ -37,8 +37,6 @@ public class VRDialoguePanel : MonoBehaviour
     [SerializeField] private float _charsPerSecond = 30f;
 
     [Header("Pagination")]
-    [Tooltip("Max visible lines per page before pagination kicks in.")]
-    [SerializeField] private int _maxVisibleLines = 6;
     [Tooltip("Seconds before auto-advancing to next page if user doesn't poke.")]
     [SerializeField] private float _autoAdvanceDelay = 10f;
 
@@ -185,6 +183,7 @@ public class VRDialoguePanel : MonoBehaviour
 
     private void PreparePagesAndStart(string parsedText)
     {
+        _bodyText.overflowMode = TextOverflowModes.Page;
         _bodyText.text = parsedText;
         _bodyText.maxVisibleCharacters = int.MaxValue;
         _bodyText.ForceMeshUpdate();
@@ -207,37 +206,31 @@ public class VRDialoguePanel : MonoBehaviour
     }
 
     /// <summary>
-    /// Splits the laid-out text into pages of <see cref="_maxVisibleLines"/> lines each.
-    /// Must be called after ForceMeshUpdate so textInfo is populated.
+    /// Builds page spans using TMP's built-in page overflow data.
+    /// Must be called after ForceMeshUpdate so textInfo.pageInfo is populated.
     /// </summary>
     private void BuildPages()
     {
         _pages.Clear();
 
         var info = _bodyText.textInfo;
-        int totalLines = info.lineCount;
-        if (totalLines == 0)
+        int pageCount = info.pageCount;
+
+        if (pageCount == 0)
         {
-            _pages.Add(new PageSpan { FirstCharIndex = 0, LastCharIndex = 0 });
+            int lastChar = Mathf.Max(0, info.characterCount - 1);
+            _pages.Add(new PageSpan { FirstCharIndex = 0, LastCharIndex = lastChar });
             return;
         }
 
-        int lineIdx = 0;
-        while (lineIdx < totalLines)
+        for (int p = 0; p < pageCount; p++)
         {
-            int pageStartLine = lineIdx;
-            int pageEndLine = Mathf.Min(lineIdx + _maxVisibleLines - 1, totalLines - 1);
-
-            int firstChar = info.lineInfo[pageStartLine].firstCharacterIndex;
-            int lastChar  = info.lineInfo[pageEndLine].lastCharacterIndex;
-
+            var pi = info.pageInfo[p];
             _pages.Add(new PageSpan
             {
-                FirstCharIndex = firstChar,
-                LastCharIndex  = lastChar
+                FirstCharIndex = pi.firstCharacterIndex,
+                LastCharIndex  = pi.lastCharacterIndex
             });
-
-            lineIdx = pageEndLine + 1;
         }
     }
 
@@ -257,6 +250,9 @@ public class VRDialoguePanel : MonoBehaviour
 
         var span = _pages[pageIndex];
         float interval = _charsPerSecond > 0f ? 1f / _charsPerSecond : 0f;
+
+        // Tell TMP to display this page (1-indexed)
+        _bodyText.pageToDisplay = pageIndex + 1;
 
         // Reveal characters from this page's start to end
         for (int i = span.FirstCharIndex; i <= span.LastCharIndex; i++)
@@ -296,6 +292,7 @@ public class VRDialoguePanel : MonoBehaviour
 
         while (true)
         {
+            _bodyText.overflowMode = TextOverflowModes.Overflow;
             _bodyText.text = dots[i];
             _bodyText.maxVisibleCharacters = int.MaxValue;
             i = (i + 1) % dots.Length;
