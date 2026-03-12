@@ -118,7 +118,7 @@ Material:
     - _Parallax: 0.02
     - _QueueOffset: 0
     - _ReceiveShadows: 1
-    - _ReflectionStrength: 0.5
+    - _ReflectionStrength: 0.45
     - _RimIntensity: 0.15
     - _RimLightToggle: 0
     - _RimPower: 4
@@ -145,8 +145,8 @@ Material:
     - _Color: {r: 0.7653811, g: 0.90926147, b: 0.93749994, a: 1}
     - _DeepColor: {r: 0.17999995, g: 0.3799999, b: 0.58, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _FoamColor: {r: 0.34848693, g: 0.735849, b: 0.70242953, a: 1}
-    - _ReflectionColor: {r: 1, g: 0.32213554, b: 0, a: 1}
+    - _FoamColor: {r: 0.8301887, g: 0.3695648, b: 0.13705944, a: 1}
+    - _ReflectionColor: {r: 1, g: 0.4002924, b: 0, a: 1}
     - _RimColor: {r: 1, g: 0.9, b: 0.85, a: 1}
     - _ShadowColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShallowColor: {r: 0.45, g: 0.78, b: 0.88, a: 1}
