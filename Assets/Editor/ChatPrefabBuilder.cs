@@ -289,81 +289,60 @@ public static class ChatPrefabBuilder
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  3. VR HISTORY ITEM (must be built before HistoryPanel)
+    //  3. VR HISTORY ITEM — VN-style message entry (Speaker + Message)
     // ═══════════════════════════════════════════════════════════════════════
     private static bool BuildHistoryItem(TMP_FontAsset inter)
     {
         string path = $"{PrefabFolder}/VRHistoryItem.prefab";
         if (!ConfirmOverwrite(path)) return false;
 
-        // ── Root ──
+        // ── Root with VerticalLayoutGroup for speaker + text stacking ──
         var root = new GameObject("VRHistoryItem");
         var rootRect = root.AddComponent<RectTransform>();
-        rootRect.sizeDelta = new Vector2(0, 50);
+        rootRect.sizeDelta = new Vector2(0, 0); // height driven by content
 
-        // Layout element — VLG in scroll content controls width and height
         var rootLE = root.AddComponent<LayoutElement>();
-        rootLE.minHeight       = 50;
-        rootLE.preferredHeight = 50;
-        rootLE.flexibleWidth   = 1;
+        rootLE.flexibleWidth = 1;
 
-        // Background (raycastTarget for TrackedDeviceGraphicRaycaster)
+        var rootVLG = root.AddComponent<VerticalLayoutGroup>();
+        rootVLG.padding = new RectOffset(12, 12, 6, 6);
+        rootVLG.spacing = 2;
+        rootVLG.childAlignment = TextAnchor.UpperLeft;
+        rootVLG.childForceExpandWidth  = true;
+        rootVLG.childForceExpandHeight = false;
+
+        var rootCSF = root.AddComponent<ContentSizeFitter>();
+        rootCSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+        // Subtle separator background
         var bgImg = root.AddComponent<Image>();
-        bgImg.color = new Color(1f, 1f, 1f, 0.06f);
-        bgImg.raycastTarget = true;
+        bgImg.color = new Color(1f, 1f, 1f, 0.03f);
+        bgImg.raycastTarget = false;
 
-        // Button component (receives all XR input via TrackedDeviceGraphicRaycaster)
-        var button = root.AddComponent<Button>();
-        button.targetGraphic = bgImg;
-        var colors = button.colors;
-        colors.normalColor      = new Color(1f, 1f, 1f, 0.06f);
-        colors.highlightedColor = new Color(1f, 1f, 1f, 0.15f);
-        colors.pressedColor     = new Color(1f, 1f, 1f, 0.25f);
-        colors.selectedColor    = new Color(1f, 1f, 1f, 0.12f);
-        button.colors = colors;
+        // ── SpeakerLabel ──
+        var speakerGo = CreateTMP(root, "SpeakerLabel", "EMILIA", inter, 20f, NameColor);
+        var speakerTmp = speakerGo.GetComponent<TMP_Text>();
+        speakerTmp.fontStyle = FontStyles.Bold;
+        speakerTmp.alignment = TextAlignmentOptions.TopLeft;
+        speakerTmp.enableWordWrapping = false;
+        speakerTmp.overflowMode = TextOverflowModes.Ellipsis;
+        speakerTmp.raycastTarget = false;
 
-        // ── TitleLabel ──
-        var titleGo = CreateTMP(root, "TitleLabel", "Conversation", inter, 22f, BodyTextColor);
-        var titleRect = titleGo.GetComponent<RectTransform>();
-        SetAnchors(titleRect, Vector2.zero, Vector2.one);
-        titleRect.offsetMin = new Vector2(12, 4);
-        titleRect.offsetMax = new Vector2(-50, -4);
-        var titleTmp = titleGo.GetComponent<TMP_Text>();
-        titleTmp.alignment = TextAlignmentOptions.MidlineLeft;
-        titleTmp.overflowMode = TextOverflowModes.Ellipsis;
-        titleTmp.enableWordWrapping = false;
-        titleTmp.raycastTarget = false;
-
-        // ── DeleteButton ──
-        var deleteGo = CreateUIChild(root, "DeleteButton");
-        var deleteRect = deleteGo.GetComponent<RectTransform>();
-        SetAnchors(deleteRect, new Vector2(1, 0), new Vector2(1, 1));
-        deleteRect.pivot = new Vector2(1, 0.5f);
-        deleteRect.anchoredPosition = new Vector2(-6, 0);
-        deleteRect.sizeDelta = new Vector2(36, 36);
-
-        var delImg = deleteGo.AddComponent<Image>();
-        delImg.color = new Color(1f, 1f, 1f, 0.08f);
-
-        var delBtn = deleteGo.AddComponent<Button>();
-        delBtn.targetGraphic = delImg;
-        var delColors = delBtn.colors;
-        delColors.normalColor      = new Color(1f, 1f, 1f, 0.08f);
-        delColors.highlightedColor = DeleteRed;
-        delColors.pressedColor     = new Color(0.7f, 0.15f, 0.15f, 1f);
-        delBtn.colors = delColors;
-
-        var delLabel = CreateTMP(deleteGo, "Label", "✕", inter, 20f, new Color(0.8f, 0.3f, 0.3f, 1f));
-        var dlRect   = delLabel.GetComponent<RectTransform>();
-        Stretch(delLabel);
-        delLabel.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+        // ── MessageText ──
+        var msgGo = CreateTMP(root, "MessageText", "", inter, 22f, BodyTextColor);
+        var msgTmp = msgGo.GetComponent<TMP_Text>();
+        msgTmp.alignment = TextAlignmentOptions.TopLeft;
+        msgTmp.enableWordWrapping = true;
+        msgTmp.overflowMode = TextOverflowModes.Overflow;
+        msgTmp.raycastTarget = false;
+        msgTmp.richText = true;
 
         SavePrefab(root, path);
         return true;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  4. VR HISTORY PANEL
+    //  4. VR HISTORY PANEL — Conversation list + VN-style chat log
     // ═══════════════════════════════════════════════════════════════════════
     private static bool BuildHistoryPanel(TMP_FontAsset comfortaa, TMP_FontAsset inter)
     {
@@ -378,14 +357,14 @@ public static class ChatPrefabBuilder
         var histPanelComp = root.AddComponent<VRHistoryPanel>();
         var canvasGroup   = root.AddComponent<CanvasGroup>();
 
-        // ── Canvas (World Space, 400×500 → 0.4m × 0.5m) ──
+        // ── Canvas (World Space, 500×600 → 0.5m × 0.6m) ──
         var canvasGo = CreateChild(root, "Canvas");
         var canvas   = canvasGo.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
         canvasGo.AddComponent<TrackedDeviceGraphicRaycaster>();
 
         var canvasRect = canvasGo.GetComponent<RectTransform>();
-        canvasRect.sizeDelta     = new Vector2(400, 500);
+        canvasRect.sizeDelta     = new Vector2(500, 600);
         canvasRect.localScale    = Vector3.one * 0.001f;
         canvasRect.localPosition = Vector3.zero;
 
@@ -398,8 +377,8 @@ public static class ChatPrefabBuilder
         // ── Header ──
         var header = CreateUIChild(bg, "Header");
         var headerLayout = header.AddComponent<HorizontalLayoutGroup>();
-        headerLayout.padding = new RectOffset(12, 12, 8, 8);
-        headerLayout.spacing = 8;
+        headerLayout.padding = new RectOffset(8, 8, 8, 8);
+        headerLayout.spacing = 6;
         headerLayout.childAlignment = TextAnchor.MiddleCenter;
         headerLayout.childForceExpandWidth = false;
         headerLayout.childForceExpandHeight = true;
@@ -409,8 +388,26 @@ public static class ChatPrefabBuilder
         headerRect.sizeDelta = new Vector2(0, 50);
         headerRect.anchoredPosition = Vector2.zero;
 
+        // Back button (hidden by default, shown in chat log view)
+        var backGo = CreateUIChild(header, "BackButton");
+        var backImg = backGo.AddComponent<Image>();
+        backImg.color = new Color(1f, 1f, 1f, 0.1f);
+        backImg.raycastTarget = true;
+        var backBtn = backGo.AddComponent<Button>();
+        backBtn.targetGraphic = backImg;
+        var backLE = backGo.AddComponent<LayoutElement>();
+        backLE.preferredWidth  = 40;
+        backLE.preferredHeight = 40;
+        var backLabelGo = CreateTMP(backGo, "Label", "<", inter, 26f, BodyTextColor);
+        Stretch(backLabelGo);
+        backLabelGo.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+        backGo.SetActive(false); // hidden initially
+
         // Title
-        var titleGo = CreateTMP(header, "TitleLabel", "Conversations", comfortaa, 28f, NameColor);
+        var titleGo = CreateTMP(header, "TitleLabel", "Conversations", comfortaa, 26f, NameColor);
+        var titleTmp = titleGo.GetComponent<TMP_Text>();
+        titleTmp.overflowMode = TextOverflowModes.Ellipsis;
+        titleTmp.enableWordWrapping = false;
         var titleLE = titleGo.AddComponent<LayoutElement>();
         titleLE.flexibleWidth = 1;
 
@@ -424,21 +421,32 @@ public static class ChatPrefabBuilder
         var closeLE = closeGo.AddComponent<LayoutElement>();
         closeLE.preferredWidth = 40;
         closeLE.preferredHeight = 40;
-
-        var closeLabelGo = CreateTMP(closeGo, "Label", "✕", inter, 24f, BodyTextColor);
+        var closeLabelGo = CreateTMP(closeGo, "Label", "X", inter, 24f, BodyTextColor);
         Stretch(closeLabelGo);
         closeLabelGo.GetComponent<TMP_Text>().alignment = TextAlignmentOptions.Center;
+
+        // ── Accent line below header ──
+        var accentLine = CreateUIChild(bg, "AccentLine");
+        var accentRect = accentLine.GetComponent<RectTransform>();
+        SetAnchors(accentRect, new Vector2(0, 1), new Vector2(1, 1));
+        accentRect.pivot = new Vector2(0.5f, 1);
+        accentRect.anchoredPosition = new Vector2(0, -50);
+        accentRect.sizeDelta = new Vector2(0, 2);
+        var accentImg = accentLine.AddComponent<Image>();
+        accentImg.color = AccentBlue;
+        accentImg.raycastTarget = false;
 
         // ── ScrollView ──
         var scrollViewGo = CreateUIChild(bg, "ScrollView");
         var scrollRect = scrollViewGo.AddComponent<ScrollRect>();
         scrollRect.horizontal = false;
         scrollRect.vertical   = true;
-        scrollRect.movementType = ScrollRect.MovementType.Clamped;
+        scrollRect.movementType = ScrollRect.MovementType.Elastic;
+        scrollRect.scrollSensitivity = 30;
         var svRect = scrollViewGo.GetComponent<RectTransform>();
         SetAnchors(svRect, Vector2.zero, Vector2.one);
         svRect.offsetMin = new Vector2(0, 0);
-        svRect.offsetMax = new Vector2(0, -50); // below header
+        svRect.offsetMax = new Vector2(0, -52); // below header + accent line
 
         // Viewport
         var viewport = CreateUIChild(scrollViewGo, "Viewport");
@@ -454,7 +462,7 @@ public static class ChatPrefabBuilder
         contentRect.sizeDelta = new Vector2(0, 0);
         contentRect.anchoredPosition = Vector2.zero;
         var vlg = content.AddComponent<VerticalLayoutGroup>();
-        vlg.padding = new RectOffset(8, 8, 4, 4);
+        vlg.padding = new RectOffset(6, 6, 8, 8);
         vlg.spacing = 4;
         vlg.childAlignment = TextAnchor.UpperCenter;
         vlg.childForceExpandWidth  = true;
@@ -473,9 +481,12 @@ public static class ChatPrefabBuilder
 
         // ── Wire serialized fields ──
         var so = new SerializedObject(histPanelComp);
-        // _chatBridge wired in scene
-        so.FindProperty("_contentParent").objectReferenceValue    = content.transform;
+        so.FindProperty("_contentParent").objectReferenceValue     = content.transform;
+        so.FindProperty("_scrollRect").objectReferenceValue        = scrollRect;
         so.FindProperty("_historyItemPrefab").objectReferenceValue = historyItemPrefab;
+        so.FindProperty("_buttonFont").objectReferenceValue       = inter;
+        so.FindProperty("_titleLabel").objectReferenceValue        = titleTmp;
+        so.FindProperty("_backButton").objectReferenceValue        = backBtn;
         so.FindProperty("_closeButton").objectReferenceValue       = closeBtn;
         so.FindProperty("_emptyStateLabel").objectReferenceValue   = emptyGo;
         so.ApplyModifiedPropertiesWithoutUndo();

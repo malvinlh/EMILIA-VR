@@ -75,6 +75,9 @@ public class VRChatBridge : MonoBehaviour
     /// <summary>Fired when the microphone recording state changes.</summary>
     public event Action<bool> OnMicStateChanged;
 
+    /// <summary>Fired when the message list for the active conversation changes.</summary>
+    public event Action OnMessagesChanged;
+
     #endregion
 
     #region Unity
@@ -133,6 +136,20 @@ public class VRChatBridge : MonoBehaviour
 
     /// <summary>Returns the user's conversation ids (most recent first).</summary>
     public IReadOnlyList<string> ConversationIds => _userConvs;
+
+    /// <summary>The current user id (nickname from PlayerPrefs).</summary>
+    public string UserId => _userId;
+
+    /// <summary>
+    /// Returns a read-only snapshot of messages for the current conversation.
+    /// Returns null if no conversation is active or messages not yet loaded.
+    /// </summary>
+    public IReadOnlyList<Message> GetCurrentMessages()
+    {
+        if (_currentConversationId != null && _messageCache.TryGetValue(_currentConversationId, out var msgs))
+            return msgs;
+        return null;
+    }
 
     /// <summary>
     /// Gets the display title for a conversation (topic or fallback).
@@ -252,6 +269,7 @@ public class VRChatBridge : MonoBehaviour
 
         // Find the last bot response (and any preceding reasoning)
         ShowLastResponse(messages);
+        OnMessagesChanged?.Invoke();
     }
 
     /// <summary>
@@ -427,6 +445,7 @@ public class VRChatBridge : MonoBehaviour
         if (!_messageCache.ContainsKey(convoId))
             _messageCache[convoId] = new List<Message>();
         _messageCache[convoId].Add(userMsg);
+        OnMessagesChanged?.Invoke();
 
         bool inserted = false;
         yield return ServiceManager.Instance.ChatService.InsertMessage(
@@ -491,6 +510,7 @@ public class VRChatBridge : MonoBehaviour
         // Display
         _dialoguePanel.ShowText(aiResponse);
         _isAwaitingResponse = false;
+        OnMessagesChanged?.Invoke();
 
         // Post-response hooks
         TryGenerateTopicOnce(convoId, userMessage, aiResponse);
@@ -556,6 +576,7 @@ public class VRChatBridge : MonoBehaviour
         }
 
         // Display
+        OnMessagesChanged?.Invoke();
         _dialoguePanel.ShowAgentic(result.reasoning, botText);
         _isAwaitingResponse = false;
 

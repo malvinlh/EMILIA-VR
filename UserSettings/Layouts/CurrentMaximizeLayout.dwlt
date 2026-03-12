@@ -24,7 +24,7 @@ MonoBehaviour:
   m_MinSize: {x: 300, y: 112}
   m_MaxSize: {x: 24288, y: 16192}
   vertical: 0
-  controlID: 2968
+  controlID: 61
   draggingID: 0
 --- !u!114 &2
 MonoBehaviour:
@@ -153,7 +153,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 112}
   m_MaxSize: {x: 16192, y: 16192}
   vertical: 1
-  controlID: 2969
+  controlID: 62
   draggingID: 0
 --- !u!114 &4
 MonoBehaviour:
@@ -179,7 +179,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 56}
   m_MaxSize: {x: 16192, y: 8096}
   vertical: 0
-  controlID: 2970
+  controlID: 63
   draggingID: 0
 --- !u!114 &5
 MonoBehaviour:
@@ -200,8 +200,8 @@ MonoBehaviour:
     y: 0
     width: 461
     height: 548
-  m_MinSize: {x: 200, y: 200}
-  m_MaxSize: {x: 4000, y: 4000}
+  m_MinSize: {x: 201, y: 226}
+  m_MaxSize: {x: 4001, y: 4026}
   m_ActualView: {fileID: 6}
   m_Panes:
   - {fileID: 6}
@@ -247,26 +247,18 @@ MonoBehaviour:
     m_DynamicPanelBehavior: 0
   m_SceneHierarchy:
     m_TreeViewState:
-      scrollPos: {x: 0, y: 123}
+      scrollPos: {x: 0, y: 0}
       m_SelectedIDs:
-      - m_Data: -39762
+      - m_Data: -14940
       m_LastClickedID:
-        m_Data: -39762
+        m_Data: -14940
       m_ExpandedIDs:
-      - m_Data: -31006
-      - m_Data: -30952
-      - m_Data: -30940
-      - m_Data: -30902
-      - m_Data: -30896
-      - m_Data: -29388
-      - m_Data: -29376
-      - m_Data: -29286
-      - m_Data: -17004
-      - m_Data: -3790
+      - m_Data: -3824
+      - m_Data: -12
       m_RenameOverlay:
         m_UserAcceptedRename: 0
-        m_Name: VRHistoryItem
-        m_OriginalName: VRHistoryItem
+        m_Name: 
+        m_OriginalName: 
         m_EditFieldRect:
           serializedVersion: 2
           x: 0
@@ -274,10 +266,10 @@ MonoBehaviour:
           width: 0
           height: 0
         m_UserData:
-          m_Data: -30726
+          m_Data: 0
         m_IsWaitingForDelay: 0
         m_IsRenaming: 0
-        m_OriginalEventType: 0
+        m_OriginalEventType: 11
         m_IsRenamingFilename: 0
         m_TrimLeadingAndTrailingWhitespace: 0
         m_ClientGUIView: {fileID: 5}
@@ -953,9 +945,9 @@ MonoBehaviour:
   m_AudioPlay: 0
   m_DebugDrawModesUseInteractiveLightBakingData: 0
   m_Position:
-    m_Target: {x: -2.2, y: 4.167, z: -3.42155}
+    m_Target: {x: -1.8549312, y: 3.744347, z: -3.4762218}
     speed: 2
-    m_Value: {x: -2.2, y: 4.167, z: -3.42155}
+    m_Value: {x: -1.8549312, y: 3.744347, z: -3.4762218}
   m_RenderMode: 0
   m_CameraMode:
     drawMode: 0
@@ -1005,9 +997,9 @@ MonoBehaviour:
     speed: 2
     m_Value: {x: -0.0764192, y: 0.010508356, z: 0.00084334804, w: 0.99702007}
   m_Size:
-    m_Target: 1.058002
+    m_Target: 0.917916
     speed: 2
-    m_Value: 1.058002
+    m_Value: 0.917916
   m_Ortho:
     m_Target: 0
     speed: 2
@@ -1106,7 +1098,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 1
   m_Script: {fileID: 12006, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: ProjectBrowser
+  m_Name: ConsoleWindow
   m_EditorClassIdentifier: 
   m_Children: []
   m_Position:
@@ -1115,16 +1107,16 @@ MonoBehaviour:
     y: 548
     width: 1476
     height: 385
-  m_MinSize: {x: 231, y: 276}
-  m_MaxSize: {x: 10001, y: 10026}
-  m_ActualView: {fileID: 11}
+  m_MinSize: {x: 100, y: 100}
+  m_MaxSize: {x: 4000, y: 4000}
+  m_ActualView: {fileID: 14}
   m_Panes:
   - {fileID: 11}
   - {fileID: 12}
   - {fileID: 13}
   - {fileID: 14}
-  m_Selected: 0
-  m_LastSelected: 3
+  m_Selected: 3
+  m_LastSelected: 2
 --- !u!114 &11
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -1174,7 +1166,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Samples/XR Interaction Toolkit/3.3.1/Spatial Keyboard/Prefabs
+    - Assets/Scripts/Chat
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1184,7 +1176,7 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets/Samples/XR Interaction Toolkit/3.3.1/Spatial Keyboard/Prefabs
+  - Assets/Scripts/Chat
   m_LastFoldersGridSize: 16
   m_LastProjectPath: D:\Malvin_TA\UnityProjects\Tugas_Akhir\EMILIA-VR
   m_LockTracker:
@@ -1193,46 +1185,42 @@ MonoBehaviour:
   m_FolderTreeState:
     scrollPos: {x: 0, y: 1229}
     m_SelectedIDs:
-    - m_Data: 128332
+    - m_Data: 108972
     m_LastClickedID:
-      m_Data: 128332
+      m_Data: 108972
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 96550
-    - m_Data: 96552
-    - m_Data: 96554
-    - m_Data: 96556
-    - m_Data: 96558
-    - m_Data: 96560
-    - m_Data: 96562
-    - m_Data: 96564
-    - m_Data: 96566
-    - m_Data: 96568
-    - m_Data: 96570
-    - m_Data: 96572
-    - m_Data: 96574
-    - m_Data: 96576
-    - m_Data: 96578
-    - m_Data: 96580
-    - m_Data: 96582
-    - m_Data: 96584
-    - m_Data: 96586
-    - m_Data: 96588
-    - m_Data: 96590
-    - m_Data: 96592
-    - m_Data: 96594
-    - m_Data: 96596
-    - m_Data: 96598
-    - m_Data: 96600
-    - m_Data: 96602
-    - m_Data: 96604
-    - m_Data: 96606
-    - m_Data: 96608
-    - m_Data: 96610
-    - m_Data: 97202
-    - m_Data: 128334
-    - m_Data: 128336
-    - m_Data: 1000000000
+    - m_Data: 96624
+    - m_Data: 96626
+    - m_Data: 96628
+    - m_Data: 96630
+    - m_Data: 96632
+    - m_Data: 96634
+    - m_Data: 96636
+    - m_Data: 96638
+    - m_Data: 96640
+    - m_Data: 96642
+    - m_Data: 96644
+    - m_Data: 96646
+    - m_Data: 96648
+    - m_Data: 96650
+    - m_Data: 96652
+    - m_Data: 96654
+    - m_Data: 96656
+    - m_Data: 96658
+    - m_Data: 96660
+    - m_Data: 96662
+    - m_Data: 96664
+    - m_Data: 96666
+    - m_Data: 96668
+    - m_Data: 96670
+    - m_Data: 96672
+    - m_Data: 96674
+    - m_Data: 96676
+    - m_Data: 96678
+    - m_Data: 96680
+    - m_Data: 96682
+    - m_Data: 96684
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1265,38 +1253,37 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 96550
-    - m_Data: 96552
-    - m_Data: 96554
-    - m_Data: 96556
-    - m_Data: 96558
-    - m_Data: 96560
-    - m_Data: 96562
-    - m_Data: 96564
-    - m_Data: 96566
-    - m_Data: 96568
-    - m_Data: 96570
-    - m_Data: 96572
-    - m_Data: 96574
-    - m_Data: 96576
-    - m_Data: 96578
-    - m_Data: 96580
-    - m_Data: 96582
-    - m_Data: 96584
-    - m_Data: 96586
-    - m_Data: 96588
-    - m_Data: 96590
-    - m_Data: 96592
-    - m_Data: 96594
-    - m_Data: 96596
-    - m_Data: 96598
-    - m_Data: 96600
-    - m_Data: 96602
-    - m_Data: 96604
-    - m_Data: 96606
-    - m_Data: 96608
-    - m_Data: 96610
-    - m_Data: 1000000000
+    - m_Data: 96624
+    - m_Data: 96626
+    - m_Data: 96628
+    - m_Data: 96630
+    - m_Data: 96632
+    - m_Data: 96634
+    - m_Data: 96636
+    - m_Data: 96638
+    - m_Data: 96640
+    - m_Data: 96642
+    - m_Data: 96644
+    - m_Data: 96646
+    - m_Data: 96648
+    - m_Data: 96650
+    - m_Data: 96652
+    - m_Data: 96654
+    - m_Data: 96656
+    - m_Data: 96658
+    - m_Data: 96660
+    - m_Data: 96662
+    - m_Data: 96664
+    - m_Data: 96666
+    - m_Data: 96668
+    - m_Data: 96670
+    - m_Data: 96672
+    - m_Data: 96674
+    - m_Data: 96676
+    - m_Data: 96678
+    - m_Data: 96680
+    - m_Data: 96682
+    - m_Data: 96684
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1324,9 +1311,9 @@ MonoBehaviour:
       m_ResourceFile: 
   m_ListAreaState:
     m_SelectedInstanceIDs:
-    - m_Data: -39762
-    m_LastClickedInstanceID: -39762
-    m_HadKeyboardFocusLastEvent: 1
+    - m_Data: 130630
+    m_LastClickedInstanceID: 130630
+    m_HadKeyboardFocusLastEvent: 0
     m_ExpandedInstanceIDs:
     - m_Data: 126064
     - m_Data: 56190
@@ -1336,8 +1323,8 @@ MonoBehaviour:
     - m_Data: 87246
     m_RenameOverlay:
       m_UserAcceptedRename: 0
-      m_Name: XRI Spatial Keyboard
-      m_OriginalName: XRI Spatial Keyboard
+      m_Name: 
+      m_OriginalName: 
       m_EditFieldRect:
         serializedVersion: 2
         x: 0
@@ -1345,10 +1332,10 @@ MonoBehaviour:
         width: 0
         height: 0
       m_UserData:
-        m_Data: 68278
+        m_Data: 0
       m_IsWaitingForDelay: 0
       m_IsRenaming: 0
-      m_OriginalEventType: 0
+      m_OriginalEventType: 11
       m_IsRenamingFilename: 1
       m_TrimLeadingAndTrailingWhitespace: 0
       m_ClientGUIView: {fileID: 10}
@@ -1436,38 +1423,37 @@ MonoBehaviour:
       m_Data: 86566
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 96550
-    - m_Data: 96552
-    - m_Data: 96554
-    - m_Data: 96556
-    - m_Data: 96558
-    - m_Data: 96560
-    - m_Data: 96562
-    - m_Data: 96564
-    - m_Data: 96566
-    - m_Data: 96568
-    - m_Data: 96570
-    - m_Data: 96572
-    - m_Data: 96574
-    - m_Data: 96576
-    - m_Data: 96578
-    - m_Data: 96580
-    - m_Data: 96582
-    - m_Data: 96584
-    - m_Data: 96586
-    - m_Data: 96588
-    - m_Data: 96590
-    - m_Data: 96592
-    - m_Data: 96594
-    - m_Data: 96596
-    - m_Data: 96598
-    - m_Data: 96600
-    - m_Data: 96602
-    - m_Data: 96604
-    - m_Data: 96606
-    - m_Data: 96608
-    - m_Data: 96610
-    - m_Data: 1000000000
+    - m_Data: 96624
+    - m_Data: 96626
+    - m_Data: 96628
+    - m_Data: 96630
+    - m_Data: 96632
+    - m_Data: 96634
+    - m_Data: 96636
+    - m_Data: 96638
+    - m_Data: 96640
+    - m_Data: 96642
+    - m_Data: 96644
+    - m_Data: 96646
+    - m_Data: 96648
+    - m_Data: 96650
+    - m_Data: 96652
+    - m_Data: 96654
+    - m_Data: 96656
+    - m_Data: 96658
+    - m_Data: 96660
+    - m_Data: 96662
+    - m_Data: 96664
+    - m_Data: 96666
+    - m_Data: 96668
+    - m_Data: 96670
+    - m_Data: 96672
+    - m_Data: 96674
+    - m_Data: 96676
+    - m_Data: 96678
+    - m_Data: 96680
+    - m_Data: 96682
+    - m_Data: 96684
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1500,38 +1486,37 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 96550
-    - m_Data: 96552
-    - m_Data: 96554
-    - m_Data: 96556
-    - m_Data: 96558
-    - m_Data: 96560
-    - m_Data: 96562
-    - m_Data: 96564
-    - m_Data: 96566
-    - m_Data: 96568
-    - m_Data: 96570
-    - m_Data: 96572
-    - m_Data: 96574
-    - m_Data: 96576
-    - m_Data: 96578
-    - m_Data: 96580
-    - m_Data: 96582
-    - m_Data: 96584
-    - m_Data: 96586
-    - m_Data: 96588
-    - m_Data: 96590
-    - m_Data: 96592
-    - m_Data: 96594
-    - m_Data: 96596
-    - m_Data: 96598
-    - m_Data: 96600
-    - m_Data: 96602
-    - m_Data: 96604
-    - m_Data: 96606
-    - m_Data: 96608
-    - m_Data: 96610
-    - m_Data: 1000000000
+    - m_Data: 96624
+    - m_Data: 96626
+    - m_Data: 96628
+    - m_Data: 96630
+    - m_Data: 96632
+    - m_Data: 96634
+    - m_Data: 96636
+    - m_Data: 96638
+    - m_Data: 96640
+    - m_Data: 96642
+    - m_Data: 96644
+    - m_Data: 96646
+    - m_Data: 96648
+    - m_Data: 96650
+    - m_Data: 96652
+    - m_Data: 96654
+    - m_Data: 96656
+    - m_Data: 96658
+    - m_Data: 96660
+    - m_Data: 96662
+    - m_Data: 96664
+    - m_Data: 96666
+    - m_Data: 96668
+    - m_Data: 96670
+    - m_Data: 96672
+    - m_Data: 96674
+    - m_Data: 96676
+    - m_Data: 96678
+    - m_Data: 96680
+    - m_Data: 96682
+    - m_Data: 96684
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1670,38 +1655,37 @@ MonoBehaviour:
       m_Data: 100748
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 96550
-    - m_Data: 96552
-    - m_Data: 96554
-    - m_Data: 96556
-    - m_Data: 96558
-    - m_Data: 96560
-    - m_Data: 96562
-    - m_Data: 96564
-    - m_Data: 96566
-    - m_Data: 96568
-    - m_Data: 96570
-    - m_Data: 96572
-    - m_Data: 96574
-    - m_Data: 96576
-    - m_Data: 96578
-    - m_Data: 96580
-    - m_Data: 96582
-    - m_Data: 96584
-    - m_Data: 96586
-    - m_Data: 96588
-    - m_Data: 96590
-    - m_Data: 96592
-    - m_Data: 96594
-    - m_Data: 96596
-    - m_Data: 96598
-    - m_Data: 96600
-    - m_Data: 96602
-    - m_Data: 96604
-    - m_Data: 96606
-    - m_Data: 96608
-    - m_Data: 96610
-    - m_Data: 1000000000
+    - m_Data: 96624
+    - m_Data: 96626
+    - m_Data: 96628
+    - m_Data: 96630
+    - m_Data: 96632
+    - m_Data: 96634
+    - m_Data: 96636
+    - m_Data: 96638
+    - m_Data: 96640
+    - m_Data: 96642
+    - m_Data: 96644
+    - m_Data: 96646
+    - m_Data: 96648
+    - m_Data: 96650
+    - m_Data: 96652
+    - m_Data: 96654
+    - m_Data: 96656
+    - m_Data: 96658
+    - m_Data: 96660
+    - m_Data: 96662
+    - m_Data: 96664
+    - m_Data: 96666
+    - m_Data: 96668
+    - m_Data: 96670
+    - m_Data: 96672
+    - m_Data: 96674
+    - m_Data: 96676
+    - m_Data: 96678
+    - m_Data: 96680
+    - m_Data: 96682
+    - m_Data: 96684
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1734,38 +1718,37 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 96550
-    - m_Data: 96552
-    - m_Data: 96554
-    - m_Data: 96556
-    - m_Data: 96558
-    - m_Data: 96560
-    - m_Data: 96562
-    - m_Data: 96564
-    - m_Data: 96566
-    - m_Data: 96568
-    - m_Data: 96570
-    - m_Data: 96572
-    - m_Data: 96574
-    - m_Data: 96576
-    - m_Data: 96578
-    - m_Data: 96580
-    - m_Data: 96582
-    - m_Data: 96584
-    - m_Data: 96586
-    - m_Data: 96588
-    - m_Data: 96590
-    - m_Data: 96592
-    - m_Data: 96594
-    - m_Data: 96596
-    - m_Data: 96598
-    - m_Data: 96600
-    - m_Data: 96602
-    - m_Data: 96604
-    - m_Data: 96606
-    - m_Data: 96608
-    - m_Data: 96610
-    - m_Data: 1000000000
+    - m_Data: 96624
+    - m_Data: 96626
+    - m_Data: 96628
+    - m_Data: 96630
+    - m_Data: 96632
+    - m_Data: 96634
+    - m_Data: 96636
+    - m_Data: 96638
+    - m_Data: 96640
+    - m_Data: 96642
+    - m_Data: 96644
+    - m_Data: 96646
+    - m_Data: 96648
+    - m_Data: 96650
+    - m_Data: 96652
+    - m_Data: 96654
+    - m_Data: 96656
+    - m_Data: 96658
+    - m_Data: 96660
+    - m_Data: 96662
+    - m_Data: 96664
+    - m_Data: 96666
+    - m_Data: 96668
+    - m_Data: 96670
+    - m_Data: 96672
+    - m_Data: 96674
+    - m_Data: 96676
+    - m_Data: 96678
+    - m_Data: 96680
+    - m_Data: 96682
+    - m_Data: 96684
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
