@@ -1268,6 +1268,22 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 3931515759710489388, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3931515759710489388, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3931515759710489388, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3931515759710489388, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5695563688027091985, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
       propertyPath: m_SizeDelta.y
       value: 0
@@ -1275,6 +1291,22 @@ PrefabInstance:
     - target: {fileID: 7056708566119426438, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
       propertyPath: m_Name
       value: VRHistoryPanel
+      objectReference: {fileID: 0}
+    - target: {fileID: 8091092897412882612, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8091092897412882612, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8091092897412882612, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8091092897412882612, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 8198811932737356453, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
       propertyPath: _chatBridge
@@ -4612,7 +4644,7 @@ Transform:
   m_GameObject: {fileID: 1530796889}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 15.06, z: 0}
+  m_LocalPosition: {x: -0, y: 15.06, z: 1.15}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
