@@ -33,7 +33,7 @@ public class APISentimentService : MonoBehaviour
     #region Inspector
 
     [Header("API")]
-    [SerializeField] private string baseUrl    = "http://10.125.143.39:8000";
+    [SerializeField] private string baseUrl    = "http://192.168.31.69:8000";
     [SerializeField] private string endpoint   = "/sentiment";
     [SerializeField] private int    timeoutSec = 30;
 

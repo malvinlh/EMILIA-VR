@@ -17,7 +17,7 @@ public class APITranscribeService : MonoBehaviour
 
     #region Inspector
     [Header("API")]
-    [SerializeField] private string baseUrl    = "http://10.125.189.93:8000";
+    [SerializeField] private string baseUrl    = "http://192.168.31.69:8000";
     [SerializeField] private string endpoint   = "/transcribe";
     [SerializeField] private int    timeoutSec = 99999;
     #endregion
