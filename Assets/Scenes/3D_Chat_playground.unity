@@ -817,7 +817,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6598815579406187037, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -3199,6 +3199,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 92fc496d51c69c94f81087b825a08512, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  journalSessionManager: {fileID: 0}
   handedness: 2
   touchTolerance: 0.015
   filterMinCutoff: 2.5
@@ -3218,6 +3219,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 92fc496d51c69c94f81087b825a08512, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  journalSessionManager: {fileID: 0}
   handedness: 2
   touchTolerance: 0.015
   filterMinCutoff: 2.5

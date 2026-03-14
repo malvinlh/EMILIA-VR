@@ -9,6 +9,8 @@ using UnityEngine.XR.Hands;
 /// </summary>
 public class WhiteboardPen : MonoBehaviour
 {
+    public JournalSessionManager journalSessionManager;
+    
     [Tooltip("Which hand drives this pen.")]
     public Handedness handedness = Handedness.Right;
 
@@ -262,7 +264,8 @@ public class WhiteboardPen : MonoBehaviour
             {
                 if (whiteboard != null)
                 {
-                    whiteboard.Initialize();
+                    // whiteboard.Initialize();
+                    journalSessionManager?.EndSession();
 
                     // Also clear accumulated ink, recognised text, and pre-context
                     if (inkBridge != null)
