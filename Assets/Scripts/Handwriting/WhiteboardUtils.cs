@@ -63,8 +63,17 @@ public class WhiteboardUtils : MonoBehaviour
         projectionSphereRight.SetActive(false);
     }
 
+    /// <summary>
+    /// When true, manual gesture controls (middle-pinch create, pinky-pinch reset,
+    /// dual-pinch rotate) are suppressed — the JournalSessionManager owns the whiteboard.
+    /// </summary>
+    [HideInInspector] public bool suppressManualGestures;
+
     void Update()
     {
+        // Skip manual gestures entirely during a managed journal session
+        if (suppressManualGestures) return;
+
         // Lazily acquire the hand subsystem
         if (handSubsystem == null || !handSubsystem.running)
         {
@@ -242,11 +251,11 @@ public class WhiteboardUtils : MonoBehaviour
         float scaleZ = size.y / 10f;
         whiteboard.transform.localScale = new Vector3(scaleX, 0.1f / 10f, scaleZ);
 
-        // Orient face-up: the default Unity plane faces +Y, so we apply the
-        // user-facing rotation directly (LookRotation already has up = Vector3.up).
+        // Orient face-up: the default Unity plane's rendered face is +Y.
+        // LookRotation(userForward, Vector3.up) keeps the plane horizontal
+        // with its local Z axis pointing toward the user — exactly what we
+        // need for table-top writing.  No additional rotation required.
         whiteboard.transform.rotation = rotation;
-        // Flip so the plane's rendered face (+Y) points up for the writer
-        whiteboard.transform.Rotate(Vector3.right, 90f, Space.Self);
 
         // Slight offset above the table surface to prevent z-fighting
         whiteboard.transform.position = position + Vector3.up * 0.001f;

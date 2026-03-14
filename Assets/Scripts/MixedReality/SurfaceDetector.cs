@@ -43,6 +43,10 @@ public class SurfaceDetector : MonoBehaviour
     [Tooltip("Prefab for the progress indicator sphere. Reuses MarkingSphere from WhiteboardUtils.")]
     public GameObject indicatorPrefab;
 
+    [Tooltip("Layer for objects visible during passthrough. " +
+             "Must match PassthroughManager.passthroughUILayer.")]
+    public int passthroughUILayer = 31;
+
     // ── Events ──────────────────────────────────────────────────────────
     public event Action<float> OnDetectionProgress;    // 0..1
     public event Action<TablePlane> OnTableDetected;
@@ -121,6 +125,7 @@ public class SurfaceDetector : MonoBehaviour
                 HasDetected = true;
                 IsDetecting = false;
                 DestroyIndicator();
+                Debug.Log($"[SurfaceDetector] Table detected at {table.position}, size={table.size}");
                 OnTableDetected?.Invoke(table);
             }
         }
@@ -248,6 +253,8 @@ public class SurfaceDetector : MonoBehaviour
         if (indicator == null)
         {
             indicator = Instantiate(indicatorPrefab, position, Quaternion.identity);
+            // Put on passthrough UI layer so it's visible during passthrough
+            PassthroughManager.SetLayerRecursive(indicator, passthroughUILayer);
         }
 
         indicator.transform.position = position;

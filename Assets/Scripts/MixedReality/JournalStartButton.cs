@@ -183,6 +183,8 @@ public class JournalStartButton : MonoBehaviour
     {
         if (isOnCooldown) return;
 
+        Debug.Log("[JournalStartButton] Button triggered.");
+
         SetColor(pressedColor);
         transform.localPosition = idleLocalPos - transform.forward * pressDepth;
 

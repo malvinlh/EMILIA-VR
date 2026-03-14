@@ -120,12 +120,17 @@ public class JournalSessionManager : MonoBehaviour
 
     private void OnStartButtonPressed()
     {
+        Debug.Log("[JournalSession] Start button pressed. CurrentState=" + CurrentState);
         if (CurrentState != SessionState.Idle) return;
 
         CurrentState = SessionState.Passthrough;
 
         // Hide the book/button — session has begun
         SetButtonVisible(false);
+
+        // Suppress manual whiteboard gestures during the managed session
+        if (whiteboardUtils != null)
+            whiteboardUtils.suppressManualGestures = true;
 
         ShowInstruction("Switching to your real surroundings...");
 
@@ -145,6 +150,7 @@ public class JournalSessionManager : MonoBehaviour
         CurrentState = SessionState.SurfaceDetection;
         detectionTimeoutTimer = 0f;
 
+        Debug.Log("[JournalSession] Entered SurfaceDetection state.");
         ShowInstruction("Place both hands flat on your table.");
 
         if (surfaceDetector != null)
@@ -355,6 +361,10 @@ public class JournalSessionManager : MonoBehaviour
             journalChairTable.rotation = originalChairTableRotation;
         }
 
+        // Re-enable manual whiteboard gestures
+        if (whiteboardUtils != null)
+            whiteboardUtils.suppressManualGestures = false;
+
         // Re-show the book/button
         SetButtonVisible(true);
 
@@ -412,6 +422,10 @@ public class JournalSessionManager : MonoBehaviour
             journalChairTable.rotation = originalChairTableRotation;
         }
 
+        // Re-enable manual whiteboard gestures
+        if (whiteboardUtils != null)
+            whiteboardUtils.suppressManualGestures = false;
+
         // Re-show the book/button
         SetButtonVisible(true);
 
@@ -455,6 +469,12 @@ public class JournalSessionManager : MonoBehaviour
         instructionText.color = new Color(0.95f, 0.92f, 0.85f); // warm cream text
         instructionText.rectTransform.sizeDelta = new Vector2(1.2f, 0.4f);
         instructionText.enableWordWrapping = true;
+
+        // Put on passthrough UI layer so text is visible during passthrough
+        if (passthroughManager != null)
+        {
+            textObj.layer = passthroughManager.GetPassthroughUILayer();
+        }
     }
 
     private void ShowInstruction(string message)

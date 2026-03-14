@@ -341,7 +341,7 @@ MonoBehaviour:
   passthroughManager: {fileID: 2026082702}
   surfaceDetector: {fileID: 1844448070}
   whiteboardUtils: {fileID: 1074370305}
-  startButton: {fileID: 0}
+  startButton: {fileID: 1913018134}
   journalChairTable: {fileID: 56610378}
   journalTable: {fileID: 251825959}
   chair: {fileID: 1371020394}
@@ -3182,6 +3182,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   WhiteboardPrefab: {fileID: 3882585379178841419, guid: b0eabe25111ed6747b64bc2274603d4a, type: 3}
   SpherePrefab: {fileID: 2909490306651346934, guid: c69ff3cbb315e2a48803a71e0eb049bb, type: 3}
+  suppressManualGestures: 0
 --- !u!4 &1074370306
 Transform:
   m_ObjectHideFlags: 0
@@ -14601,7 +14602,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PassthroughManager
   fadeDuration: 0.5
-  mainCamera: {fileID: 0}
+  mainCamera: {fileID: 2029685059}
 --- !u!1001 &2028694357
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14682,7 +14683,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 2.5
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode
