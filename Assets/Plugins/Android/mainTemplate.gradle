@@ -9,6 +9,9 @@ apply from: '../shared/keepUnitySymbols.gradle'
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
 
+    // ── AppCompat (required by UnityPlayerGameActivity in Unity 6) ──
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+
     // ── Google ML Kit Digital Ink Recognition (bundled / standalone) ──
     // The bundled variant ships the model inside the APK and does NOT
     // require Google Play Services – essential for Meta Quest 3.
