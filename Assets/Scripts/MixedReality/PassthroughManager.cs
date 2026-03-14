@@ -155,8 +155,12 @@ public class PassthroughManager : MonoBehaviour
 
             IsPassthroughActive = true;
             OnPassthroughEntered?.Invoke();
-            Debug.Log("[PassthroughManager] Passthrough entered. CullingMask=" +
-                      mainCamera.cullingMask);
+            Debug.Log($"[PassthroughManager] Passthrough entered. " +
+                      $"CullingMask={mainCamera.cullingMask}, " +
+                      $"ClearFlags={mainCamera.clearFlags}, " +
+                      $"BgColor={mainCamera.backgroundColor}, " +
+                      $"ARCameraBackground.enabled={arCameraBackground.enabled}, " +
+                      $"ARCameraManager.enabled={arCameraManager.enabled}");
         }
         else
         {

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.XR.Hands;
 
 /// <summary>
@@ -94,13 +93,6 @@ public class WhiteboardUtils : MonoBehaviour
         if (!leftHand.GetJoint(XRHandJointID.ThumbTip).TryGetPose(out Pose leftThumbTipPose)) return;
         if (!leftHand.GetJoint(XRHandJointID.IndexTip).TryGetPose(out Pose leftIndexTipPose)) return;
         if (!leftHand.GetJoint(XRHandJointID.MiddleTip).TryGetPose(out Pose leftMiddleTipPose)) return;
-        if (!leftHand.GetJoint(XRHandJointID.LittleTip).TryGetPose(out Pose leftLittleTipPose)) return;
-
-        // ---- Left pinky pinch → reset the scene ----
-        if (IsPinching(leftThumbTipPose.position, leftLittleTipPose.position))
-        {
-            SceneManager.LoadScene("WhiteboardScene-XRI");
-        }
 
         // ---- Left middle-finger pinch → calibration / board creation ----
         if (IsPinching(leftThumbTipPose.position, leftMiddleTipPose.position))
@@ -243,24 +235,26 @@ public class WhiteboardUtils : MonoBehaviour
 
         whiteboard = Instantiate(WhiteboardPrefab, position, Quaternion.identity);
 
-        // The default plane mesh is 10×10 units, and the prefab is scaled 0.1 on each axis
-        // to make 1 unit = 1 metre.  We need to set the scale so the plane matches the
-        // requested size in metres.
-        // Formula: localScale.axis = desiredMetres / WHITEBOARD_SCALE(10)
+        // The prefab uses a Unity Plane mesh (10×10 units) with default scale 0.1
+        // on each axis (making 1 unit = 1 metre). Scale to match requested size.
         float scaleX = size.x / 10f;
         float scaleZ = size.y / 10f;
         whiteboard.transform.localScale = new Vector3(scaleX, 0.1f / 10f, scaleZ);
 
-        // Orient face-up: the default Unity plane's rendered face is +Y.
-        // LookRotation(userForward, Vector3.up) keeps the plane horizontal
-        // with its local Z axis pointing toward the user — exactly what we
-        // need for table-top writing.  No additional rotation required.
+        // The Unity Plane mesh faces +Y. The rotation from SurfaceDetector is
+        // LookRotation(userForward, Vector3.up) which keeps +Y pointing up.
+        // This means the plane is already horizontal / face-up — correct for
+        // table-top writing.
         whiteboard.transform.rotation = rotation;
 
         // Slight offset above the table surface to prevent z-fighting
         whiteboard.transform.position = position + Vector3.up * 0.001f;
 
         whiteboard.GetComponent<Whiteboard>().Initialize();
+
+        Debug.Log($"[WhiteboardUtils] SpawnAligned: pos={whiteboard.transform.position}, " +
+                  $"rot={whiteboard.transform.rotation.eulerAngles}, " +
+                  $"scale={whiteboard.transform.localScale}, size={size}");
 
         OnWhiteboardSpawned?.Invoke(whiteboard);
 

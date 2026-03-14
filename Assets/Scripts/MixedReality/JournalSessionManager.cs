@@ -1,33 +1,53 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.XR.ARFoundation;
 using TMPro;
+#if UNITY_ANDROID
+using UnityEngine.Android;
+#endif
 
 /// <summary>
 /// Orchestrates the Mixed Reality journaling flow:
-///   Idle → Passthrough → SurfaceDetection → Aligning → TransitionToVR → Journaling
+///   Idle → Passthrough → PlaneDiscovery → HandConfirmation → Preview → TransitionToVR → Journaling
 ///
-/// The session starts when JournalStartButton is pressed (works with hand tracking AND controllers).
+/// UX inspired by Meta Quest 3 AR Surface Keyboard:
+///   1. Press start button → fade to passthrough (real world visible)
+///   2. AR planes highlight candidate tables; user places both hands flat → surface confirmed
+///   3. Whiteboard spawns on real table surface (visible in passthrough)
+///   4. Brief preview → fade back to VR
+///   5. Virtual world is calibrated so JournalTable = real table position, chair faces user
+///   6. Spatial anchor resists tracking drift
+///   7. Mid-session re-calibration available via RequestReCalibration()
+///
 /// Attach to the JournalChairTable parent object.
-/// Requires references to PassthroughManager, SurfaceDetector, WhiteboardUtils, and JournalStartButton.
 /// </summary>
 public class JournalSessionManager : MonoBehaviour
 {
     public enum SessionState
     {
         Idle,
+        RequestingPermission,
         Passthrough,
-        SurfaceDetection,
-        Aligning,
+        PlaneDiscovery,
+        HandConfirmation,
+        Preview,
         TransitionToVR,
         Journaling,
+        ReCalibrating,
         Ending
     }
 
     [Header("References")]
     public PassthroughManager passthroughManager;
-    public SurfaceDetector surfaceDetector;
+    public ARTableDetector arTableDetector;
+    public CalibrationGuide calibrationGuide;
+    public AlignmentAnchor alignmentAnchor;
     public WhiteboardUtils whiteboardUtils;
     public JournalStartButton startButton;
+
+    [Header("AR Managers")]
+    [Tooltip("ARPlaneManager for table detection. Enabled only during detection.")]
+    public ARPlaneManager arPlaneManager;
 
     [Header("Scene Objects")]
     [Tooltip("The JournalChairTable parent that will be repositioned.")]
@@ -38,24 +58,20 @@ public class JournalSessionManager : MonoBehaviour
     public Transform chair;
 
     [Header("UI")]
-    [Tooltip("World-space TextMeshPro for instruction prompts. Created at runtime if null.")]
+    [Tooltip("World-space TextMeshPro for instruction prompts (fallback if CalibrationGuide is null). Created at runtime if null.")]
     public TextMeshPro instructionText;
 
-    [Header("Alignment Settings")]
-    [Tooltip("Duration of the alignment animation (seconds).")]
-    [Range(0.1f, 2f)]
-    public float alignmentDuration = 0.5f;
-
-    [Tooltip("How long the translucent preview is shown before transitioning back to VR.")]
+    [Header("Timing")]
+    [Tooltip("How long the whiteboard preview is shown on the real table before transitioning.")]
     [Range(0.5f, 5f)]
-    public float previewDuration = 1.5f;
+    public float previewDuration = 2f;
 
     [Header("Journal Whiteboard")]
     [Tooltip("Background colour for the journal whiteboard (warm cream).")]
     public Color journalBackgroundColor = new Color(1f, 0.97f, 0.92f);
 
     [Header("Fallback")]
-    [Tooltip("Seconds to wait in SurfaceDetection before offering fallback spawn.")]
+    [Tooltip("Seconds to wait in detection before offering fallback spawn.")]
     [Range(5f, 30f)]
     public float detectionTimeout = 15f;
 
@@ -65,53 +81,126 @@ public class JournalSessionManager : MonoBehaviour
     private Vector3 originalChairTablePosition;
     private Quaternion originalChairTableRotation;
     private float detectionTimeoutTimer;
+    private bool hasTimedOut;
     private GameObject spawnedWhiteboard;
+    private ARTableDetector.DetectedTable pendingTable;
+    private bool scenePermissionGranted;
+
+    // ================================================================
+    // LIFECYCLE
+    // ================================================================
 
     private void Start()
     {
-        // Save original positions for reset
         if (journalChairTable != null)
         {
             originalChairTablePosition = journalChairTable.position;
             originalChairTableRotation = journalChairTable.rotation;
         }
 
-        // Wire up start button (hand poke or controller select)
         if (startButton != null)
-        {
             startButton.OnButtonPressed += OnStartButtonPressed;
+
+        if (arTableDetector != null)
+        {
+            arTableDetector.OnTableConfirmed += OnTableConfirmed;
+            arTableDetector.OnConfirmationLost += OnConfirmationLost;
+            arTableDetector.enabled = false;
         }
 
-        // Wire up surface detector
-        if (surfaceDetector != null)
-        {
-            surfaceDetector.OnTableDetected += OnTableDetected;
-            surfaceDetector.OnDetectionLost += OnDetectionLost;
-            surfaceDetector.enabled = false; // Only active during detection state
-        }
+        // Disable AR plane manager until needed (saves performance)
+        if (arPlaneManager != null)
+            arPlaneManager.enabled = false;
 
-        // Create instruction text if not assigned
-        if (instructionText == null)
-        {
+        // Setup fallback instruction text if CalibrationGuide is not assigned
+        if (calibrationGuide == null && instructionText == null)
             CreateInstructionText();
-        }
+
         HideInstruction();
     }
 
     private void Update()
     {
-        switch (CurrentState)
+        // Timeout guard for detection phases
+        if (CurrentState == SessionState.PlaneDiscovery
+            || CurrentState == SessionState.HandConfirmation)
         {
-            case SessionState.SurfaceDetection:
-                detectionTimeoutTimer += Time.deltaTime;
-                if (detectionTimeoutTimer >= detectionTimeout)
-                {
-                    // Fallback: spawn at default position
-                    Debug.Log("[JournalSession] Detection timed out — using fallback spawn.");
-                    FallbackSpawn();
-                }
-                break;
+            if (hasTimedOut) return;
+
+            detectionTimeoutTimer += Time.deltaTime;
+            if (detectionTimeoutTimer >= detectionTimeout)
+            {
+                hasTimedOut = true;
+                Debug.Log("[JournalSession] Detection timed out — using fallback spawn.");
+                FallbackSpawn();
+            }
         }
+
+        // Keep fallback instruction text facing user during passthrough
+        if (calibrationGuide == null && instructionText != null
+            && instructionText.gameObject.activeSelf)
+        {
+            UpdateInstructionPosition();
+        }
+    }
+
+    // ================================================================
+    // ANDROID RUNTIME PERMISSION
+    // ================================================================
+
+    /// <summary>
+    /// Request com.oculus.permission.USE_SCENE at runtime.
+    /// Without this, ARPlaneManager cannot detect planes on Meta Quest.
+    /// </summary>
+    private void RequestScenePermissionThenProceed()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        const string SCENE_PERMISSION = "com.oculus.permission.USE_SCENE";
+
+        if (Permission.HasUserAuthorizedPermission(SCENE_PERMISSION))
+        {
+            Debug.Log("[JournalSession] USE_SCENE permission already granted.");
+            scenePermissionGranted = true;
+            ProceedToPassthrough();
+            return;
+        }
+
+        Debug.Log("[JournalSession] Requesting USE_SCENE permission...");
+        CurrentState = SessionState.RequestingPermission;
+
+        var callbacks = new PermissionCallbacks();
+        callbacks.PermissionGranted += (perm) =>
+        {
+            Debug.Log($"[JournalSession] Permission granted: {perm}");
+            scenePermissionGranted = true;
+            ProceedToPassthrough();
+        };
+        callbacks.PermissionDenied += (perm) =>
+        {
+            Debug.LogWarning($"[JournalSession] Permission denied: {perm}. " +
+                             "Plane detection will be unavailable — using hand-only fallback.");
+            scenePermissionGranted = false;
+            ProceedToPassthrough();
+        };
+
+        Permission.RequestUserPermissions(new[] { SCENE_PERMISSION }, callbacks);
+#else
+        // In Editor or non-Android, skip permission
+        scenePermissionGranted = true;
+        ProceedToPassthrough();
+#endif
+    }
+
+    private void ProceedToPassthrough()
+    {
+        CurrentState = SessionState.Passthrough;
+
+        ShowInstruction("Switching to your real surroundings...");
+
+        if (passthroughManager != null)
+            passthroughManager.EnterPassthrough(() => EnterPlaneDiscovery());
+        else
+            EnterPlaneDiscovery();
     }
 
     // ================================================================
@@ -123,143 +212,260 @@ public class JournalSessionManager : MonoBehaviour
         Debug.Log("[JournalSession] Start button pressed. CurrentState=" + CurrentState);
         if (CurrentState != SessionState.Idle) return;
 
-        CurrentState = SessionState.Passthrough;
-
-        // Hide the book/button — session has begun
         SetButtonVisible(false);
 
-        // Suppress manual whiteboard gestures during the managed session
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = true;
 
-        ShowInstruction("Switching to your real surroundings...");
-
-        if (passthroughManager != null)
-        {
-            passthroughManager.EnterPassthrough(() => EnterSurfaceDetection());
-        }
-        else
-        {
-            // No passthrough available — go directly to detection
-            EnterSurfaceDetection();
-        }
+        // Request permission first, then proceed to passthrough
+        RequestScenePermissionThenProceed();
     }
 
-    private void EnterSurfaceDetection()
+    private void EnterPlaneDiscovery()
     {
-        CurrentState = SessionState.SurfaceDetection;
+        CurrentState = SessionState.PlaneDiscovery;
+        hasTimedOut = false;
         detectionTimeoutTimer = 0f;
 
-        Debug.Log("[JournalSession] Entered SurfaceDetection state.");
-        ShowInstruction("Place both hands flat on your table.");
+        Debug.Log("[JournalSession] Entered PlaneDiscovery state.");
 
-        if (surfaceDetector != null)
+        // Enable AR plane detection (only if permission was granted)
+        if (arPlaneManager != null && scenePermissionGranted)
         {
-            surfaceDetector.ResetState();
-            surfaceDetector.enabled = true;
+            arPlaneManager.enabled = true;
+            Debug.Log("[JournalSession] ARPlaneManager enabled (permission granted).");
         }
+        else if (!scenePermissionGranted)
+        {
+            Debug.LogWarning("[JournalSession] ARPlaneManager NOT enabled — USE_SCENE permission denied.");
+        }
+
+        if (arTableDetector != null)
+        {
+            arTableDetector.ResetState();
+            arTableDetector.enabled = true;
+        }
+
+        if (calibrationGuide != null)
+            calibrationGuide.Show();
+
+        ShowInstruction("Place both hands flat on your table.\nHold for 2 seconds.");
     }
 
-    private void OnTableDetected(SurfaceDetector.TablePlane table)
+    private void OnTableConfirmed(ARTableDetector.DetectedTable table)
     {
-        if (CurrentState != SessionState.SurfaceDetection) return;
+        // Race condition guard: if timeout already fired, ignore detection
+        if (hasTimedOut) return;
+        if (CurrentState != SessionState.PlaneDiscovery
+            && CurrentState != SessionState.HandConfirmation) return;
 
-        surfaceDetector.enabled = false;
-        CurrentState = SessionState.Aligning;
+        // Disable detection systems
+        if (arTableDetector != null)
+            arTableDetector.enabled = false;
+        if (arPlaneManager != null)
+            arPlaneManager.enabled = false;
 
-        ShowInstruction("Table detected! Aligning your journal...");
+        CurrentState = SessionState.Preview;
 
-        StartCoroutine(AlignAndTransition(table));
+        Debug.Log($"[JournalSession] Table confirmed at {table.position}, " +
+                  $"size={table.size}, AR={table.sourcePlane != null}. " +
+                  $"User at {table.userHeadPosition}.");
+
+        StartCoroutine(PreviewAndTransition(table));
     }
 
-    private void OnDetectionLost()
+    private void OnConfirmationLost()
     {
-        // User lifted hands — just reset timer and keep waiting
+        // Reset timeout when user lifts hands (not a timeout scenario)
         detectionTimeoutTimer = 0f;
     }
 
-    private IEnumerator AlignAndTransition(SurfaceDetector.TablePlane table)
-    {
-        // Animate JournalChairTable to align with detected table
-        yield return AlignCoroutine(table);
+    // ================================================================
+    // PREVIEW & TRANSITION
+    // ================================================================
 
-        // Show preview of the aligned table for a moment
-        ShowInstruction("You can sit down now.");
+    private IEnumerator PreviewAndTransition(ARTableDetector.DetectedTable table)
+    {
+        // Step 1: Spawn whiteboard on real table in passthrough
+        SpawnWhiteboardForPreview(table);
+
+        ShowInstruction("Journal ready! Transitioning...");
+
+        // Step 2: Let user see the whiteboard on their real table
         yield return new WaitForSeconds(previewDuration);
 
-        // Transition back to VR
+        // Step 3: Transition to VR
         CurrentState = SessionState.TransitionToVR;
         HideInstruction();
 
+        if (calibrationGuide != null)
+            calibrationGuide.Hide();
+
         if (passthroughManager != null)
         {
+            passthroughManager.OnPassthroughExited += OnceAfterPassthroughExit;
             passthroughManager.ExitPassthrough(() =>
             {
-                SpawnJournalWhiteboard(table);
+                CurrentState = SessionState.Journaling;
+                Debug.Log("[JournalSession] Journaling session started.");
             });
         }
         else
         {
-            SpawnJournalWhiteboard(table);
+            AlignVRWorldToTable(table);
+            MoveWhiteboardToVRLayer();
+            CurrentState = SessionState.Journaling;
+            Debug.Log("[JournalSession] Journaling session started (no passthrough).");
         }
     }
 
-    private IEnumerator AlignCoroutine(SurfaceDetector.TablePlane table)
+    private void OnceAfterPassthroughExit()
     {
-        if (journalChairTable == null) yield break;
+        passthroughManager.OnPassthroughExited -= OnceAfterPassthroughExit;
 
-        // Calculate offset: move JournalChairTable so that JournalTable
-        // ends up at the detected table position.
-        Vector3 tableChildLocalPos = journalTable != null
-            ? journalTable.localPosition
-            : Vector3.zero;
+        AlignVRWorldToTable(pendingTable);
+        MoveWhiteboardToVRLayer();
 
-        // Target position for the parent, accounting for child offset
-        Vector3 targetParentPos = table.position - journalChairTable.rotation * tableChildLocalPos;
-        // Match the detected table's Y for the table surface
-        targetParentPos.y = table.position.y - (journalTable != null ? journalTable.localPosition.y : 0f);
-
-        Quaternion targetParentRot = table.rotation;
-
-        Vector3 startPos = journalChairTable.position;
-        Quaternion startRot = journalChairTable.rotation;
-
-        float elapsed = 0f;
-        while (elapsed < alignmentDuration)
+        // Create spatial anchor for drift resistance
+        if (alignmentAnchor != null)
         {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / alignmentDuration);
-            // Smoothstep easing
-            t = t * t * (3f - 2f * t);
-
-            journalChairTable.position = Vector3.Lerp(startPos, targetParentPos, t);
-            journalChairTable.rotation = Quaternion.Slerp(startRot, targetParentRot, t);
-            yield return null;
+            Pose tablePose = new Pose(pendingTable.position, pendingTable.rotation);
+            alignmentAnchor.CreateAnchorAtTable(tablePose);
         }
+    }
+
+    // ================================================================
+    // WHITEBOARD SPAWNING
+    // ================================================================
+
+    private void SpawnWhiteboardForPreview(ARTableDetector.DetectedTable table)
+    {
+        pendingTable = table;
+
+        if (whiteboardUtils == null) return;
+
+        var wbComponent = whiteboardUtils.WhiteboardPrefab.GetComponent<Whiteboard>();
+        if (wbComponent != null)
+            wbComponent.backgroundColor = journalBackgroundColor;
+
+        Vector3 spawnPos = table.position + Vector3.up * 0.002f;
+        spawnedWhiteboard = whiteboardUtils.SpawnAligned(spawnPos, table.rotation, table.size);
+
+        if (spawnedWhiteboard != null)
+        {
+            int ptLayer = passthroughManager != null
+                ? passthroughManager.GetPassthroughUILayer()
+                : 31;
+            PassthroughManager.SetLayerRecursive(spawnedWhiteboard, ptLayer);
+
+            Debug.Log($"[JournalSession] Whiteboard spawned at {spawnPos} " +
+                      $"on layer {ptLayer} (passthrough preview).");
+        }
+    }
+
+    private void MoveWhiteboardToVRLayer()
+    {
+        if (spawnedWhiteboard == null) return;
+
+        const int WHITEBOARD_LAYER = 10;
+        PassthroughManager.SetLayerRecursive(spawnedWhiteboard, WHITEBOARD_LAYER);
+        Debug.Log("[JournalSession] Whiteboard moved to layer 10 for VR interaction.");
+    }
+
+    // ================================================================
+    // VR WORLD ALIGNMENT
+    // ================================================================
+
+    private void AlignVRWorldToTable(ARTableDetector.DetectedTable table)
+    {
+        if (journalChairTable == null || journalTable == null) return;
+
+        // 1. Compute "table faces user" direction
+        Vector3 tableToUser = table.userHeadPosition - table.position;
+        tableToUser.y = 0f;
+
+        if (tableToUser.sqrMagnitude < 0.01f)
+        {
+            tableToUser = -table.userForward;
+            tableToUser.y = 0f;
+        }
+        tableToUser.Normalize();
+
+        Quaternion targetParentRot = Quaternion.LookRotation(tableToUser, Vector3.up);
+
+        // 2. Position: place parent so JournalTable child ends up at detected position
+        Vector3 tableChildLocalPos = journalTable.localPosition;
+        Vector3 targetParentPos = table.position - targetParentRot * tableChildLocalPos;
+        targetParentPos.y = table.position.y - tableChildLocalPos.y;
 
         journalChairTable.position = targetParentPos;
         journalChairTable.rotation = targetParentRot;
-    }
 
-    private void SpawnJournalWhiteboard(SurfaceDetector.TablePlane table)
-    {
-        CurrentState = SessionState.Journaling;
-
-        if (whiteboardUtils != null)
+        // 3. Chair validation: if chair is too far from user, try 180° flip
+        if (chair != null)
         {
-            // Set the journal background colour on the prefab before spawning
-            var wbComponent = whiteboardUtils.WhiteboardPrefab.GetComponent<Whiteboard>();
-            if (wbComponent != null)
-            {
-                wbComponent.backgroundColor = journalBackgroundColor;
-            }
+            float chairToUserDist = Vector3.Distance(
+                new Vector3(chair.position.x, 0f, chair.position.z),
+                new Vector3(table.userHeadPosition.x, 0f, table.userHeadPosition.z));
 
-            // Spawn the whiteboard flat on the table
-            Vector3 spawnPos = table.position + Vector3.up * 0.002f;
-            spawnedWhiteboard = whiteboardUtils.SpawnAligned(spawnPos, table.rotation, table.size);
+            if (chairToUserDist > 1.5f)
+            {
+                Debug.LogWarning($"[JournalSession] Chair-user distance {chairToUserDist:F2}m " +
+                                 "exceeds threshold. Trying 180° rotation.");
+
+                Quaternion flippedRot = targetParentRot * Quaternion.Euler(0f, 180f, 0f);
+                Vector3 flippedPos = table.position - flippedRot * tableChildLocalPos;
+                flippedPos.y = table.position.y - tableChildLocalPos.y;
+
+                journalChairTable.position = flippedPos;
+                journalChairTable.rotation = flippedRot;
+
+                float newDist = Vector3.Distance(
+                    new Vector3(chair.position.x, 0f, chair.position.z),
+                    new Vector3(table.userHeadPosition.x, 0f, table.userHeadPosition.z));
+
+                if (newDist > chairToUserDist)
+                {
+                    journalChairTable.position = targetParentPos;
+                    journalChairTable.rotation = targetParentRot;
+                    Debug.Log("[JournalSession] 180° flip didn't help — reverted.");
+                }
+                else
+                {
+                    Debug.Log($"[JournalSession] 180° flip improved chair distance: " +
+                              $"{chairToUserDist:F2}m → {newDist:F2}m.");
+                }
+            }
         }
 
-        Debug.Log("[JournalSession] Journaling session started.");
+        Debug.Log($"[JournalSession] VR world aligned. " +
+                  $"JournalChairTable → pos={journalChairTable.position}, " +
+                  $"rot={journalChairTable.rotation.eulerAngles}. " +
+                  $"JournalTable should be at {table.position}. " +
+                  $"User was at {table.userHeadPosition}.");
+    }
+
+    // ================================================================
+    // RE-CALIBRATION
+    // ================================================================
+
+    public void RequestReCalibration()
+    {
+        if (CurrentState != SessionState.Journaling) return;
+
+        CurrentState = SessionState.ReCalibrating;
+        Debug.Log("[JournalSession] Re-calibration requested.");
+
+        if (alignmentAnchor != null)
+            alignmentAnchor.ReleaseAnchor();
+
+        if (spawnedWhiteboard != null)
+            spawnedWhiteboard.SetActive(false);
+
+        if (passthroughManager != null)
+            passthroughManager.EnterPassthrough(() => EnterPlaneDiscovery());
+        else
+            EnterPlaneDiscovery();
     }
 
     // ================================================================
@@ -268,23 +474,20 @@ public class JournalSessionManager : MonoBehaviour
 
     private void FallbackSpawn()
     {
-        if (surfaceDetector != null)
-            surfaceDetector.enabled = false;
+        if (arTableDetector != null)
+            arTableDetector.enabled = false;
+        if (arPlaneManager != null)
+            arPlaneManager.enabled = false;
 
         HideInstruction();
 
-        // Exit passthrough if active
+        if (calibrationGuide != null)
+            calibrationGuide.Hide();
+
         if (passthroughManager != null && passthroughManager.IsPassthroughActive)
-        {
-            passthroughManager.ExitPassthrough(() =>
-            {
-                SpawnAtDefaultPosition();
-            });
-        }
+            passthroughManager.ExitPassthrough(() => SpawnAtDefaultPosition());
         else
-        {
             SpawnAtDefaultPosition();
-        }
     }
 
     private void SpawnAtDefaultPosition()
@@ -297,10 +500,9 @@ public class JournalSessionManager : MonoBehaviour
             if (wbComponent != null)
                 wbComponent.backgroundColor = journalBackgroundColor;
 
-            // Use the JournalTable's current position at default height
             Vector3 pos = journalTable.position + Vector3.up * 0.002f;
             Quaternion rot = Quaternion.LookRotation(journalTable.forward, Vector3.up);
-            Vector2 size = new Vector2(0.4f, 0.3f); // reasonable default
+            Vector2 size = new Vector2(0.4f, 0.3f);
 
             spawnedWhiteboard = whiteboardUtils.SpawnAligned(pos, rot, size);
         }
@@ -309,17 +511,9 @@ public class JournalSessionManager : MonoBehaviour
     }
 
     // ================================================================
-    // END SESSION (graceful — user finished journaling)
+    // END SESSION
     // ================================================================
 
-    /// <summary>
-    /// Gracefully end the journaling session. Destroys the whiteboard,
-    /// restores JournalChairTable to its original position, and re-shows
-    /// the start button so the user can begin a new session later.
-    ///
-    /// Call from a finish gesture (e.g., left-hand pinky-thumb pinch)
-    /// or from a UI "Done" button.
-    /// </summary>
     public void EndSession()
     {
         if (CurrentState != SessionState.Journaling) return;
@@ -330,27 +524,28 @@ public class JournalSessionManager : MonoBehaviour
 
     private IEnumerator EndSessionCoroutine()
     {
-        // Brief "closing" moment — let the user see their last stroke
         ShowInstruction("Saving your reflections...");
+
         yield return new WaitForSeconds(1f);
 
-        // Destroy the whiteboard
         CleanupWhiteboard();
-
         HideInstruction();
 
-        // Smoothly return JournalChairTable to original position
+        if (alignmentAnchor != null)
+            alignmentAnchor.ReleaseAnchor();
+
         if (journalChairTable != null)
         {
             Vector3 startPos = journalChairTable.position;
             Quaternion startRot = journalChairTable.rotation;
             float elapsed = 0f;
+            float duration = 0.5f;
 
-            while (elapsed < alignmentDuration)
+            while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / alignmentDuration);
-                t = t * t * (3f - 2f * t); // smoothstep
+                float t = Mathf.Clamp01(elapsed / duration);
+                t = t * t * (3f - 2f * t);
 
                 journalChairTable.position = Vector3.Lerp(startPos, originalChairTablePosition, t);
                 journalChairTable.rotation = Quaternion.Slerp(startRot, originalChairTableRotation, t);
@@ -361,30 +556,22 @@ public class JournalSessionManager : MonoBehaviour
             journalChairTable.rotation = originalChairTableRotation;
         }
 
-        // Re-enable manual whiteboard gestures
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
 
-        // Re-show the book/button
         SetButtonVisible(true);
-
         CurrentState = SessionState.Idle;
         Debug.Log("[JournalSession] Session ended. Book re-enabled.");
     }
 
     // ================================================================
-    // CANCEL SESSION (abort — user wants out mid-setup)
+    // CANCEL SESSION
     // ================================================================
 
-    /// <summary>
-    /// Abort the session at any point during setup (Passthrough, SurfaceDetection,
-    /// Aligning, TransitionToVR). If already in Journaling state, use EndSession() instead.
-    /// </summary>
     public void CancelSession()
     {
         if (CurrentState == SessionState.Idle || CurrentState == SessionState.Ending) return;
 
-        // If user cancels during journaling, treat it as ending the session
         if (CurrentState == SessionState.Journaling)
         {
             EndSession();
@@ -393,47 +580,50 @@ public class JournalSessionManager : MonoBehaviour
 
         StopAllCoroutines();
 
-        if (surfaceDetector != null)
+        if (arTableDetector != null)
         {
-            surfaceDetector.enabled = false;
-            surfaceDetector.ResetState();
+            arTableDetector.enabled = false;
+            arTableDetector.ResetState();
         }
+        if (arPlaneManager != null)
+            arPlaneManager.enabled = false;
 
-        CleanupWhiteboard();
         HideInstruction();
 
-        // Return to VR if in passthrough
+        if (calibrationGuide != null)
+            calibrationGuide.Hide();
+
+        if (passthroughManager != null)
+            passthroughManager.OnPassthroughExited -= OnceAfterPassthroughExit;
+
+        if (alignmentAnchor != null)
+            alignmentAnchor.ReleaseAnchor();
+
+        CleanupWhiteboard();
+
         if (passthroughManager != null && passthroughManager.IsPassthroughActive)
-        {
             passthroughManager.ExitPassthrough(() => ResetToIdle());
-        }
         else
-        {
             ResetToIdle();
-        }
     }
 
     private void ResetToIdle()
     {
-        // Restore original position
         if (journalChairTable != null)
         {
             journalChairTable.position = originalChairTablePosition;
             journalChairTable.rotation = originalChairTableRotation;
         }
 
-        // Re-enable manual whiteboard gestures
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
 
-        // Re-show the book/button
         SetButtonVisible(true);
-
         CurrentState = SessionState.Idle;
     }
 
     // ================================================================
-    // BUTTON VISIBILITY
+    // HELPERS
     // ================================================================
 
     private void SetButtonVisible(bool visible)
@@ -441,10 +631,6 @@ public class JournalSessionManager : MonoBehaviour
         if (startButton != null)
             startButton.gameObject.SetActive(visible);
     }
-
-    // ================================================================
-    // WHITEBOARD CLEANUP
-    // ================================================================
 
     private void CleanupWhiteboard()
     {
@@ -456,8 +642,51 @@ public class JournalSessionManager : MonoBehaviour
     }
 
     // ================================================================
-    // INSTRUCTION UI
+    // INSTRUCTION UI (fallback when CalibrationGuide is null)
     // ================================================================
+
+    private void ShowInstruction(string message)
+    {
+        // Prefer CalibrationGuide if available
+        if (calibrationGuide != null)
+        {
+            calibrationGuide.SetInstruction(message);
+            return;
+        }
+
+        // Fallback: world-space TextMeshPro
+        if (instructionText == null) return;
+
+        instructionText.text = message;
+        instructionText.gameObject.SetActive(true);
+        UpdateInstructionPosition();
+    }
+
+    private void HideInstruction()
+    {
+        if (calibrationGuide != null)
+            calibrationGuide.HideInstruction();
+
+        if (instructionText != null)
+            instructionText.gameObject.SetActive(false);
+    }
+
+    private void UpdateInstructionPosition()
+    {
+        if (instructionText == null) return;
+
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        Vector3 forward = cam.transform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.001f)
+            forward = cam.transform.forward;
+        forward.Normalize();
+
+        instructionText.transform.position = cam.transform.position + forward * 1.2f + Vector3.down * 0.2f;
+        instructionText.transform.rotation = Quaternion.LookRotation(forward);
+    }
 
     private void CreateInstructionText()
     {
@@ -466,54 +695,29 @@ public class JournalSessionManager : MonoBehaviour
 
         instructionText.fontSize = 0.4f;
         instructionText.alignment = TextAlignmentOptions.Center;
-        instructionText.color = new Color(0.95f, 0.92f, 0.85f); // warm cream text
+        instructionText.color = new Color(0.95f, 0.92f, 0.85f);
         instructionText.rectTransform.sizeDelta = new Vector2(1.2f, 0.4f);
         instructionText.enableWordWrapping = true;
 
         // Put on passthrough UI layer so text is visible during passthrough
-        if (passthroughManager != null)
-        {
-            textObj.layer = passthroughManager.GetPassthroughUILayer();
-        }
-    }
-
-    private void ShowInstruction(string message)
-    {
-        if (instructionText == null) return;
-
-        instructionText.text = message;
-        instructionText.gameObject.SetActive(true);
-
-        // Position in front of the user's gaze
-        Camera cam = Camera.main;
-        if (cam != null)
-        {
-            Vector3 forward = cam.transform.forward;
-            forward.y = 0f;
-            forward.Normalize();
-
-            instructionText.transform.position = cam.transform.position + forward * 1.5f + Vector3.up * 0.2f;
-            instructionText.transform.rotation = Quaternion.LookRotation(forward);
-        }
-    }
-
-    private void HideInstruction()
-    {
-        if (instructionText != null)
-            instructionText.gameObject.SetActive(false);
+        int ptLayer = passthroughManager != null
+            ? passthroughManager.GetPassthroughUILayer()
+            : 31;
+        textObj.layer = ptLayer;
     }
 
     private void OnDestroy()
     {
         if (startButton != null)
-        {
             startButton.OnButtonPressed -= OnStartButtonPressed;
+
+        if (arTableDetector != null)
+        {
+            arTableDetector.OnTableConfirmed -= OnTableConfirmed;
+            arTableDetector.OnConfirmationLost -= OnConfirmationLost;
         }
 
-        if (surfaceDetector != null)
-        {
-            surfaceDetector.OnTableDetected -= OnTableDetected;
-            surfaceDetector.OnDetectionLost -= OnDetectionLost;
-        }
+        if (passthroughManager != null)
+            passthroughManager.OnPassthroughExited -= OnceAfterPassthroughExit;
     }
 }
