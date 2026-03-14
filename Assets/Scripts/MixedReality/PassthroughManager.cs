@@ -1,12 +1,17 @@
 using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.Rendering.Universal;
+using UnityEngine.XR.ARFoundation;
 
 /// <summary>
 /// Manages VR ↔ MR passthrough transitions on Meta Quest 3 via OpenXR.
-/// Uses a fade quad parented to the camera for smooth black-out transitions.
-/// Requires com.unity.xr.meta-openxr package with Meta Quest Environment feature enabled.
+/// Uses ARCameraManager + ARCameraBackground (Meta Quest: Camera Passthrough feature)
+/// to toggle passthrough, with a fade quad for smooth black-out transitions.
+///
+/// Setup:
+///   1. Enable "Meta Quest: Camera (Passthrough)" in OpenXR Feature Groups.
+///   2. Add an ARSession GameObject to the scene.
+///   3. This script will add/manage ARCameraManager and ARCameraBackground on the main camera.
 /// </summary>
 public class PassthroughManager : MonoBehaviour
 {
@@ -31,12 +36,37 @@ public class PassthroughManager : MonoBehaviour
     private Color savedBackgroundColor;
     private CameraClearFlags savedClearFlags;
 
+    private ARCameraManager arCameraManager;
+    private ARCameraBackground arCameraBackground;
+
     private void Awake()
     {
         if (mainCamera == null)
             mainCamera = Camera.main;
 
         CreateFadeQuad();
+        EnsureARComponents();
+    }
+
+    /// <summary>
+    /// Ensures ARCameraManager and ARCameraBackground exist on the main camera
+    /// but are disabled until passthrough is needed.
+    /// </summary>
+    private void EnsureARComponents()
+    {
+        if (mainCamera == null) return;
+
+        arCameraManager = mainCamera.GetComponent<ARCameraManager>();
+        if (arCameraManager == null)
+            arCameraManager = mainCamera.gameObject.AddComponent<ARCameraManager>();
+
+        arCameraBackground = mainCamera.GetComponent<ARCameraBackground>();
+        if (arCameraBackground == null)
+            arCameraBackground = mainCamera.gameObject.AddComponent<ARCameraBackground>();
+
+        // Start disabled — VR mode by default
+        arCameraManager.enabled = false;
+        arCameraBackground.enabled = false;
     }
 
     /// <summary>
@@ -64,29 +94,36 @@ public class PassthroughManager : MonoBehaviour
         // Phase 1: Fade to black
         yield return FadeCoroutine(0f, 1f, fadeDuration);
 
-        // Phase 2: Switch blend mode while screen is black
+        // Phase 2: Switch passthrough while screen is black
         if (toPassthrough)
         {
             savedBackgroundColor = mainCamera.backgroundColor;
             savedClearFlags = mainCamera.clearFlags;
 
+            // Enable AR camera components to activate passthrough
+            arCameraManager.enabled = true;
+            arCameraBackground.enabled = true;
+
             // Transparent background lets passthrough show through
             mainCamera.clearFlags = CameraClearFlags.SolidColor;
             mainCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
 
-            SetPassthroughBlendMode(true);
             IsPassthroughActive = true;
             OnPassthroughEntered?.Invoke();
+            Debug.Log("[PassthroughManager] Passthrough entered (AR Camera Background).");
         }
         else
         {
-            SetPassthroughBlendMode(false);
+            // Disable AR camera components to return to VR
+            arCameraBackground.enabled = false;
+            arCameraManager.enabled = false;
 
             mainCamera.clearFlags = savedClearFlags;
             mainCamera.backgroundColor = savedBackgroundColor;
 
             IsPassthroughActive = false;
             OnPassthroughExited?.Invoke();
+            Debug.Log("[PassthroughManager] Passthrough exited (back to VR).");
         }
 
         // Phase 3: Fade from black
@@ -116,54 +153,6 @@ public class PassthroughManager : MonoBehaviour
 
         if (toAlpha <= 0f)
             fadeQuadObj.SetActive(false);
-    }
-
-    private void SetPassthroughBlendMode(bool enablePassthrough)
-    {
-#if UNITY_ANDROID && !UNITY_EDITOR
-        try
-        {
-            // Use reflection to call MetaOpenXREnvironment.SetEnvironmentBlendMode
-            // to avoid hard compile dependency when package may not be installed yet.
-            var metaEnvType = System.Type.GetType(
-                "UnityEngine.XR.OpenXR.Features.Meta.MetaOpenXREnvironment, " +
-                "Unity.XR.Meta.OpenXR");
-
-            if (metaEnvType != null)
-            {
-                // The enum XrEnvironmentBlendMode: AlphaBlend = 2, Opaque = 1
-                var method = metaEnvType.GetMethod("SetEnvironmentBlendMode",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-
-                if (method != null)
-                {
-                    // Get the enum type
-                    var enumType = method.GetParameters()[0].ParameterType;
-                    object blendMode = enablePassthrough
-                        ? System.Enum.ToObject(enumType, 2)  // AlphaBlend
-                        : System.Enum.ToObject(enumType, 1);  // Opaque
-
-                    method.Invoke(null, new object[] { blendMode });
-                    Debug.Log($"[PassthroughManager] Blend mode set to {(enablePassthrough ? "AlphaBlend (Passthrough)" : "Opaque (VR)")}");
-                }
-                else
-                {
-                    Debug.LogWarning("[PassthroughManager] SetEnvironmentBlendMode method not found.");
-                }
-            }
-            else
-            {
-                Debug.LogWarning("[PassthroughManager] MetaOpenXREnvironment type not found. " +
-                    "Ensure com.unity.xr.meta-openxr package is installed and Meta Quest Environment feature is enabled.");
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[PassthroughManager] Failed to set blend mode: {e.Message}");
-        }
-#else
-        Debug.Log($"[PassthroughManager] (Editor) Would set passthrough to {enablePassthrough}");
-#endif
     }
 
     private void CreateFadeQuad()
