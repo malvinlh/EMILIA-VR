@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -204,5 +205,56 @@ public class WhiteboardUtils : MonoBehaviour
     private bool IsPinching(Vector3 thumbTip, Vector3 fingerTip)
     {
         return Vector3.Distance(thumbTip, fingerTip) < PINCH_THRESHOLD;
+    }
+
+    // ================================================================
+    // ALIGNED SPAWNING (used by JournalSessionManager)
+    // ================================================================
+
+    /// <summary>Fired when a whiteboard is created (manual or aligned).</summary>
+    public event Action<GameObject> OnWhiteboardSpawned;
+
+    /// <summary>
+    /// Spawns a horizontal whiteboard at a specific world position, rotation,
+    /// and size — used for table-aligned journal mode.
+    ///
+    /// The whiteboard is oriented face-up (writing surface = +Y) so the user
+    /// writes on it like paper on a desk.
+    /// </summary>
+    /// <param name="position">World-space centre of the whiteboard.</param>
+    /// <param name="rotation">World-space rotation (forward = user's facing direction).</param>
+    /// <param name="size">Width (X) and depth (Z) in metres.</param>
+    /// <returns>The instantiated whiteboard GameObject.</returns>
+    public GameObject SpawnAligned(Vector3 position, Quaternion rotation, Vector2 size)
+    {
+        if (whiteboard != null)
+        {
+            Destroy(whiteboard);
+        }
+
+        whiteboard = Instantiate(WhiteboardPrefab, position, Quaternion.identity);
+
+        // The default plane mesh is 10×10 units, and the prefab is scaled 0.1 on each axis
+        // to make 1 unit = 1 metre.  We need to set the scale so the plane matches the
+        // requested size in metres.
+        // Formula: localScale.axis = desiredMetres / WHITEBOARD_SCALE(10)
+        float scaleX = size.x / 10f;
+        float scaleZ = size.y / 10f;
+        whiteboard.transform.localScale = new Vector3(scaleX, 0.1f / 10f, scaleZ);
+
+        // Orient face-up: the default Unity plane faces +Y, so we apply the
+        // user-facing rotation directly (LookRotation already has up = Vector3.up).
+        whiteboard.transform.rotation = rotation;
+        // Flip so the plane's rendered face (+Y) points up for the writer
+        whiteboard.transform.Rotate(Vector3.right, 90f, Space.Self);
+
+        // Slight offset above the table surface to prevent z-fighting
+        whiteboard.transform.position = position + Vector3.up * 0.001f;
+
+        whiteboard.GetComponent<Whiteboard>().Initialize();
+
+        OnWhiteboardSpawned?.Invoke(whiteboard);
+
+        return whiteboard;
     }
 }

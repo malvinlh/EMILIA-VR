@@ -67,6 +67,9 @@ public class WhiteboardPen : MonoBehaviour
     private DigitalInkBridge inkBridge;
     private bool strokeActive;
 
+    /// <summary>True when the pen is actively drawing on a whiteboard.</summary>
+    public bool IsDrawing => wasTouchingLastFrame;
+
     private void Start()
     {
         CreateTouchParticles();

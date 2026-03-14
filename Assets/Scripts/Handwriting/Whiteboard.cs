@@ -15,6 +15,9 @@ public class Whiteboard : MonoBehaviour
     private Texture2D texture;
     public Color color;
 
+    [Tooltip("Background colour of the whiteboard texture. Use warm cream for journal mode.")]
+    public Color backgroundColor = Color.white;
+
     private bool touching, touchingLast;
 
     private float posX, posY;
@@ -77,6 +80,14 @@ public class Whiteboard : MonoBehaviour
         Renderer renderer = GetComponent<Renderer>();
         texture = new Texture2D(texturesSizeHorizontal, texturesSizeVertical);
         texture.filterMode = FilterMode.Bilinear;   // smooth scaling / angled viewing
+
+        // Fill with background colour
+        Color[] fill = new Color[texturesSizeHorizontal * texturesSizeVertical];
+        for (int i = 0; i < fill.Length; i++)
+            fill[i] = backgroundColor;
+        texture.SetPixels(fill);
+        texture.Apply();
+
         renderer.material.mainTexture = texture;
 
         //Set the color of our pen to black
