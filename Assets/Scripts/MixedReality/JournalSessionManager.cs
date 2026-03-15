@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
+using UnityEngine.XR.Hands;
 using TMPro;
 #if UNITY_ANDROID
 using UnityEngine.Android;
@@ -15,7 +16,7 @@ using UnityEngine.Android;
 ///   2. AR planes highlight candidate tables; user places both hands flat → surface confirmed
 ///   3. Whiteboard spawns on real table surface (visible in passthrough)
 ///   4. Brief preview → fade back to VR
-///   5. Virtual world is calibrated so JournalTable = real table position, chair faces user
+///   5. Player is teleported to SeatPoint; virtual table offset adjusted to match real-world distance
 ///   6. Spatial anchor resists tracking drift
 ///   7. Mid-session re-calibration available via RequestReCalibration()
 ///
@@ -57,6 +58,14 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("The Chair child.")]
     public Transform chair;
 
+    [Header("SeatPoint Calibration")]
+    [Tooltip("The SeatPoint transform where the player will be teleported after calibration. " +
+             "Its forward direction defines the player's seated facing direction. " +
+             "If null, falls back to legacy AlignVRWorldToTable behaviour.")]
+    public Transform seatPoint;
+    [Tooltip("The XR Origin (XR Rig) root transform. Required for teleportation to SeatPoint.")]
+    public Transform xrOrigin;
+
     [Header("UI")]
     [Tooltip("World-space TextMeshPro for instruction prompts (fallback if CalibrationGuide is null). Created at runtime if null.")]
     public TextMeshPro instructionText;
@@ -80,11 +89,13 @@ public class JournalSessionManager : MonoBehaviour
 
     private Vector3 originalChairTablePosition;
     private Quaternion originalChairTableRotation;
+    private Vector3 originalTableLocalPosition;
     private float detectionTimeoutTimer;
     private bool hasTimedOut;
     private GameObject spawnedWhiteboard;
     private ARTableDetector.DetectedTable pendingTable;
     private bool scenePermissionGranted;
+    private XRHandSubsystem handSubsystem;
 
     // ================================================================
     // LIFECYCLE
@@ -97,6 +108,9 @@ public class JournalSessionManager : MonoBehaviour
             originalChairTablePosition = journalChairTable.position;
             originalChairTableRotation = journalChairTable.rotation;
         }
+
+        if (journalTable != null)
+            originalTableLocalPosition = journalTable.localPosition;
 
         if (startButton != null)
             startButton.OnButtonPressed += OnStartButtonPressed;
@@ -134,6 +148,10 @@ public class JournalSessionManager : MonoBehaviour
                 Debug.Log("[JournalSession] Detection timed out — using fallback spawn.");
                 FallbackSpawn();
             }
+
+            // Drive CalibrationGuide palm indicators from hand tracking data
+            if (calibrationGuide != null && arTableDetector != null)
+                UpdateCalibrationPalmIndicators();
         }
 
         // Keep fallback instruction text facing user during passthrough
@@ -142,6 +160,39 @@ public class JournalSessionManager : MonoBehaviour
         {
             UpdateInstructionPosition();
         }
+    }
+
+    /// <summary>
+    /// Reads hand tracking state and forwards it to CalibrationGuide so
+    /// palm indicator spheres appear during detection.
+    /// </summary>
+    private void UpdateCalibrationPalmIndicators()
+    {
+        if (handSubsystem == null || !handSubsystem.running)
+        {
+            handSubsystem = WhiteboardPen.GetHandSubsystem();
+            if (handSubsystem == null) return;
+        }
+
+        XRHand leftHand = handSubsystem.leftHand;
+        XRHand rightHand = handSubsystem.rightHand;
+
+        bool leftTracked = leftHand.isTracked;
+        bool rightTracked = rightHand.isTracked;
+
+        bool leftFlat = false;
+        bool rightFlat = false;
+        Vector3 leftPos = Vector3.zero;
+        Vector3 rightPos = Vector3.zero;
+
+        if (leftTracked)
+            leftFlat = arTableDetector.IsPalmFlat(leftHand, out leftPos);
+        if (rightTracked)
+            rightFlat = arTableDetector.IsPalmFlat(rightHand, out rightPos);
+
+        calibrationGuide.UpdatePalmIndicators(
+            leftTracked, leftPos, leftFlat,
+            rightTracked, rightPos, rightFlat);
     }
 
     // ================================================================
@@ -312,7 +363,15 @@ public class JournalSessionManager : MonoBehaviour
         }
         else
         {
-            AlignVRWorldToTable(table);
+            if (seatPoint != null && xrOrigin != null)
+            {
+                TeleportToSeatPoint(table);
+                AdjustTableForDistanceMismatch(table);
+            }
+            else
+            {
+                AlignVRWorldToTable(table);
+            }
             MoveWhiteboardToVRLayer();
             CurrentState = SessionState.Journaling;
             Debug.Log("[JournalSession] Journaling session started (no passthrough).");
@@ -323,7 +382,16 @@ public class JournalSessionManager : MonoBehaviour
     {
         passthroughManager.OnPassthroughExited -= OnceAfterPassthroughExit;
 
-        AlignVRWorldToTable(pendingTable);
+        if (seatPoint != null && xrOrigin != null)
+        {
+            TeleportToSeatPoint(pendingTable);
+            AdjustTableForDistanceMismatch(pendingTable);
+        }
+        else
+        {
+            AlignVRWorldToTable(pendingTable);
+        }
+
         MoveWhiteboardToVRLayer();
 
         // Create spatial anchor for drift resistance
@@ -446,6 +514,84 @@ public class JournalSessionManager : MonoBehaviour
     }
 
     // ================================================================
+    // SEATPOINT TELEPORTATION
+    // ================================================================
+
+    /// <summary>
+    /// Teleports the XR Origin so the player's camera ends up at SeatPoint's
+    /// position and forward direction. This creates a natural seated experience
+    /// where the player appears at the virtual desk.
+    /// </summary>
+    private void TeleportToSeatPoint(ARTableDetector.DetectedTable table)
+    {
+        if (seatPoint == null || xrOrigin == null) return;
+
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        // 1. Rotate XR Origin so camera faces SeatPoint's forward direction
+        float currentCamY = cam.transform.eulerAngles.y;
+        float targetY = seatPoint.eulerAngles.y;
+        float yawDelta = targetY - currentCamY;
+
+        xrOrigin.RotateAround(cam.transform.position, Vector3.up, yawDelta);
+
+        // 2. Translate XR Origin so camera ends up at SeatPoint position
+        //    Only adjust XZ (horizontal) — Y stays at tracking height for comfort
+        Vector3 camPos = cam.transform.position;
+        Vector3 offset = seatPoint.position - camPos;
+        offset.y = 0f; // Preserve tracked head height
+        xrOrigin.position += offset;
+
+        Debug.Log($"[JournalSession] Teleported to SeatPoint. " +
+                  $"XR Origin → {xrOrigin.position}, yaw delta={yawDelta:F1}°");
+    }
+
+    /// <summary>
+    /// Handles the distance mismatch between the real-world chair-to-table
+    /// distance and the virtual SeatPoint-to-JournalTable distance.
+    ///
+    /// Approach: Offset the JournalTable along SeatPoint's forward axis
+    /// so the virtual table sits at the same relative distance as the real one.
+    /// This keeps the whiteboard reachable and prevents arm-length discomfort.
+    /// </summary>
+    private void AdjustTableForDistanceMismatch(ARTableDetector.DetectedTable table)
+    {
+        if (seatPoint == null || journalTable == null || journalChairTable == null) return;
+
+        // Real-world horizontal distance from user's head to detected table center
+        Vector3 headXZ = new Vector3(table.userHeadPosition.x, 0f, table.userHeadPosition.z);
+        Vector3 tableXZ = new Vector3(table.position.x, 0f, table.position.z);
+        float realDistance = Vector3.Distance(headXZ, tableXZ);
+
+        // Virtual horizontal distance from SeatPoint to JournalTable
+        Vector3 seatXZ = new Vector3(seatPoint.position.x, 0f, seatPoint.position.z);
+        Vector3 virtualTableXZ = new Vector3(journalTable.position.x, 0f, journalTable.position.z);
+        float virtualDistance = Vector3.Distance(seatXZ, virtualTableXZ);
+
+        float distanceDelta = realDistance - virtualDistance;
+
+        // Only adjust if the difference is noticeable (>5cm) to avoid unnecessary jitter
+        if (Mathf.Abs(distanceDelta) < 0.05f)
+        {
+            Debug.Log($"[JournalSession] Distance mismatch is negligible " +
+                      $"(real={realDistance:F2}m, virtual={virtualDistance:F2}m). No offset applied.");
+            return;
+        }
+
+        // Push the table forward/backward along SeatPoint's forward axis
+        Vector3 seatForward = seatPoint.forward;
+        seatForward.y = 0f;
+        seatForward.Normalize();
+
+        journalTable.position += seatForward * distanceDelta;
+
+        Debug.Log($"[JournalSession] Table distance offset applied: {distanceDelta:F3}m " +
+                  $"(real={realDistance:F2}m, virtual={virtualDistance:F2}m). " +
+                  $"JournalTable now at {journalTable.position}.");
+    }
+
+    // ================================================================
     // RE-CALIBRATION
     // ================================================================
 
@@ -556,6 +702,10 @@ public class JournalSessionManager : MonoBehaviour
             journalChairTable.rotation = originalChairTableRotation;
         }
 
+        // Restore table local position if it was offset for distance mismatch
+        if (journalTable != null)
+            journalTable.localPosition = originalTableLocalPosition;
+
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
 
@@ -614,6 +764,10 @@ public class JournalSessionManager : MonoBehaviour
             journalChairTable.position = originalChairTablePosition;
             journalChairTable.rotation = originalChairTableRotation;
         }
+
+        // Restore table local position if it was offset for distance mismatch
+        if (journalTable != null)
+            journalTable.localPosition = originalTableLocalPosition;
 
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
