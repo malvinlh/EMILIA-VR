@@ -41,6 +41,11 @@ public class CalibrationGuide : MonoBehaviour
     public Color palmFlatColor = new Color(1f, 0.85f, 0.2f, 0.9f);
     public Color palmConfirmingColor = new Color(0.3f, 0.9f, 0.3f, 0.95f);
 
+    [Header("Surface Dot Grid")]
+    [Tooltip("SurfaceDotGrid component for Quest-style dot visualization. " +
+             "If assigned, dots appear around palms when flat on the surface.")]
+    public SurfaceDotGrid dotGrid;
+
     // ── State ────────────────────────────────────────────────────────
     private TextMeshPro instructionText;
     private GameObject leftPalmIndicator;
@@ -64,6 +69,10 @@ public class CalibrationGuide : MonoBehaviour
         EnsureInstructionText();
         EnsurePalmIndicators();
         EnsureProgressIndicator();
+
+        if (dotGrid != null)
+            dotGrid.Initialise(passthroughLayer);
+
         SetInstruction("Place both hands flat on your table.");
 
         if (tableDetector != null)
@@ -90,6 +99,7 @@ public class CalibrationGuide : MonoBehaviour
         HideInstruction();
         HidePalmIndicators();
         HideProgressIndicator();
+        HideDotGrid();
         ClearPlaneHighlights();
     }
 
@@ -119,8 +129,19 @@ public class CalibrationGuide : MonoBehaviour
         UpdatePalmIndicator(leftPalmIndicator, leftTracked, leftPalmPos, leftFlat);
         UpdatePalmIndicator(rightPalmIndicator, rightTracked, rightPalmPos, rightFlat);
 
+        bool bothFlat = leftTracked && rightTracked && leftFlat && rightFlat;
+
+        // Surface dot grid — Quest keyboard-style dots around palms
+        if (dotGrid != null)
+        {
+            if (bothFlat)
+                dotGrid.UpdateGrid(leftPalmPos, rightPalmPos, confirmationProgress);
+            else
+                dotGrid.Hide();
+        }
+
         // Progress indicator between hands
-        if (leftTracked && rightTracked && leftFlat && rightFlat && progressIndicator != null)
+        if (bothFlat && progressIndicator != null)
         {
             Vector3 mid = (leftPalmPos + rightPalmPos) / 2f + Vector3.up * 0.05f;
             progressIndicator.transform.position = mid;
@@ -168,6 +189,7 @@ public class CalibrationGuide : MonoBehaviour
         if (leftPalmIndicator != null) Destroy(leftPalmIndicator);
         if (rightPalmIndicator != null) Destroy(rightPalmIndicator);
         if (progressIndicator != null) Destroy(progressIndicator);
+        if (dotGrid != null) dotGrid.Cleanup();
         ClearPlaneHighlights();
     }
 
@@ -214,6 +236,9 @@ public class CalibrationGuide : MonoBehaviour
         HidePalmIndicators();
         HideProgressIndicator();
         ClearPlaneHighlights();
+
+        if (dotGrid != null)
+            dotGrid.FlashConfirmed();
     }
 
     private void OnLost()
@@ -223,6 +248,8 @@ public class CalibrationGuide : MonoBehaviour
 
         if (progressIndicator != null)
             progressIndicator.SetActive(false);
+
+        HideDotGrid();
     }
 
     // ================================================================
@@ -312,6 +339,11 @@ public class CalibrationGuide : MonoBehaviour
     private void HideProgressIndicator()
     {
         if (progressIndicator != null) progressIndicator.SetActive(false);
+    }
+
+    private void HideDotGrid()
+    {
+        if (dotGrid != null) dotGrid.Hide();
     }
 
     /// <summary>

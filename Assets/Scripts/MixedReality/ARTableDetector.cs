@@ -23,6 +23,12 @@ public class ARTableDetector : MonoBehaviour
     [Tooltip("ARPlaneManager for real table geometry. Auto-found if null.")]
     public ARPlaneManager planeManager;
 
+    [Header("Coordinate Space")]
+    [Tooltip("XR Origin root transform. Required to convert hand joint positions " +
+             "from session/tracking space to world space. If null, positions are " +
+             "assumed to already be in world space (only valid if XR Origin is at origin).")]
+    public Transform xrOrigin;
+
     [Header("Table Height Heuristics")]
     [Tooltip("Min height above floor (metres) to classify as table.")]
     public float minTableHeight = 0.45f;
@@ -454,15 +460,15 @@ public class ARTableDetector : MonoBehaviour
         if (!palmJoint.TryGetPose(out Pose palmPose))
             return false;
 
-        palmPosition = palmPose.position;
-
-        // Palm "down" vector should align with world down
+        // Flatness checks use session-space values (relative, so space doesn't matter)
         Vector3 palmDown = palmPose.rotation * (-Vector3.up);
+        if (xrOrigin != null)
+            palmDown = xrOrigin.TransformDirection(palmDown);
         float angle = Vector3.Angle(palmDown, Vector3.down);
         if (angle > palmDownAngleThreshold)
             return false;
 
-        float palmY = palmPosition.y;
+        float palmY = palmPose.position.y;
         foreach (var jointID in FingertipJoints)
         {
             XRHandJoint joint = hand.GetJoint(jointID);
@@ -473,7 +479,19 @@ public class ARTableDetector : MonoBehaviour
                 return false;
         }
 
+        // Output position in world space
+        palmPosition = SessionToWorld(palmPose.position);
         return true;
+    }
+
+    /// <summary>
+    /// Converts a position from XR session/tracking space to Unity world space.
+    /// XRHandJoint.TryGetPose() returns poses in session space (the XR Origin's local space).
+    /// </summary>
+    private Vector3 SessionToWorld(Vector3 sessionPos)
+    {
+        if (xrOrigin == null) return sessionPos;
+        return xrOrigin.TransformPoint(sessionPos);
     }
 
     // ================================================================
@@ -486,7 +504,7 @@ public class ARTableDetector : MonoBehaviour
         {
             XRHandJoint joint = hand.GetJoint(jointID);
             if (joint.TryGetPose(out Pose pose))
-                points.Add(pose.position);
+                points.Add(SessionToWorld(pose.position));
         }
     }
 
@@ -504,5 +522,16 @@ public class ARTableDetector : MonoBehaviour
         candidates.Clear();
         planeScanTimer = 0f;
         usingFallback = false;
+    }
+
+    /// <summary>
+    /// Forces hand-only mode immediately, skipping AR plane scanning entirely.
+    /// Used when JournalSessionManager.skipPlaneDetection is enabled for
+    /// Quest-style instant detection from hand joints alone.
+    /// </summary>
+    public void ForceHandOnlyMode()
+    {
+        usingFallback = true;
+        Debug.Log("[ARTableDetector] Forced into hand-only mode (plane detection skipped).");
     }
 }

@@ -1,7 +1,9 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.Hands;
+using UnityEngine.XR.Interaction.Toolkit.Locomotion;
 using TMPro;
 #if UNITY_ANDROID
 using UnityEngine.Android;
@@ -50,6 +52,12 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("ARPlaneManager for table detection. Enabled only during detection.")]
     public ARPlaneManager arPlaneManager;
 
+    [Header("Detection Mode")]
+    [Tooltip("Skip AR plane scanning entirely. Uses hand-only detection like the " +
+             "Quest 3 AR Surface Keyboard — instant dot grid feedback from palm positions. " +
+             "Enable this for faster, lighter calibration without Scene Model dependency.")]
+    public bool skipPlaneDetection;
+
     [Header("Scene Objects")]
     [Tooltip("The JournalChairTable parent that will be repositioned.")]
     public Transform journalChairTable;
@@ -65,6 +73,10 @@ public class JournalSessionManager : MonoBehaviour
     public Transform seatPoint;
     [Tooltip("The XR Origin (XR Rig) root transform. Required for teleportation to SeatPoint.")]
     public Transform xrOrigin;
+    [Tooltip("Target seated eye height in world units (Y position the camera should be at). " +
+             "Set to SeatPoint's Y + typical seated eye height offset. " +
+             "If <= 0, the tracked head height is preserved (no height adjustment).")]
+    public float seatedEyeHeight = -1f;
 
     [Header("UI")]
     [Tooltip("World-space TextMeshPro for instruction prompts (fallback if CalibrationGuide is null). Created at runtime if null.")]
@@ -96,6 +108,8 @@ public class JournalSessionManager : MonoBehaviour
     private ARTableDetector.DetectedTable pendingTable;
     private bool scenePermissionGranted;
     private XRHandSubsystem handSubsystem;
+    private List<LocomotionProvider> disabledLocomotionProviders = new List<LocomotionProvider>();
+    private float originalXROriginY;
 
     // ================================================================
     // LIFECYCLE
@@ -268,8 +282,11 @@ public class JournalSessionManager : MonoBehaviour
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = true;
 
-        // Request permission first, then proceed to passthrough
-        RequestScenePermissionThenProceed();
+        // Skip permission request if plane detection is disabled (hand-only mode)
+        if (skipPlaneDetection)
+            ProceedToPassthrough();
+        else
+            RequestScenePermissionThenProceed();
     }
 
     private void EnterPlaneDiscovery()
@@ -280,11 +297,15 @@ public class JournalSessionManager : MonoBehaviour
 
         Debug.Log("[JournalSession] Entered PlaneDiscovery state.");
 
-        // Enable AR plane detection (only if permission was granted)
-        if (arPlaneManager != null && scenePermissionGranted)
+        // Enable AR plane detection (only if permission was granted AND not skipped)
+        if (!skipPlaneDetection && arPlaneManager != null && scenePermissionGranted)
         {
             arPlaneManager.enabled = true;
             Debug.Log("[JournalSession] ARPlaneManager enabled (permission granted).");
+        }
+        else if (skipPlaneDetection)
+        {
+            Debug.Log("[JournalSession] Plane detection skipped — using hand-only mode.");
         }
         else if (!scenePermissionGranted)
         {
@@ -295,6 +316,10 @@ public class JournalSessionManager : MonoBehaviour
         {
             arTableDetector.ResetState();
             arTableDetector.enabled = true;
+
+            // Force hand-only fallback immediately when skipping planes
+            if (skipPlaneDetection)
+                arTableDetector.ForceHandOnlyMode();
         }
 
         if (calibrationGuide != null)
@@ -358,6 +383,7 @@ public class JournalSessionManager : MonoBehaviour
             passthroughManager.ExitPassthrough(() =>
             {
                 CurrentState = SessionState.Journaling;
+                LockLocomotion();
                 Debug.Log("[JournalSession] Journaling session started.");
             });
         }
@@ -374,6 +400,7 @@ public class JournalSessionManager : MonoBehaviour
             }
             MoveWhiteboardToVRLayer();
             CurrentState = SessionState.Journaling;
+            LockLocomotion();
             Debug.Log("[JournalSession] Journaling session started (no passthrough).");
         }
     }
@@ -529,6 +556,9 @@ public class JournalSessionManager : MonoBehaviour
         Camera cam = Camera.main;
         if (cam == null) return;
 
+        // Save original Y for restoration when session ends
+        originalXROriginY = xrOrigin.position.y;
+
         // 1. Rotate XR Origin so camera faces SeatPoint's forward direction
         float currentCamY = cam.transform.eulerAngles.y;
         float targetY = seatPoint.eulerAngles.y;
@@ -536,15 +566,38 @@ public class JournalSessionManager : MonoBehaviour
 
         xrOrigin.RotateAround(cam.transform.position, Vector3.up, yawDelta);
 
-        // 2. Translate XR Origin so camera ends up at SeatPoint position
-        //    Only adjust XZ (horizontal) — Y stays at tracking height for comfort
+        // 2. Translate XR Origin so camera ends up at SeatPoint position (XZ)
         Vector3 camPos = cam.transform.position;
         Vector3 offset = seatPoint.position - camPos;
-        offset.y = 0f; // Preserve tracked head height
+        offset.y = 0f;
         xrOrigin.position += offset;
 
+        // 3. Seated height adjustment — lower the camera to SeatPoint's Y level
+        //    This compensates for standing users being too tall for the virtual table.
+        //    The approach: compute the tracking height (camera Y relative to XR Origin Y)
+        //    and set XR Origin Y so camera ends up at SeatPoint.Y.
+        if (seatedEyeHeight > 0f)
+        {
+            // Use explicit seated eye height
+            float trackingHeight = cam.transform.position.y - xrOrigin.position.y;
+            xrOrigin.position = new Vector3(
+                xrOrigin.position.x,
+                seatedEyeHeight - trackingHeight,
+                xrOrigin.position.z);
+        }
+        else
+        {
+            // Use SeatPoint.Y as the target eye height
+            float trackingHeight = cam.transform.position.y - xrOrigin.position.y;
+            xrOrigin.position = new Vector3(
+                xrOrigin.position.x,
+                seatPoint.position.y - trackingHeight,
+                xrOrigin.position.z);
+        }
+
         Debug.Log($"[JournalSession] Teleported to SeatPoint. " +
-                  $"XR Origin → {xrOrigin.position}, yaw delta={yawDelta:F1}°");
+                  $"XR Origin → {xrOrigin.position}, yaw delta={yawDelta:F1}°, " +
+                  $"camera Y target={seatPoint.position.y:F2}");
     }
 
     /// <summary>
@@ -639,6 +692,7 @@ public class JournalSessionManager : MonoBehaviour
     private void SpawnAtDefaultPosition()
     {
         CurrentState = SessionState.Journaling;
+        LockLocomotion();
 
         if (whiteboardUtils != null && journalTable != null)
         {
@@ -706,6 +760,9 @@ public class JournalSessionManager : MonoBehaviour
         if (journalTable != null)
             journalTable.localPosition = originalTableLocalPosition;
 
+        RestoreXROriginHeight();
+        UnlockLocomotion();
+
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
 
@@ -769,11 +826,72 @@ public class JournalSessionManager : MonoBehaviour
         if (journalTable != null)
             journalTable.localPosition = originalTableLocalPosition;
 
+        RestoreXROriginHeight();
+        UnlockLocomotion();
+
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
 
         SetButtonVisible(true);
         CurrentState = SessionState.Idle;
+    }
+
+    // ================================================================
+    // LOCOMOTION LOCK
+    // ================================================================
+
+    /// <summary>
+    /// Disables all LocomotionProvider components (move, turn, teleport)
+    /// so the player cannot move with controllers during journaling.
+    /// Physical head movement (looking around) is unaffected.
+    /// </summary>
+    private void LockLocomotion()
+    {
+        disabledLocomotionProviders.Clear();
+
+        var providers = FindObjectsByType<LocomotionProvider>(FindObjectsSortMode.None);
+        foreach (var provider in providers)
+        {
+            if (provider.enabled)
+            {
+                provider.enabled = false;
+                disabledLocomotionProviders.Add(provider);
+            }
+        }
+
+        if (disabledLocomotionProviders.Count > 0)
+            Debug.Log($"[JournalSession] Locomotion locked — disabled {disabledLocomotionProviders.Count} provider(s).");
+    }
+
+    /// <summary>
+    /// Re-enables all locomotion providers that were disabled by LockLocomotion().
+    /// </summary>
+    private void UnlockLocomotion()
+    {
+        foreach (var provider in disabledLocomotionProviders)
+        {
+            if (provider != null)
+                provider.enabled = true;
+        }
+
+        if (disabledLocomotionProviders.Count > 0)
+            Debug.Log($"[JournalSession] Locomotion unlocked — re-enabled {disabledLocomotionProviders.Count} provider(s).");
+
+        disabledLocomotionProviders.Clear();
+    }
+
+    /// <summary>
+    /// Restores the XR Origin's Y position to what it was before seated adjustment.
+    /// </summary>
+    private void RestoreXROriginHeight()
+    {
+        if (xrOrigin != null)
+        {
+            xrOrigin.position = new Vector3(
+                xrOrigin.position.x,
+                originalXROriginY,
+                xrOrigin.position.z);
+        }
     }
 
     // ================================================================
