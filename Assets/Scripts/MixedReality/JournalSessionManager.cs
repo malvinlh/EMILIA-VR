@@ -465,8 +465,13 @@ public class JournalSessionManager : MonoBehaviour
         if (wbComponent != null)
             wbComponent.backgroundColor = journalBackgroundColor;
 
+        // Spawn at the hand-detected position (palm midpoint on real table).
+        // Use the placeholder's BoxCollider size so the passthrough preview
+        // matches the game-world whiteboard exactly.
         Vector3 spawnPos = table.position + Vector3.up * 0.002f;
-        spawnedWhiteboard = whiteboardUtils.SpawnAligned(spawnPos, table.rotation, table.size);
+        Vector2 spawnSize = GetPlaceholderWorldSize(table.size);
+
+        spawnedWhiteboard = whiteboardUtils.SpawnAligned(spawnPos, table.rotation, spawnSize);
 
         if (spawnedWhiteboard != null)
         {
@@ -475,9 +480,25 @@ public class JournalSessionManager : MonoBehaviour
                 : 31;
             PassthroughManager.SetLayerRecursive(spawnedWhiteboard, ptLayer);
 
-            Debug.Log($"[JournalSession] Whiteboard spawned at {spawnPos} " +
-                      $"on layer {ptLayer} (passthrough preview).");
+            Debug.Log($"[JournalSession] Whiteboard spawned at {spawnPos}, " +
+                      $"size={spawnSize} on layer {ptLayer} (passthrough preview).");
         }
+    }
+
+    /// <summary>
+    /// Returns the whiteboard size from the placeholder's BoxCollider (world-space
+    /// X and Z dimensions). Falls back to the MR-detected size if no placeholder
+    /// or no BoxCollider is assigned.
+    /// </summary>
+    private Vector2 GetPlaceholderWorldSize(Vector2 fallbackSize)
+    {
+        if (whiteboardPlaceholder == null) return fallbackSize;
+
+        BoxCollider boxCol = whiteboardPlaceholder.GetComponent<BoxCollider>();
+        if (boxCol == null) return fallbackSize;
+
+        Vector3 worldSize = Vector3.Scale(boxCol.size, whiteboardPlaceholder.lossyScale);
+        return new Vector2(worldSize.x, worldSize.z);
     }
 
     private void MoveWhiteboardToVRLayer()

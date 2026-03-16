@@ -10,10 +10,11 @@
 
 ```
 JournalSessionManager  (central state machine on "JournalChairTable")
-  ├─ PassthroughManager           VR ↔ passthrough fade transitions
-  ├─ ARTableDetector              AR planes + palm-flat hand confirmation
+  ├─ PassthroughManager           VR ↔ passthrough fade transitions (OpenXR + ARCameraBackground)
+  ├─ ARTableDetector              XR Hand Tracking palm-flat detection + AR plane matching
+  │     ├─ SessionToWorld()       Uses CameraFloorOffsetObject (NOT XR Origin root!)
   │     └─ (uses WhiteboardPen.GetHandSubsystem())
-  ├─ CalibrationGuide             Visual feedback (plane highlights, palm dots, progress ring)
+  ├─ CalibrationGuide             Visual feedback (palm dots, dot grid, progress ring)
   │     ├─ SurfaceDotGrid         Quest-style dot grid on detected surface
   │     └─ (subscribes to ARTableDetector events)
   ├─ AlignmentAnchor              ARAnchor drift correction
@@ -23,138 +24,115 @@ JournalSessionManager  (central state machine on "JournalChairTable")
 
 **State flow:**
 ```
-Idle → [button press] → Passthrough → PlaneDiscovery → HandConfirmation
-  → Preview (whiteboard on real table) → TransitionToVR → Journaling
+Idle → [button press] → Passthrough → PlaneDiscovery/HandConfirmation
+  → Preview (whiteboard at hand coords, placeholder size) → TransitionToVR → Journaling
+```
+
+**Coordinate conversion (critical):**
+```
+XRHandSubsystem joint pose (session space)
+  → CameraFloorOffsetObject.TransformPoint()     ← CORRECT
+  → world space (matches camera position)
+
+XRHandSubsystem joint pose (session space)
+  → xrOrigin.TransformPoint()                    ← WRONG (misses CameraYOffset)
+  → world space shifted by -CameraYOffset on Y
 ```
 
 ---
 
 ## 2. Required Scene Hierarchy
 
-### Root GameObjects (all present in scene ✅)
+### Root GameObjects
 
 | GameObject | Component(s) | Status |
 |---|---|---|
-| **XR Origin (XR Rig)** | XR Origin, ARPlaneManager, ARAnchorManager, 2× WhiteboardPen (on hand children) | ✅ Present |
-| **AR Session** | ARSession, ARInputManager | ✅ Present |
-| **JournalChairTable** | **JournalSessionManager** | ✅ Present |
-| ↳ **JournalTable** | (Transform only) | ✅ Present |
-| ↳↳ **JournalStartButton** | JournalStartButton, XRSimpleInteractable, BoxCollider | ✅ Present |
-| ↳↳↳ **BookMesh** | MeshFilter, MeshRenderer, BoxCollider | ✅ Present |
-| ↳ **Chair** | (Transform only) | ✅ Present |
-| ↳↳ **SeatPoint** | (Transform only — teleport target) | ✅ Present |
-| **PassthroughManager** | PassthroughManager | ✅ Present |
-| **ARTableDetector** | ARTableDetector | ✅ Present |
-| **CalibrationGuide** | CalibrationGuide, SurfaceDotGrid | ✅ Present |
-| **AlignmentAnchor** | AlignmentAnchor | ✅ Present |
-| **WhiteboardUtils** | WhiteboardUtils | ✅ Present |
-| **DigitalInkManager** | 3 recognition components | ✅ Present |
-| **SurfaceDetector** | SurfaceDetector (legacy, unused) | ⚠️ Legacy — not referenced by active flow |
-
-### Named GameObjects (required by `MRJournalSceneSetup.cs` / `GameObject.Find()`)
-
-All names match: ✅ JournalChairTable, JournalTable, Chair, SeatPoint, "XR Origin (XR Rig)"
+| **XR Origin (XR Rig)** | XR Origin (Device mode, CameraYOffset=2, Y=2.98), ARPlaneManager, ARAnchorManager, 2× WhiteboardPen | ✅ |
+| **AR Session** | ARSession, ARInputManager | ✅ |
+| **JournalChairTable** | **JournalSessionManager** | ✅ |
+| ↳ **JournalTable** | localScale=(160, 16.65, 279.9) | ✅ |
+| ↳↳ **WhiteboardPlaceholder** | BoxCollider (trigger, size=0.005×0.002×0.005) | ✅ |
+| ↳↳ **JournalStartButton** | JournalStartButton, XRSimpleInteractable, BoxCollider | ✅ |
+| ↳ **Chair** | (Transform only) | ✅ |
+| ↳↳ **SeatPoint** | (Transform only — teleport target) | ✅ |
+| **PassthroughManager** | PassthroughManager | ✅ |
+| **ARTableDetector** | ARTableDetector | ✅ |
+| **CalibrationGuide** | CalibrationGuide, SurfaceDotGrid | ✅ |
+| **AlignmentAnchor** | AlignmentAnchor | ✅ |
+| **WhiteboardUtils** | WhiteboardUtils | ✅ |
 
 ---
 
 ## 3. Inspector Reference Wiring
 
-Run **Tools > MR Journal > Setup Scene References** to auto-wire. Current status from scene file:
+Run **Tools > MR Journal > Setup Scene References** to auto-wire.
 
 ### JournalSessionManager fields
 
-| Field | Assigned? | Value |
+| Field | Assigned? | Notes |
 |---|---|---|
-| `passthroughManager` | ✅ | PassthroughManager GO |
-| `arTableDetector` | ✅ | ARTableDetector GO |
-| `calibrationGuide` | ✅ | CalibrationGuide GO |
-| `alignmentAnchor` | ✅ | AlignmentAnchor GO |
-| `whiteboardUtils` | ✅ | WhiteboardUtils GO |
-| `startButton` | ✅ | JournalStartButton (on JournalTable child) |
-| `arPlaneManager` | ✅ | ARPlaneManager (on XR Origin) |
-| `journalChairTable` | ✅ | JournalChairTable transform |
-| `journalTable` | ✅ | JournalTable transform |
-| `chair` | ✅ | Chair transform |
-| `seatPoint` | ✅ | SeatPoint transform |
-| `xrOrigin` | ✅ | XR Origin (XR Rig) transform |
+| `passthroughManager` | ✅ | |
+| `arTableDetector` | ✅ | |
+| `calibrationGuide` | ✅ | |
+| `alignmentAnchor` | ✅ | |
+| `whiteboardUtils` | ✅ | |
+| `startButton` | ✅ | |
+| `arPlaneManager` | ✅ | |
+| `journalChairTable` | ✅ | |
+| `journalTable` | ✅ | |
+| `chair` | ✅ | |
+| `seatPoint` | ✅ | |
+| `xrOrigin` | ✅ | |
+| `whiteboardPlaceholder` | ✅ | BoxCollider on JournalTable child |
 | `skipPlaneDetection` | ✅ | `true` (hand-only mode) |
-| `instructionText` | — | `null` (auto-created at runtime — OK) |
-| **`whiteboardPlaceholder`** | ❌ **MISSING** | `null` — see issue #1 below |
 
-### Cross-references (wired by editor script)
+### Cross-references
 
 | Component.Field | Status |
 |---|---|
-| `ARTableDetector.xrOrigin` | ✅ |
-| `ARTableDetector.planeManager` | ✅ |
+| `ARTableDetector.xrOrigin` | ✅ (also auto-finds at runtime) |
+| `ARTableDetector.cameraOffsetTransform` | ✅ (resolved at runtime from XROrigin.CameraFloorOffsetObject) |
 | `CalibrationGuide.tableDetector` | ✅ |
 | `CalibrationGuide.passthroughManager` | ✅ |
-| `CalibrationGuide.dotGrid` → SurfaceDotGrid | ✅ |
-| `CalibrationGuide.palmIndicatorPrefab` | ✅ (Sphere prefab) |
-| `AlignmentAnchor.anchorManager` | ✅ (ARAnchorManager on XR Origin) |
-| `AlignmentAnchor.targetToAlign` | ✅ (JournalChairTable) |
+| `CalibrationGuide.dotGrid` | ✅ |
+| `AlignmentAnchor.targetToAlign` | ✅ |
 
 ---
 
-## 4. Issues Found
+## 4. How the MR Flow Works
 
-### Issue #1 — `whiteboardPlaceholder` is NOT assigned (Functional impact: Medium)
-
-**What:** `JournalSessionManager.whiteboardPlaceholder` is `null` (`{fileID: 0}` in scene).
-
-**Impact:** When the whiteboard transitions from passthrough to VR (`MoveWhiteboardToVRLayer()`), the code checks `whiteboardPlaceholder` to reposition and rescale the whiteboard onto the virtual table surface. With it `null`, the whiteboard stays at the raw MR-detected world position, which may not align with the virtual table mesh. The whiteboard also won't be scaled to match the table area.
-
-**Fix:**
-1. On the **JournalTable** GameObject, add an **empty child** named e.g. "WhiteboardArea"
-2. Add a **BoxCollider** (set as **Trigger**) sized to the desired whiteboard area on the table surface
-3. Assign this transform to `JournalSessionManager.whiteboardPlaceholder`
-4. The collider's lossy scale (X, Z) defines the whiteboard dimensions; Y should be thin (e.g. 0.01)
-
-### Issue #2 — `XRSimpleInteractable.m_InteractionManager` is `{fileID: 0}` (Functional impact: Low)
-
-**What:** The `XRSimpleInteractable` on the JournalStartButton has no explicit `m_InteractionManager` reference.
-
-**Impact:** XRI auto-discovers the `XRInteractionManager` at runtime via `FindObjectOfType`, so this technically works if the XR Origin prefab contains one. However, if the XR Interaction Manager is missing or loads late, the controller-based button press path won't work (hand-poke still works via direct distance checks in `JournalStartButton.Update()`).
-
-**Fix:** Verify that the XR Origin prefab includes an `XRInteractionManager`. If not, add one as a root scene GO or ensure the prefab contains it.
-
-### Issue #3 — Camera culling mask includes PassthroughUI layer (Functional impact: Low)
-
-**What:** The main XR camera renders all layers (`m_Bits: 4294967295`), including layer 31 (PassthroughUI).
-
-**Impact:** Objects placed on the PassthroughUI layer (calibration dots, instruction text, whiteboard preview) would be visible during normal VR gameplay. In practice this is mitigated because those objects are destroyed/deactivated after calibration. But if any leak, they'd render in VR.
-
-**Fix (optional):** Exclude layer 31 from the camera culling mask in the prefab or at runtime when not in passthrough mode. `PassthroughManager.cs` handles this dynamically for the transition, but a default exclusion is safer.
-
-### Issue #4 — Gemini API key is empty (Functional impact: High for handwriting recognition)
-
-**What:** `DigitalInkManager` → Gemini API client has `apiKey: ""`.
-
-**Impact:** The 2nd and 3rd tier handwriting recognition (Gemini LLM refinement, Gemini VLM fallback) will fail. ML Kit (1st tier, on-device) still works.
-
-**Fix:** Set the API key in the DigitalInkManager inspector or via a ScriptableObject config before building.
-
-### Issue #5 — `SurfaceDetector` is a legacy/unused GO (Functional impact: None)
-
-**What:** A `SurfaceDetector` GO exists in the scene but is not referenced by `JournalSessionManager` or any active script.
-
-**Impact:** No functional impact — it just clutters the hierarchy. The active flow uses `ARTableDetector`.
-
-**Fix (optional):** Delete the `SurfaceDetector` GameObject to reduce clutter.
+1. **Button press** → hides button, enters passthrough via fade-to-black
+2. **Passthrough** → camera renders real world (culling mask = layer 31 only)
+3. **Hand detection** → ARTableDetector checks both palms flat on surface:
+   - Palm-down angle < 20° (XR Hand Tracking)
+   - All fingertips within 3cm of palm Y (session space — relative check)
+   - Positions converted to world space via `CameraFloorOffsetObject.TransformPoint()`
+4. **Dot grid** → CalibrationGuide shows dots around palm positions, progress ring between hands
+5. **Hold 1.5s** → table confirmed, whiteboard spawns at hand-detected position
+   - Size matches `whiteboardPlaceholder` BoxCollider (same as game world)
+   - Placed on passthrough UI layer (31) so visible in passthrough
+6. **Preview** → user sees whiteboard on real table for ~1.5s
+7. **Transition** → fade to black → exit passthrough → fade from black
+8. **VR setup** (during black screen):
+   - Teleport player to SeatPoint (yaw + position + eye height)
+   - Skip `AdjustTableForDistanceMismatch` when placeholder is assigned
+   - Snap whiteboard to placeholder BoxCollider center, match placeholder size
+   - Move whiteboard to layer 10 (Whiteboard layer)
+   - Create spatial anchor for drift correction
+9. **Journaling** → locomotion locked, player writes on whiteboard
 
 ---
 
-## 5. OpenXR Feature Group Status
+## 5. Known Gotchas
 
-All required Meta Quest features are **enabled** for both Android and Standalone:
+### CameraYOffset coordinate mismatch
+The XR Origin uses Device tracking mode with `CameraYOffset = 2`. The Camera Floor Offset Object sits at `Y = XROrigin.Y + CameraYOffset`. Hand tracking session-space positions must go through this same transform — using `xrOrigin.TransformPoint()` skips the offset and places hands 2m too low.
 
-| Feature | Android | Standalone |
-|---|---|---|
-| Meta Quest: Camera (Passthrough) | ✅ enabled | ✅ enabled |
-| Meta Quest: Planes | ✅ enabled | ✅ enabled |
-| Meta Quest: Anchors | ✅ enabled | ✅ enabled |
-| Meta Quest: Session | ✅ enabled | ✅ enabled |
-| Meta Quest: Meshing | ✅ enabled | ✅ enabled |
+### WhiteboardPlaceholder parent scale
+JournalTable has localScale=(160, 16.65, 279.9). The placeholder's BoxCollider size (0.005, 0.002, 0.005) is in local space — world size = `Vector3.Scale(boxCol.size, lossyScale)`.
+
+### AdjustTableForDistanceMismatch
+When `whiteboardPlaceholder` is assigned, this method returns early. Moving journalTable at runtime shifts the placeholder away from its designed position, breaking alignment. The scene layout is authoritative when a placeholder exists.
 
 ---
 
@@ -165,49 +143,24 @@ All required Meta Quest features are **enabled** for both Android and Standalone
 | 10 | Whiteboard | WhiteboardPen, JournalSessionManager (post-transition) |
 | 31 | PassthroughUI | PassthroughManager, CalibrationGuide, SurfaceDotGrid, instruction text |
 
-Both are correctly defined in `ProjectSettings/TagManager.asset` ✅
-
 ---
 
-## 7. Package Dependencies
-
-| Package | Version | Required By |
-|---|---|---|
-| `com.unity.xr.arfoundation` | — | ARSession, ARPlaneManager, ARAnchorManager, ARCameraManager, ARCameraBackground |
-| `com.unity.xr.hands` | 1.7.3 | Hand tracking (palm-flat detection, button poke) |
-| `com.unity.xr.interaction.toolkit` | 3.3.1 | XRSimpleInteractable, LocomotionProvider |
-| `com.unity.xr.meta-openxr` | 2.4.0 | OpenXR backend + Meta features |
-| `com.unity.textmeshpro` | — | Runtime instruction text |
-| URP | — | Unlit shader for fade quad, plane highlights, dot grid |
-
----
-
-## 8. Runtime Permissions (Android)
-
-The `JournalSessionManager` requests `com.oculus.permission.USE_SCENE` at runtime before enabling plane detection. If denied, it falls back to hand-only mode. When `skipPlaneDetection = true` (current setting), this permission request is skipped entirely.
-
----
-
-## 9. Quick Setup Checklist
-
-For a fresh scene or after pulling changes:
+## 7. Quick Setup Checklist
 
 - [ ] Open `3D_Journal_playground` scene
-- [ ] Run **Tools > MR Journal > Setup Scene References** — auto-wires all inspector refs
-- [ ] **Create `whiteboardPlaceholder`**: add empty child to JournalTable with BoxCollider trigger, assign to JournalSessionManager
+- [ ] Run **Tools > MR Journal > Setup Scene References**
+- [ ] Verify `whiteboardPlaceholder` is assigned (BoxCollider child of JournalTable)
 - [ ] Verify XR Origin prefab contains **XRInteractionManager**
 - [ ] Set **Gemini API key** on DigitalInkManager (if using LLM/VLM recognition)
-- [ ] (Optional) Delete the legacy `SurfaceDetector` GO
-- [ ] (Optional) Exclude layer 31 from XR camera culling mask in prefab
 - [ ] Build target: **Android** (Meta Quest 3)
-- [ ] Verify **OpenXR Feature Groups** are all enabled (Project Settings > XR Plug-in Management > OpenXR)
+- [ ] Verify **OpenXR Feature Groups** are all enabled
 
 ---
 
-## 10. Testing Tips
+## 8. Testing Tips
 
-- **skipPlaneDetection = true** (current) → hand-only mode, no Scene Model needed. Faster calibration.
-- **skipPlaneDetection = false** → requires `com.oculus.permission.USE_SCENE` + Space Setup completed on Quest 3.
-- Test passthrough transitions in headset only (XR Simulator doesn't support ARCameraManager).
-- If detection times out (15s default), a fallback whiteboard spawns at the virtual table position.
-- Re-calibration available mid-session via `JournalSessionManager.RequestReCalibration()`.
+- **skipPlaneDetection = true** (current) → hand-only mode, no Scene Model needed
+- Test passthrough transitions in headset only (XR Simulator doesn't support ARCameraManager)
+- Check adb logcat for `[ARTableDetector] Using CameraFloorOffsetObject:` to verify correct transform is used
+- If detection times out (15s), fallback whiteboard spawns at virtual table position
+- Re-calibration available mid-session via `RequestReCalibration()`

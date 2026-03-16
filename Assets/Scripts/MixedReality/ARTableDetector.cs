@@ -106,6 +106,12 @@ public class ARTableDetector : MonoBehaviour
     private ARPlane matchedPlane;
     private List<CandidatePlane> candidates = new List<CandidatePlane>();
 
+    // Cached reference to the Camera Floor Offset Object — the transform that
+    // converts session/tracking space to world space through the same chain as
+    // the camera. Using XROrigin.root.TransformPoint() skips the CameraYOffset,
+    // causing a vertical mismatch between camera and hand positions.
+    private Transform cameraOffsetTransform;
+
     public bool IsConfirming { get; private set; }
     public bool HasConfirmed { get; private set; }
 
@@ -128,9 +134,9 @@ public class ARTableDetector : MonoBehaviour
         usingFallback = false;
         floorHeight = float.MaxValue;
         floorDetected = false;
+        cameraOffsetTransform = null;
 
-        // Auto-find XR Origin if not assigned — critical for correct
-        // session-to-world coordinate conversion of hand tracking positions.
+        // Auto-find XR Origin if not assigned
         if (xrOrigin == null)
         {
             var origin = FindAnyObjectByType<XROrigin>();
@@ -139,11 +145,36 @@ public class ARTableDetector : MonoBehaviour
                 xrOrigin = origin.transform;
                 Debug.Log($"[ARTableDetector] Auto-found XR Origin: {xrOrigin.name}");
             }
-            else
+        }
+
+        // Resolve the Camera Floor Offset Object — this is the correct transform
+        // for session-to-world conversion because it includes the CameraYOffset
+        // that the XR Origin root's Transform.TransformPoint() misses.
+        ResolveCameraOffsetTransform();
+    }
+
+    private void ResolveCameraOffsetTransform()
+    {
+        // Try to get it from the XROrigin component
+        if (xrOrigin != null)
+        {
+            var xrOriginComp = xrOrigin.GetComponent<XROrigin>();
+            if (xrOriginComp != null && xrOriginComp.CameraFloorOffsetObject != null)
             {
-                Debug.LogWarning("[ARTableDetector] No XR Origin found — " +
-                    "hand positions may be in wrong coordinate space.");
+                cameraOffsetTransform = xrOriginComp.CameraFloorOffsetObject.transform;
+                Debug.Log($"[ARTableDetector] Using CameraFloorOffsetObject: " +
+                          $"{cameraOffsetTransform.name} (Y={cameraOffsetTransform.position.y:F2})");
+                return;
             }
+        }
+
+        // Fallback: walk up from the main camera to find its parent
+        Camera cam = Camera.main;
+        if (cam != null && cam.transform.parent != null)
+        {
+            cameraOffsetTransform = cam.transform.parent;
+            Debug.Log($"[ARTableDetector] Using camera parent as offset: " +
+                      $"{cameraOffsetTransform.name} (Y={cameraOffsetTransform.position.y:F2})");
         }
     }
 
@@ -478,9 +509,13 @@ public class ARTableDetector : MonoBehaviour
         if (!palmJoint.TryGetPose(out Pose palmPose))
             return false;
 
-        // Flatness checks use session-space values (relative, so space doesn't matter)
+        // Transform palm-down direction from session space to world space.
+        // Direction transforms are unaffected by CameraYOffset (translation only),
+        // so either cameraOffsetTransform or xrOrigin works for direction.
         Vector3 palmDown = palmPose.rotation * (-Vector3.up);
-        if (xrOrigin != null)
+        if (cameraOffsetTransform != null)
+            palmDown = cameraOffsetTransform.TransformDirection(palmDown);
+        else if (xrOrigin != null)
             palmDown = xrOrigin.TransformDirection(palmDown);
         float angle = Vector3.Angle(palmDown, Vector3.down);
         if (angle > palmDownAngleThreshold)
@@ -504,12 +539,23 @@ public class ARTableDetector : MonoBehaviour
 
     /// <summary>
     /// Converts a position from XR session/tracking space to Unity world space.
-    /// XRHandJoint.TryGetPose() returns poses in session space (the XR Origin's local space).
+    ///
+    /// Uses the Camera Floor Offset Object (not the XR Origin root) so that the
+    /// CameraYOffset is included. Without this, hand positions end up
+    /// CameraYOffset metres too low relative to the camera — e.g. a 2m offset
+    /// makes the whiteboard appear 2m below the real table in passthrough.
     /// </summary>
     private Vector3 SessionToWorld(Vector3 sessionPos)
     {
-        if (xrOrigin == null) return sessionPos;
-        return xrOrigin.TransformPoint(sessionPos);
+        // Preferred: same transform chain the camera uses
+        if (cameraOffsetTransform != null)
+            return cameraOffsetTransform.TransformPoint(sessionPos);
+
+        // Fallback: XR Origin root (correct only when CameraYOffset == 0)
+        if (xrOrigin != null)
+            return xrOrigin.TransformPoint(sessionPos);
+
+        return sessionPos;
     }
 
     // ================================================================
