@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
 using UnityEngine.XR.Hands;
+using Unity.XR.CoreUtils;
 
 /// <summary>
 /// Detects a real-world table using AR Foundation plane data (Meta Quest 3 Scene Model)
@@ -127,6 +128,23 @@ public class ARTableDetector : MonoBehaviour
         usingFallback = false;
         floorHeight = float.MaxValue;
         floorDetected = false;
+
+        // Auto-find XR Origin if not assigned — critical for correct
+        // session-to-world coordinate conversion of hand tracking positions.
+        if (xrOrigin == null)
+        {
+            var origin = FindAnyObjectByType<XROrigin>();
+            if (origin != null)
+            {
+                xrOrigin = origin.transform;
+                Debug.Log($"[ARTableDetector] Auto-found XR Origin: {xrOrigin.name}");
+            }
+            else
+            {
+                Debug.LogWarning("[ARTableDetector] No XR Origin found — " +
+                    "hand positions may be in wrong coordinate space.");
+            }
+        }
     }
 
     private void Update()

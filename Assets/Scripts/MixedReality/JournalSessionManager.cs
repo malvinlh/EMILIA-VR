@@ -488,17 +488,37 @@ public class JournalSessionManager : MonoBehaviour
         PassthroughManager.SetLayerRecursive(spawnedWhiteboard, WHITEBOARD_LAYER);
 
         // Reposition the whiteboard onto the placeholder if one is assigned.
-        // Only position + rotation are taken from the placeholder; the whiteboard
-        // keeps its original scale and texture from SpawnAligned (MR-detected size).
-        // This avoids texture overflow from the parent chain's lossyScale.
+        // Uses the BoxCollider (if present) for precise center alignment and
+        // resizes the whiteboard to match the placeholder's defined area.
         if (whiteboardPlaceholder != null)
         {
-            spawnedWhiteboard.transform.position =
-                whiteboardPlaceholder.position + Vector3.up * 0.002f;
+            BoxCollider boxCol = whiteboardPlaceholder.GetComponent<BoxCollider>();
+            if (boxCol != null)
+            {
+                // Use box collider's world-space center for precise alignment
+                Vector3 worldCenter = whiteboardPlaceholder.TransformPoint(boxCol.center);
+                spawnedWhiteboard.transform.position = worldCenter + Vector3.up * 0.002f;
+
+                // Match the whiteboard scale to the placeholder's box collider size
+                Vector3 worldSize = Vector3.Scale(boxCol.size, whiteboardPlaceholder.lossyScale);
+                float scaleX = worldSize.x / 10f;
+                float scaleZ = worldSize.z / 10f;
+                spawnedWhiteboard.transform.localScale = new Vector3(scaleX, 0.1f / 10f, scaleZ);
+
+                // Reinitialize the whiteboard texture for the new size
+                var wb = spawnedWhiteboard.GetComponent<Whiteboard>();
+                if (wb != null) wb.Initialize();
+            }
+            else
+            {
+                spawnedWhiteboard.transform.position =
+                    whiteboardPlaceholder.position + Vector3.up * 0.002f;
+            }
             spawnedWhiteboard.transform.rotation = whiteboardPlaceholder.rotation;
 
             Debug.Log($"[JournalSession] Whiteboard repositioned to placeholder at " +
-                      $"{spawnedWhiteboard.transform.position}.");
+                      $"{spawnedWhiteboard.transform.position}, " +
+                      $"scale={spawnedWhiteboard.transform.localScale}.");
 
             // Hide the placeholder during journaling
             placeholderWasVisible = whiteboardPlaceholder.gameObject.activeSelf;
@@ -654,6 +674,17 @@ public class JournalSessionManager : MonoBehaviour
     private void AdjustTableForDistanceMismatch(ARTableDetector.DetectedTable table)
     {
         if (seatPoint == null || journalTable == null || journalChairTable == null) return;
+
+        // When a placeholder defines the whiteboard position, the scene layout
+        // is authoritative — moving journalTable would shift the placeholder
+        // away from its designed position. TeleportToSeatPoint already places
+        // the user at the correct viewing distance.
+        if (whiteboardPlaceholder != null)
+        {
+            Debug.Log("[JournalSession] Skipping distance adjustment — " +
+                      "whiteboardPlaceholder defines authoritative position.");
+            return;
+        }
 
         // Real-world horizontal distance from user's head to detected table center
         Vector3 headXZ = new Vector3(table.userHeadPosition.x, 0f, table.userHeadPosition.z);
