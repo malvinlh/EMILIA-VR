@@ -352,7 +352,7 @@ MonoBehaviour:
   whiteboardPlaceholder: {fileID: 904680107}
   seatPoint: {fileID: 1299993207}
   xrOrigin: {fileID: 1214649567}
-  useRealEyeHeight: 1
+  mainIsland: {fileID: 1261414441}
   instructionText: {fileID: 0}
   previewDuration: 1.5
   journalBackgroundColor: {r: 1, g: 0.97, b: 0.92, a: 1}
@@ -13162,7 +13162,7 @@ Transform:
   m_GameObject: {fileID: 1299993206}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
-  m_LocalPosition: {x: 0, y: 0, z: -0.017}
+  m_LocalPosition: {x: 0, y: 0.8, z: -0.017}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

@@ -83,6 +83,7 @@ Run **Tools > MR Journal > Setup Scene References** to auto-wire.
 | `chair` | ✅ | |
 | `seatPoint` | ✅ | |
 | `xrOrigin` | ✅ | |
+| `mainIsland` | ✅ | Root of MainIsland prefab — moved vertically for height calibration |
 | `whiteboardPlaceholder` | ✅ | BoxCollider on JournalTable child |
 | `skipPlaneDetection` | ✅ | `true` (hand-only mode) |
 
@@ -114,9 +115,10 @@ Run **Tools > MR Journal > Setup Scene References** to auto-wire.
 6. **Preview** → user sees whiteboard on real table for ~1.5s
 7. **Transition** → fade to black → exit passthrough → fade from black
 8. **VR setup** (during black screen):
-   - Teleport player to SeatPoint (yaw + position + eye height)
-   - Skip `AdjustTableForDistanceMismatch` when placeholder is assigned
-   - Snap whiteboard to placeholder BoxCollider center, match placeholder size
+   - Teleport XR Origin: match SeatPoint XZ position + yaw; set camera Y = SeatPoint designed height
+   - Skip `AdjustTableForDistanceMismatch` (placeholder is authoritative)
+   - `AdjustIslandHeight`: shift entire MainIsland so virtual table surface = cameraY − realEyeAboveTable
+   - Snap whiteboard to placeholder BoxCollider center (now at calibrated height), rotation = identity
    - Move whiteboard to layer 10 (Whiteboard layer)
    - Create spatial anchor for drift correction
 9. **Journaling** → locomotion locked, player writes on whiteboard

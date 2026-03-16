@@ -69,6 +69,12 @@ public class WhiteboardPen : MonoBehaviour
     private DigitalInkBridge inkBridge;
     private bool strokeActive;
 
+    // Cached Camera Floor Offset Object — needed to convert XRHandJoint
+    // session-space positions to world space. The XR Origin uses Device
+    // tracking mode with CameraYOffset=2, so joint positions must go through
+    // the same transform chain as the camera (not the XR Origin root).
+    private Transform cameraOffsetTransform;
+
     /// <summary>True when the pen is actively drawing on a whiteboard.</summary>
     public bool IsDrawing => wasTouchingLastFrame;
 
@@ -76,6 +82,35 @@ public class WhiteboardPen : MonoBehaviour
     {
         CreateTouchParticles();
         inkBridge = DigitalInkBridge.Instance;
+        ResolveCameraOffsetTransform();
+    }
+
+    private void ResolveCameraOffsetTransform()
+    {
+        // Try XROrigin component first
+        var xrOriginComp = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
+        if (xrOriginComp != null && xrOriginComp.CameraFloorOffsetObject != null)
+        {
+            cameraOffsetTransform = xrOriginComp.CameraFloorOffsetObject.transform;
+            return;
+        }
+        // Fallback: camera's direct parent
+        Camera cam = Camera.main;
+        if (cam != null && cam.transform.parent != null)
+            cameraOffsetTransform = cam.transform.parent;
+    }
+
+    /// <summary>
+    /// Converts an XRHandJoint pose position from session/tracking space to
+    /// world space via the Camera Floor Offset Object. This is required because
+    /// the scene uses Device tracking mode with CameraYOffset=2 — raw joint
+    /// positions are 2m below where they should appear in world space.
+    /// </summary>
+    private Vector3 JointToWorld(Vector3 sessionPos)
+    {
+        if (cameraOffsetTransform != null)
+            return cameraOffsetTransform.TransformPoint(sessionPos);
+        return sessionPos;
     }
 
     private void Update()
@@ -107,8 +142,12 @@ public class WhiteboardPen : MonoBehaviour
         if (!indexDistalJoint.TryGetPose(out Pose indexDistalPose)) return;
         if (!thumbTipJoint.TryGetPose(out Pose thumbTipPose)) return;
 
-        Vector3 origin = indexDistalPose.position;
-        Vector3 tip = indexTipPose.position;
+        // Convert joint positions from session/tracking space to world space.
+        // Raw XRHandJoint poses are in session space; the camera is offset by
+        // CameraYOffset via the Camera Floor Offset Object, so we must use the
+        // same transform chain or raycasts will miss by ~2m vertically.
+        Vector3 origin = JointToWorld(indexDistalPose.position);
+        Vector3 tip    = JointToWorld(indexTipPose.position);
         Vector3 direction = Vector3.Normalize(tip - origin);
         float fingerLength = Vector3.Distance(origin, tip);
 
@@ -151,7 +190,7 @@ public class WhiteboardPen : MonoBehaviour
                 // Fallback ray from intermediate joint
                 else if (indexIntermediateJoint.TryGetPose(out Pose intermediatePose))
                 {
-                    Vector3 intOrigin = intermediatePose.position;
+                    Vector3 intOrigin = JointToWorld(intermediatePose.position);
                     Vector3 intDir    = Vector3.Normalize(tip - intOrigin);
                     float   intDist   = Vector3.Distance(intOrigin, tip) + touchTolerance;
 

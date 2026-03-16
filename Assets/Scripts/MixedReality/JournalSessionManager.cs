@@ -80,10 +80,10 @@ public class JournalSessionManager : MonoBehaviour
     public Transform seatPoint;
     [Tooltip("The XR Origin (XR Rig) root transform. Required for teleportation to SeatPoint.")]
     public Transform xrOrigin;
-    [Tooltip("When true, the player's real-world eye height at calibration time is used " +
-             "as the target camera Y (SeatPoint becomes the XZ + yaw target only). " +
-             "This produces the most natural seated perspective.")]
-    public bool useRealEyeHeight = true;
+    [Tooltip("The root GameObject of the entire virtual island (table, chair, decorations). " +
+             "Moved as a unit during height calibration so the virtual table surface sits at the " +
+             "same eye-relative height as the real table detected in passthrough.")]
+    public Transform mainIsland;
 
     [Header("UI")]
     [Tooltip("World-space TextMeshPro for instruction prompts (fallback if CalibrationGuide is null). Created at runtime if null.")]
@@ -119,6 +119,7 @@ public class JournalSessionManager : MonoBehaviour
     private float originalXROriginY;
     private float capturedRealEyeHeight;
     private bool placeholderWasVisible;
+    private float originalMainIslandY;  // recorded before AdjustIslandHeight, restored on EndSession
 
     // ================================================================
     // LIFECYCLE
@@ -430,6 +431,7 @@ public class JournalSessionManager : MonoBehaviour
             {
                 TeleportToSeatPoint(pendingTable);
                 AdjustTableForDistanceMismatch(pendingTable);
+                AdjustIslandHeight(pendingTable);  // must come after teleport, before whiteboard placement
             }
             else
             {
@@ -628,12 +630,10 @@ public class JournalSessionManager : MonoBehaviour
 
     /// <summary>
     /// Teleports the XR Origin so the player's camera ends up at SeatPoint's
-    /// position and forward direction. This creates a natural seated experience
-    /// where the player appears at the virtual desk.
-    ///
-    /// When useRealEyeHeight is true, the Y position comes from the player's
-    /// actual eye height captured during passthrough calibration — not the
-    /// SeatPoint's Y. This eliminates "too low / too high" mismatches.
+    /// position (XZ) and forward direction (yaw). The camera Y is set to
+    /// SeatPoint's designed eye height — AdjustIslandHeight() then moves the
+    /// entire island so the virtual table surface sits at the correct
+    /// eye-relative height to match the real table detected in passthrough.
     /// </summary>
     private void TeleportToSeatPoint(ARTableDetector.DetectedTable table)
     {
@@ -646,32 +646,20 @@ public class JournalSessionManager : MonoBehaviour
         originalXROriginY = xrOrigin.position.y;
 
         // 1. Rotate XR Origin so camera faces SeatPoint's forward direction
-        float currentCamY = cam.transform.eulerAngles.y;
-        float targetY = seatPoint.eulerAngles.y;
-        float yawDelta = targetY - currentCamY;
-
+        float currentCamYaw = cam.transform.eulerAngles.y;
+        float targetYaw = seatPoint.eulerAngles.y;
+        float yawDelta = targetYaw - currentCamYaw;
         xrOrigin.RotateAround(cam.transform.position, Vector3.up, yawDelta);
 
-        // 2. Translate XR Origin so camera ends up at SeatPoint position (XZ)
-        Vector3 camPos = cam.transform.position;
-        Vector3 offset = seatPoint.position - camPos;
+        // 2. Translate XR Origin so camera ends up at SeatPoint XZ position
+        Vector3 offset = seatPoint.position - cam.transform.position;
         offset.y = 0f;
         xrOrigin.position += offset;
 
-        // 3. Height adjustment
-        float targetEyeY;
-        if (useRealEyeHeight && capturedRealEyeHeight > 0f)
-        {
-            // Use the player's actual eye height from when they confirmed the table.
-            // This keeps the VR perspective identical to what they saw in passthrough.
-            targetEyeY = capturedRealEyeHeight;
-        }
-        else
-        {
-            // Fallback: use SeatPoint's Y as target eye height
-            targetEyeY = seatPoint.position.y;
-        }
-
+        // 3. Set camera Y to SeatPoint's designed eye height.
+        //    AdjustIslandHeight() will shift the whole island up/down so the
+        //    virtual table is at the same eye-relative height as the real one.
+        float targetEyeY = seatPoint.position.y;
         float trackingHeight = cam.transform.position.y - xrOrigin.position.y;
         xrOrigin.position = new Vector3(
             xrOrigin.position.x,
@@ -680,8 +668,7 @@ public class JournalSessionManager : MonoBehaviour
 
         Debug.Log($"[JournalSession] Teleported to SeatPoint. " +
                   $"XR Origin → {xrOrigin.position}, yaw delta={yawDelta:F1}°, " +
-                  $"camera Y target={targetEyeY:F2} " +
-                  $"(useRealEyeHeight={useRealEyeHeight}, captured={capturedRealEyeHeight:F2})");
+                  $"camera Y → {cam.transform.position.y:F2} (SeatPoint.y={seatPoint.position.y:F2})");
     }
 
     /// <summary>
@@ -737,6 +724,79 @@ public class JournalSessionManager : MonoBehaviour
         Debug.Log($"[JournalSession] Table distance offset applied: {distanceDelta:F3}m " +
                   $"(real={realDistance:F2}m, virtual={virtualDistance:F2}m). " +
                   $"JournalTable now at {journalTable.position}.");
+    }
+
+    /// <summary>
+    /// Moves the entire MainIsland vertically so the virtual table surface sits
+    /// at the same eye-relative height as the real table detected in passthrough.
+    ///
+    /// Formula: targetVirtualTableY = cameraY - (realEyeY - realTableY)
+    ///          deltaY = targetVirtualTableY - currentVirtualTableY
+    ///
+    /// Must be called AFTER TeleportToSeatPoint (so camera Y is set) and
+    /// BEFORE MoveWhiteboardToVRLayer (so the placeholder is at its final Y
+    /// when the whiteboard is placed on it).
+    /// </summary>
+    private void AdjustIslandHeight(ARTableDetector.DetectedTable table)
+    {
+        if (mainIsland == null)
+        {
+            // Auto-find by name if not assigned in Inspector
+            var go = GameObject.Find("MainIsland");
+            if (go != null)
+            {
+                mainIsland = go.transform;
+                Debug.Log("[JournalSession] Auto-found MainIsland by name.");
+            }
+            else
+            {
+                Debug.LogWarning("[JournalSession] mainIsland is null and 'MainIsland' not found. " +
+                                 "Skipping island height adjustment — viewpoint may be too high/low.");
+                return;
+            }
+        }
+
+        Camera cam = Camera.main;
+        if (cam == null) return;
+
+        // How high were the player's eyes above the real table during calibration?
+        float realEyeAboveTable = capturedRealEyeHeight - table.position.y;
+
+        // Find the virtual table surface Y from the whiteboard placeholder
+        float virtualTableSurfaceY = GetVirtualTableSurfaceY();
+
+        // We want: virtualTableSurfaceY == cameraY - realEyeAboveTable
+        float targetVirtualTableY = cam.transform.position.y - realEyeAboveTable;
+        float deltaY = targetVirtualTableY - virtualTableSurfaceY;
+
+        if (Mathf.Abs(deltaY) < 0.005f) return;  // < 5mm, skip
+
+        originalMainIslandY = mainIsland.position.y;  // record before moving, for restoration
+        mainIsland.position += new Vector3(0f, deltaY, 0f);
+
+        Debug.Log($"[JournalSession] Island height adjusted by {deltaY:+0.000;-0.000}m. " +
+                  $"realEyeAboveTable={realEyeAboveTable:F3}m, " +
+                  $"cameraY={cam.transform.position.y:F3}, " +
+                  $"virtualTableY: {virtualTableSurfaceY:F3} → {virtualTableSurfaceY + deltaY:F3}.");
+    }
+
+    /// <summary>
+    /// Returns the world-space Y of the virtual writing surface.
+    /// Uses the whiteboardPlaceholder BoxCollider center for precision,
+    /// falls back to the placeholder or journalTable position.
+    /// </summary>
+    private float GetVirtualTableSurfaceY()
+    {
+        if (whiteboardPlaceholder != null)
+        {
+            BoxCollider boxCol = whiteboardPlaceholder.GetComponent<BoxCollider>();
+            if (boxCol != null)
+                return whiteboardPlaceholder.TransformPoint(boxCol.center).y;
+            return whiteboardPlaceholder.position.y;
+        }
+        if (journalTable != null)
+            return journalTable.position.y;
+        return 0f;
     }
 
     // ================================================================
@@ -855,6 +915,14 @@ public class JournalSessionManager : MonoBehaviour
         if (journalTable != null)
             journalTable.localPosition = originalTableLocalPosition;
 
+        // Restore MainIsland to its pre-session height (undoes AdjustIslandHeight)
+        if (mainIsland != null && originalMainIslandY != 0f)
+        {
+            Vector3 p = mainIsland.position;
+            mainIsland.position = new Vector3(p.x, originalMainIslandY, p.z);
+            originalMainIslandY = 0f;
+        }
+
         RestoreXROriginHeight();
         UnlockLocomotion();
 
@@ -920,6 +988,14 @@ public class JournalSessionManager : MonoBehaviour
         // Restore table local position if it was offset for distance mismatch
         if (journalTable != null)
             journalTable.localPosition = originalTableLocalPosition;
+
+        // Restore MainIsland to its pre-session height (undoes AdjustIslandHeight)
+        if (mainIsland != null && originalMainIslandY != 0f)
+        {
+            Vector3 p = mainIsland.position;
+            mainIsland.position = new Vector3(p.x, originalMainIslandY, p.z);
+            originalMainIslandY = 0f;
+        }
 
         RestoreXROriginHeight();
         UnlockLocomotion();

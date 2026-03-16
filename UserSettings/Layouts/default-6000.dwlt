@@ -1438,7 +1438,7 @@ MonoBehaviour:
     m_GridAxis: 1
     m_gridOpacity: 0.5
   m_Rotation:
-    m_Target: {x: 0.14507145, y: -0.26597536, z: 0.040524554, w: 0.952143}
+    m_Target: {x: 0.1978237, y: -0.024698561, z: 0.004986199, w: 0.97992}
     speed: 2
     m_Value: {x: -0.14507146, y: 0.26597536, z: -0.040524557, w: -0.952143}
   m_Size:
@@ -1446,7 +1446,7 @@ MonoBehaviour:
     speed: 2
     m_Value: 0.8660254
   m_Ortho:
-    m_Target: 0
+    m_Target: 1
     speed: 2
     m_Value: 0
   m_CameraSettings:
@@ -1606,12 +1606,6 @@ MonoBehaviour:
       m_Data: 94820
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 94064
-    - m_Data: 94066
-    - m_Data: 94068
-    - m_Data: 94070
-    - m_Data: 94072
-    - m_Data: 94074
     - m_Data: 94076
     - m_Data: 94078
     - m_Data: 94080
@@ -1630,6 +1624,12 @@ MonoBehaviour:
     - m_Data: 94106
     - m_Data: 94108
     - m_Data: 94110
+    - m_Data: 94112
+    - m_Data: 94114
+    - m_Data: 94116
+    - m_Data: 94118
+    - m_Data: 94120
+    - m_Data: 94122
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1662,12 +1662,6 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 94064
-    - m_Data: 94066
-    - m_Data: 94068
-    - m_Data: 94070
-    - m_Data: 94072
-    - m_Data: 94074
     - m_Data: 94076
     - m_Data: 94078
     - m_Data: 94080
@@ -1686,6 +1680,12 @@ MonoBehaviour:
     - m_Data: 94106
     - m_Data: 94108
     - m_Data: 94110
+    - m_Data: 94112
+    - m_Data: 94114
+    - m_Data: 94116
+    - m_Data: 94118
+    - m_Data: 94120
+    - m_Data: 94122
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1824,12 +1824,6 @@ MonoBehaviour:
       m_Data: 111456
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 94064
-    - m_Data: 94066
-    - m_Data: 94068
-    - m_Data: 94070
-    - m_Data: 94072
-    - m_Data: 94074
     - m_Data: 94076
     - m_Data: 94078
     - m_Data: 94080
@@ -1848,6 +1842,12 @@ MonoBehaviour:
     - m_Data: 94106
     - m_Data: 94108
     - m_Data: 94110
+    - m_Data: 94112
+    - m_Data: 94114
+    - m_Data: 94116
+    - m_Data: 94118
+    - m_Data: 94120
+    - m_Data: 94122
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1880,12 +1880,6 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 94064
-    - m_Data: 94066
-    - m_Data: 94068
-    - m_Data: 94070
-    - m_Data: 94072
-    - m_Data: 94074
     - m_Data: 94076
     - m_Data: 94078
     - m_Data: 94080
@@ -1904,6 +1898,12 @@ MonoBehaviour:
     - m_Data: 94106
     - m_Data: 94108
     - m_Data: 94110
+    - m_Data: 94112
+    - m_Data: 94114
+    - m_Data: 94116
+    - m_Data: 94118
+    - m_Data: 94120
+    - m_Data: 94122
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2042,12 +2042,6 @@ MonoBehaviour:
       m_Data: 94824
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 94064
-    - m_Data: 94066
-    - m_Data: 94068
-    - m_Data: 94070
-    - m_Data: 94072
-    - m_Data: 94074
     - m_Data: 94076
     - m_Data: 94078
     - m_Data: 94080
@@ -2066,6 +2060,12 @@ MonoBehaviour:
     - m_Data: 94106
     - m_Data: 94108
     - m_Data: 94110
+    - m_Data: 94112
+    - m_Data: 94114
+    - m_Data: 94116
+    - m_Data: 94118
+    - m_Data: 94120
+    - m_Data: 94122
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2098,12 +2098,6 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 94064
-    - m_Data: 94066
-    - m_Data: 94068
-    - m_Data: 94070
-    - m_Data: 94072
-    - m_Data: 94074
     - m_Data: 94076
     - m_Data: 94078
     - m_Data: 94080
@@ -2122,6 +2116,12 @@ MonoBehaviour:
     - m_Data: 94106
     - m_Data: 94108
     - m_Data: 94110
+    - m_Data: 94112
+    - m_Data: 94114
+    - m_Data: 94116
+    - m_Data: 94118
+    - m_Data: 94120
+    - m_Data: 94122
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
