@@ -229,10 +229,13 @@ public class PassthroughManager : MonoBehaviour
         float nearClip = mainCamera.nearClipPlane;
         fadeQuadObj.transform.localPosition = new Vector3(0f, 0f, nearClip + 0.01f);
 
-        // Scale to cover the entire view
+        // Scale to cover the entire view including VR stereo.
+        // Quest 3 has ~104° horizontal FOV per eye. Using a generous 4x
+        // multiplier ensures the quad covers both eyes in Single Pass
+        // Instanced rendering with no gap at the edges.
         float height = 2f * (nearClip + 0.01f) * Mathf.Tan(mainCamera.fieldOfView * 0.5f * Mathf.Deg2Rad);
         float width = height * mainCamera.aspect;
-        fadeQuadObj.transform.localScale = new Vector3(width * 1.5f, height * 1.5f, 1f);
+        fadeQuadObj.transform.localScale = new Vector3(width * 4f, height * 4f, 1f);
 
         // Remove collider
         Destroy(fadeQuadObj.GetComponent<Collider>());

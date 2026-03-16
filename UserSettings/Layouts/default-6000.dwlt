@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 1536
     height: 820.8
   m_ShowMode: 4
-  m_Title: Inspector
+  m_Title: Scene
   m_RootView: {fileID: 2}
   m_MinSize: {x: 875, y: 300}
   m_MaxSize: {x: 10000, y: 10000}
@@ -237,7 +237,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 1
   m_Script: {fileID: 12006, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: ConsoleWindow
+  m_Name: ProjectBrowser
   m_EditorClassIdentifier: 
   m_Children: []
   m_Position:
@@ -246,16 +246,16 @@ MonoBehaviour:
     y: 538.4
     width: 984.8
     height: 226.39996
-  m_MinSize: {x: 101, y: 126}
-  m_MaxSize: {x: 4001, y: 4026}
-  m_ActualView: {fileID: 20}
+  m_MinSize: {x: 231, y: 276}
+  m_MaxSize: {x: 10001, y: 10026}
+  m_ActualView: {fileID: 17}
   m_Panes:
   - {fileID: 17}
   - {fileID: 18}
   - {fileID: 19}
   - {fileID: 20}
-  m_Selected: 3
-  m_LastSelected: 2
+  m_Selected: 0
+  m_LastSelected: 3
 --- !u!114 &11
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -725,19 +725,9 @@ MonoBehaviour:
       m_LastClickedID:
         m_Data: 0
       m_ExpandedIDs:
-      - m_Data: -127646
-      - m_Data: -124392
-      - m_Data: -124028
-      - m_Data: -96372
-      - m_Data: -61788
-      - m_Data: -58534
-      - m_Data: -58170
-      - m_Data: -30516
-      - m_Data: -4194
+      - m_Data: -4332
+      - m_Data: -2138
       - m_Data: -1300
-      - m_Data: 101696
-      - m_Data: 103872
-      - m_Data: 112026
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 
@@ -1565,9 +1555,9 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 892.8
-    width: 1237.4
-    height: 213.20007
+    y: 562.4
+    width: 983.8
+    height: 200.39996
   m_SerializedDataModeController:
     m_DataMode: 0
     m_PreferredDataMode: 0
@@ -1592,7 +1582,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Samples
+    - Assets/Shaders
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1602,18 +1592,18 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets/Samples/Meta XR Core SDK/85.0.0
+  - Assets/Shaders
   m_LastFoldersGridSize: 16
   m_LastProjectPath: C:\Users\Malvin Leonardo\Documents\UnityProjects\penting\Tugas_Akhir\EMILIA-VR
   m_LockTracker:
     m_IsLocked: 0
   m_LastLocalAssetsSearchArea: 1
   m_FolderTreeState:
-    scrollPos: {x: 0, y: 1023}
+    scrollPos: {x: 0, y: 1419.6001}
     m_SelectedIDs:
-    - m_Data: 407312
+    - m_Data: 94820
     m_LastClickedID:
-      m_Data: 407312
+      m_Data: 94820
     m_ExpandedIDs:
     - m_Data: 0
     - m_Data: 94064
@@ -1723,8 +1713,8 @@ MonoBehaviour:
       m_ResourceFile: 
   m_ListAreaState:
     m_SelectedInstanceIDs:
-    - m_Data: 407282
-    m_LastClickedInstanceID: 407282
+    - m_Data: -2236
+    m_LastClickedInstanceID: -2236
     m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs:
     - m_Data: 126064
@@ -2212,8 +2202,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Console\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 0
-    y: 562.4
+    x: -1536
+    y: 617.60004
     width: 983.8
     height: 200.39996
   m_SerializedDataModeController:

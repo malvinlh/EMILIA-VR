@@ -66,6 +66,13 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("The Chair child.")]
     public Transform chair;
 
+    [Header("Whiteboard Placeholder")]
+    [Tooltip("A collider on the virtual table that defines where and at what scale the " +
+             "whiteboard should spawn. Place a Box Collider (set as trigger) on the table " +
+             "surface to visualize the whiteboard area in the editor. " +
+             "If null, the whiteboard spawns at the raw MR-detected position.")]
+    public Transform whiteboardPlaceholder;
+
     [Header("SeatPoint Calibration")]
     [Tooltip("The SeatPoint transform where the player will be teleported after calibration. " +
              "Its forward direction defines the player's seated facing direction. " +
@@ -73,10 +80,10 @@ public class JournalSessionManager : MonoBehaviour
     public Transform seatPoint;
     [Tooltip("The XR Origin (XR Rig) root transform. Required for teleportation to SeatPoint.")]
     public Transform xrOrigin;
-    [Tooltip("Target seated eye height in world units (Y position the camera should be at). " +
-             "Set to SeatPoint's Y + typical seated eye height offset. " +
-             "If <= 0, the tracked head height is preserved (no height adjustment).")]
-    public float seatedEyeHeight = -1f;
+    [Tooltip("When true, the player's real-world eye height at calibration time is used " +
+             "as the target camera Y (SeatPoint becomes the XZ + yaw target only). " +
+             "This produces the most natural seated perspective.")]
+    public bool useRealEyeHeight = true;
 
     [Header("UI")]
     [Tooltip("World-space TextMeshPro for instruction prompts (fallback if CalibrationGuide is null). Created at runtime if null.")]
@@ -110,6 +117,8 @@ public class JournalSessionManager : MonoBehaviour
     private XRHandSubsystem handSubsystem;
     private List<LocomotionProvider> disabledLocomotionProviders = new List<LocomotionProvider>();
     private float originalXROriginY;
+    private float capturedRealEyeHeight;
+    private bool placeholderWasVisible;
 
     // ================================================================
     // LIFECYCLE
@@ -343,9 +352,13 @@ public class JournalSessionManager : MonoBehaviour
 
         CurrentState = SessionState.Preview;
 
+        // Capture player's real eye height at the moment of confirmation.
+        // This is used later so the VR camera matches the passthrough perspective.
+        capturedRealEyeHeight = table.userHeadPosition.y;
+
         Debug.Log($"[JournalSession] Table confirmed at {table.position}, " +
                   $"size={table.size}, AR={table.sourcePlane != null}. " +
-                  $"User at {table.userHeadPosition}.");
+                  $"User at {table.userHeadPosition} (capturedEyeY={capturedRealEyeHeight:F2}).");
 
         StartCoroutine(PreviewAndTransition(table));
     }
@@ -409,23 +422,32 @@ public class JournalSessionManager : MonoBehaviour
     {
         passthroughManager.OnPassthroughExited -= OnceAfterPassthroughExit;
 
-        if (seatPoint != null && xrOrigin != null)
+        // Wrap in try-catch: an exception here aborts the PassthroughManager's
+        // fade-from-black coroutine, leaving the screen permanently black.
+        try
         {
-            TeleportToSeatPoint(pendingTable);
-            AdjustTableForDistanceMismatch(pendingTable);
-        }
-        else
-        {
-            AlignVRWorldToTable(pendingTable);
-        }
+            if (seatPoint != null && xrOrigin != null)
+            {
+                TeleportToSeatPoint(pendingTable);
+                AdjustTableForDistanceMismatch(pendingTable);
+            }
+            else
+            {
+                AlignVRWorldToTable(pendingTable);
+            }
 
-        MoveWhiteboardToVRLayer();
+            MoveWhiteboardToVRLayer();
 
-        // Create spatial anchor for drift resistance
-        if (alignmentAnchor != null)
+            // Create spatial anchor for drift resistance
+            if (alignmentAnchor != null)
+            {
+                Pose tablePose = new Pose(pendingTable.position, pendingTable.rotation);
+                alignmentAnchor.CreateAnchorAtTable(tablePose);
+            }
+        }
+        catch (System.Exception ex)
         {
-            Pose tablePose = new Pose(pendingTable.position, pendingTable.rotation);
-            alignmentAnchor.CreateAnchorAtTable(tablePose);
+            Debug.LogError($"[JournalSession] Error during post-passthrough setup: {ex}");
         }
     }
 
@@ -464,6 +486,25 @@ public class JournalSessionManager : MonoBehaviour
 
         const int WHITEBOARD_LAYER = 10;
         PassthroughManager.SetLayerRecursive(spawnedWhiteboard, WHITEBOARD_LAYER);
+
+        // Reposition the whiteboard onto the placeholder if one is assigned.
+        // Only position + rotation are taken from the placeholder; the whiteboard
+        // keeps its original scale and texture from SpawnAligned (MR-detected size).
+        // This avoids texture overflow from the parent chain's lossyScale.
+        if (whiteboardPlaceholder != null)
+        {
+            spawnedWhiteboard.transform.position =
+                whiteboardPlaceholder.position + Vector3.up * 0.002f;
+            spawnedWhiteboard.transform.rotation = whiteboardPlaceholder.rotation;
+
+            Debug.Log($"[JournalSession] Whiteboard repositioned to placeholder at " +
+                      $"{spawnedWhiteboard.transform.position}.");
+
+            // Hide the placeholder during journaling
+            placeholderWasVisible = whiteboardPlaceholder.gameObject.activeSelf;
+            whiteboardPlaceholder.gameObject.SetActive(false);
+        }
+
         Debug.Log("[JournalSession] Whiteboard moved to layer 10 for VR interaction.");
     }
 
@@ -548,6 +589,10 @@ public class JournalSessionManager : MonoBehaviour
     /// Teleports the XR Origin so the player's camera ends up at SeatPoint's
     /// position and forward direction. This creates a natural seated experience
     /// where the player appears at the virtual desk.
+    ///
+    /// When useRealEyeHeight is true, the Y position comes from the player's
+    /// actual eye height captured during passthrough calibration — not the
+    /// SeatPoint's Y. This eliminates "too low / too high" mismatches.
     /// </summary>
     private void TeleportToSeatPoint(ARTableDetector.DetectedTable table)
     {
@@ -572,32 +617,30 @@ public class JournalSessionManager : MonoBehaviour
         offset.y = 0f;
         xrOrigin.position += offset;
 
-        // 3. Seated height adjustment — lower the camera to SeatPoint's Y level
-        //    This compensates for standing users being too tall for the virtual table.
-        //    The approach: compute the tracking height (camera Y relative to XR Origin Y)
-        //    and set XR Origin Y so camera ends up at SeatPoint.Y.
-        if (seatedEyeHeight > 0f)
+        // 3. Height adjustment
+        float targetEyeY;
+        if (useRealEyeHeight && capturedRealEyeHeight > 0f)
         {
-            // Use explicit seated eye height
-            float trackingHeight = cam.transform.position.y - xrOrigin.position.y;
-            xrOrigin.position = new Vector3(
-                xrOrigin.position.x,
-                seatedEyeHeight - trackingHeight,
-                xrOrigin.position.z);
+            // Use the player's actual eye height from when they confirmed the table.
+            // This keeps the VR perspective identical to what they saw in passthrough.
+            targetEyeY = capturedRealEyeHeight;
         }
         else
         {
-            // Use SeatPoint.Y as the target eye height
-            float trackingHeight = cam.transform.position.y - xrOrigin.position.y;
-            xrOrigin.position = new Vector3(
-                xrOrigin.position.x,
-                seatPoint.position.y - trackingHeight,
-                xrOrigin.position.z);
+            // Fallback: use SeatPoint's Y as target eye height
+            targetEyeY = seatPoint.position.y;
         }
+
+        float trackingHeight = cam.transform.position.y - xrOrigin.position.y;
+        xrOrigin.position = new Vector3(
+            xrOrigin.position.x,
+            targetEyeY - trackingHeight,
+            xrOrigin.position.z);
 
         Debug.Log($"[JournalSession] Teleported to SeatPoint. " +
                   $"XR Origin → {xrOrigin.position}, yaw delta={yawDelta:F1}°, " +
-                  $"camera Y target={seatPoint.position.y:F2}");
+                  $"camera Y target={targetEyeY:F2} " +
+                  $"(useRealEyeHeight={useRealEyeHeight}, captured={capturedRealEyeHeight:F2})");
     }
 
     /// <summary>
@@ -911,6 +954,10 @@ public class JournalSessionManager : MonoBehaviour
             Destroy(spawnedWhiteboard);
             spawnedWhiteboard = null;
         }
+
+        // Restore placeholder visibility
+        if (whiteboardPlaceholder != null && placeholderWasVisible)
+            whiteboardPlaceholder.gameObject.SetActive(true);
     }
 
     // ================================================================

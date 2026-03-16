@@ -163,8 +163,8 @@ public static class MRJournalSceneSetup
 
         Debug.Log($"[MR Setup] Wired {wired} reference(s) on JournalSessionManager. " +
                   "Check inspector to verify. Manual setup still needed:\n" +
-                  "  - Set seatedEyeHeight on JournalSessionManager (default -1 uses SeatPoint.Y)\n" +
-                  "  - Position SeatPoint at the desired seated eye-level height\n" +
+                  "  - Assign whiteboardPlaceholder (Box Collider on virtual table surface)\n" +
+                  "  - useRealEyeHeight is ON by default (captures player's real eye Y at calibration)\n" +
                   "  - Optionally assign palmIndicatorPrefab on CalibrationGuide");
     }
 }

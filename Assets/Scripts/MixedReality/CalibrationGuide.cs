@@ -69,6 +69,7 @@ public class CalibrationGuide : MonoBehaviour
         EnsureInstructionText();
         EnsurePalmIndicators();
         EnsureProgressIndicator();
+        EnsureDotGrid();
 
         if (dotGrid != null)
             dotGrid.Initialise(passthroughLayer);
@@ -260,49 +261,116 @@ public class CalibrationGuide : MonoBehaviour
     {
         if (instructionText != null) return;
 
+        // Create a parent with a dark background quad so the text is readable
+        // over passthrough (white text on translucent dark panel).
         var obj = new GameObject("CalibrationInstruction");
+        obj.layer = passthroughLayer;
+
+        // Background panel
+        var bgObj = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        bgObj.name = "InstructionBG";
+        bgObj.transform.SetParent(obj.transform, false);
+        bgObj.transform.localPosition = new Vector3(0f, 0f, 0.001f); // slightly behind text
+        bgObj.transform.localScale = new Vector3(1.5f, 0.4f, 1f);
+        bgObj.layer = passthroughLayer;
+
+        var bgCol = bgObj.GetComponent<Collider>();
+        if (bgCol != null) Object.Destroy(bgCol);
+
+        var bgRend = bgObj.GetComponent<Renderer>();
+        var bgMat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+        bgMat.SetFloat("_Surface", 1f);
+        bgMat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        bgMat.SetFloat("_Blend", 0f);
+        bgMat.SetFloat("_ZWrite", 0f);
+        bgMat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        bgMat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        bgMat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        bgMat.color = new Color(0f, 0f, 0f, 0.6f);
+        bgRend.material = bgMat;
+        bgRend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        bgRend.receiveShadows = false;
+
+        // Instruction text
         instructionText = obj.AddComponent<TextMeshPro>();
         instructionText.fontSize = fontSize;
         instructionText.alignment = TextAlignmentOptions.Center;
-        instructionText.color = new Color(0.95f, 0.92f, 0.85f);
+        instructionText.color = Color.white;
         instructionText.rectTransform.sizeDelta = new Vector2(1.4f, 0.5f);
         instructionText.enableWordWrapping = true;
-        obj.layer = passthroughLayer;
+        instructionText.sortingOrder = 1;
+
         obj.SetActive(false);
     }
 
     private void EnsurePalmIndicators()
     {
-        if (palmIndicatorPrefab == null) return;
-
         if (leftPalmIndicator == null)
         {
-            leftPalmIndicator = Instantiate(palmIndicatorPrefab);
+            leftPalmIndicator = palmIndicatorPrefab != null
+                ? Instantiate(palmIndicatorPrefab)
+                : CreateDefaultIndicatorSphere();
             leftPalmIndicator.name = "LeftPalmIndicator";
             PassthroughManager.SetLayerRecursive(leftPalmIndicator, passthroughLayer);
             leftPalmIndicator.SetActive(false);
         }
         if (rightPalmIndicator == null)
         {
-            rightPalmIndicator = Instantiate(palmIndicatorPrefab);
+            rightPalmIndicator = palmIndicatorPrefab != null
+                ? Instantiate(palmIndicatorPrefab)
+                : CreateDefaultIndicatorSphere();
             rightPalmIndicator.name = "RightPalmIndicator";
             PassthroughManager.SetLayerRecursive(rightPalmIndicator, passthroughLayer);
             rightPalmIndicator.SetActive(false);
         }
     }
 
+    private GameObject CreateDefaultIndicatorSphere()
+    {
+        var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        var col = sphere.GetComponent<Collider>();
+        if (col != null) Object.Destroy(col);
+
+        var rend = sphere.GetComponent<Renderer>();
+        var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+        mat.SetFloat("_Surface", 1f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.SetFloat("_Blend", 0f);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        mat.color = palmIdleColor;
+        rend.material = mat;
+        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        rend.receiveShadows = false;
+        return sphere;
+    }
+
     private void EnsureProgressIndicator()
     {
-        if (palmIndicatorPrefab == null) return;
-
         if (progressIndicator == null)
         {
-            progressIndicator = Instantiate(palmIndicatorPrefab);
+            progressIndicator = palmIndicatorPrefab != null
+                ? Instantiate(palmIndicatorPrefab)
+                : CreateDefaultIndicatorSphere();
             progressIndicator.name = "ConfirmProgressIndicator";
             PassthroughManager.SetLayerRecursive(progressIndicator, passthroughLayer);
             progressIndicator.transform.localScale = Vector3.one * 0.01f;
             progressIndicator.SetActive(false);
         }
+    }
+
+    /// <summary>
+    /// Auto-creates a SurfaceDotGrid at runtime if none was assigned in the inspector.
+    /// </summary>
+    private void EnsureDotGrid()
+    {
+        if (dotGrid != null) return;
+
+        var obj = new GameObject("SurfaceDotGrid_Auto");
+        dotGrid = obj.AddComponent<SurfaceDotGrid>();
+        Debug.Log("[CalibrationGuide] Auto-created SurfaceDotGrid (none assigned in inspector).");
     }
 
     private void UpdatePalmIndicator(GameObject indicator, bool tracked, Vector3 pos, bool flat)
