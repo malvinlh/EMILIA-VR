@@ -120,6 +120,7 @@ public class JournalSessionManager : MonoBehaviour
     private float capturedRealEyeHeight;
     private bool placeholderWasVisible;
     private float originalMainIslandY;  // recorded before AdjustIslandHeight, restored on EndSession
+    private bool hasAdjustedIslandHeight;
 
     // ================================================================
     // LIFECYCLE
@@ -366,8 +367,10 @@ public class JournalSessionManager : MonoBehaviour
 
     private void OnConfirmationLost()
     {
-        // Reset timeout when user lifts hands (not a timeout scenario)
-        detectionTimeoutTimer = 0f;
+        // Only reset a portion of the timeout so the cumulative time still increases.
+        // If a user repeatedly places/lifts hands, the fallback eventually fires rather
+        // than being deferred forever.
+        detectionTimeoutTimer = Mathf.Max(detectionTimeoutTimer - 2f, 0f);
     }
 
     // ================================================================
@@ -461,7 +464,7 @@ public class JournalSessionManager : MonoBehaviour
     {
         pendingTable = table;
 
-        if (whiteboardUtils == null) return;
+        if (whiteboardUtils == null || whiteboardUtils.WhiteboardPrefab == null) return;
 
         var wbComponent = whiteboardUtils.WhiteboardPrefab.GetComponent<Whiteboard>();
         if (wbComponent != null)
@@ -772,6 +775,7 @@ public class JournalSessionManager : MonoBehaviour
         if (Mathf.Abs(deltaY) < 0.005f) return;  // < 5mm, skip
 
         originalMainIslandY = mainIsland.position.y;  // record before moving, for restoration
+        hasAdjustedIslandHeight = true;
         mainIsland.position += new Vector3(0f, deltaY, 0f);
 
         Debug.Log($"[JournalSession] Island height adjusted by {deltaY:+0.000;-0.000}m. " +
@@ -849,7 +853,7 @@ public class JournalSessionManager : MonoBehaviour
         CurrentState = SessionState.Journaling;
         LockLocomotion();
 
-        if (whiteboardUtils != null && journalTable != null)
+        if (whiteboardUtils != null && whiteboardUtils.WhiteboardPrefab != null && journalTable != null)
         {
             var wbComponent = whiteboardUtils.WhiteboardPrefab.GetComponent<Whiteboard>();
             if (wbComponent != null)
@@ -916,11 +920,11 @@ public class JournalSessionManager : MonoBehaviour
             journalTable.localPosition = originalTableLocalPosition;
 
         // Restore MainIsland to its pre-session height (undoes AdjustIslandHeight)
-        if (mainIsland != null && originalMainIslandY != 0f)
+        if (mainIsland != null && hasAdjustedIslandHeight)
         {
             Vector3 p = mainIsland.position;
             mainIsland.position = new Vector3(p.x, originalMainIslandY, p.z);
-            originalMainIslandY = 0f;
+            hasAdjustedIslandHeight = false;
         }
 
         RestoreXROriginHeight();
@@ -949,6 +953,11 @@ public class JournalSessionManager : MonoBehaviour
         }
 
         StopAllCoroutines();
+
+        // Cancel any in-progress PassthroughManager transition so the screen
+        // doesn't get stuck mid-fade-to-black.
+        if (passthroughManager != null)
+            passthroughManager.CancelTransition();
 
         if (arTableDetector != null)
         {
@@ -990,11 +999,11 @@ public class JournalSessionManager : MonoBehaviour
             journalTable.localPosition = originalTableLocalPosition;
 
         // Restore MainIsland to its pre-session height (undoes AdjustIslandHeight)
-        if (mainIsland != null && originalMainIslandY != 0f)
+        if (mainIsland != null && hasAdjustedIslandHeight)
         {
             Vector3 p = mainIsland.position;
             mainIsland.position = new Vector3(p.x, originalMainIslandY, p.z);
-            originalMainIslandY = 0f;
+            hasAdjustedIslandHeight = false;
         }
 
         RestoreXROriginHeight();

@@ -146,33 +146,54 @@ public class JournalStartButton : MonoBehaviour
             if (handSubsystem == null) return;
         }
 
-        XRHand rightHand = handSubsystem.rightHand;
-        if (!rightHand.isTracked) return;
+        // Check both hands for fingertip poke
+        bool poked = TryPokeWithHand(handSubsystem.rightHand)
+                  || TryPokeWithHand(handSubsystem.leftHand);
 
-        XRHandJoint indexTip = rightHand.GetJoint(XRHandJointID.IndexTip);
-        if (!indexTip.TryGetPose(out Pose tipPose)) return;
+        // Handle hover state from either hand
+        bool isHovering = IsHandHovering(handSubsystem.rightHand)
+                       || IsHandHovering(handSubsystem.leftHand);
 
-        Vector3 tipPos = tipPose.position;
-
-        bool isInside   = triggerCollider.bounds.Contains(tipPos);
-        float dist      = Vector3.Distance(tipPos, triggerCollider.ClosestPoint(tipPos));
-        bool isHovering = dist <= hoverDistance;
-
-        if (isInside)
+        if (!poked)
         {
-            TriggerPress();
-        }
-        else if (isHovering && !wasHovering)
-        {
-            SetColor(hoverColor);
-        }
-        else if (!isHovering && wasHovering)
-        {
-            SetColor(idleColor);
-            transform.localPosition = idleLocalPos;
+            if (isHovering && !wasHovering)
+            {
+                SetColor(hoverColor);
+            }
+            else if (!isHovering && wasHovering)
+            {
+                SetColor(idleColor);
+                transform.localPosition = idleLocalPos;
+            }
         }
 
         wasHovering = isHovering;
+    }
+
+    private bool TryPokeWithHand(XRHand hand)
+    {
+        if (!hand.isTracked) return false;
+
+        XRHandJoint indexTip = hand.GetJoint(XRHandJointID.IndexTip);
+        if (!indexTip.TryGetPose(out Pose tipPose)) return false;
+
+        if (triggerCollider.bounds.Contains(tipPose.position))
+        {
+            TriggerPress();
+            return true;
+        }
+        return false;
+    }
+
+    private bool IsHandHovering(XRHand hand)
+    {
+        if (!hand.isTracked) return false;
+
+        XRHandJoint indexTip = hand.GetJoint(XRHandJointID.IndexTip);
+        if (!indexTip.TryGetPose(out Pose tipPose)) return false;
+
+        float dist = Vector3.Distance(tipPose.position, triggerCollider.ClosestPoint(tipPose.position));
+        return dist <= hoverDistance;
     }
 
     // ================================================================

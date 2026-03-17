@@ -51,7 +51,12 @@ public class CalibrationGuide : MonoBehaviour
     private GameObject leftPalmIndicator;
     private GameObject rightPalmIndicator;
     private GameObject progressIndicator;
+    private Material leftPalmMaterial;
+    private Material rightPalmMaterial;
+    private Material progressMaterial;
     private List<GameObject> planeHighlights = new List<GameObject>();
+    private Material highlightMaterialBest;
+    private Material highlightMaterialCandidate;
     private int passthroughLayer;
     private bool isActive;
     private float confirmationProgress;
@@ -127,8 +132,8 @@ public class CalibrationGuide : MonoBehaviour
     {
         if (!isActive) return;
 
-        UpdatePalmIndicator(leftPalmIndicator, leftTracked, leftPalmPos, leftFlat);
-        UpdatePalmIndicator(rightPalmIndicator, rightTracked, rightPalmPos, rightFlat);
+        UpdatePalmIndicator(leftPalmIndicator, leftPalmMaterial, leftTracked, leftPalmPos, leftFlat);
+        UpdatePalmIndicator(rightPalmIndicator, rightPalmMaterial, rightTracked, rightPalmPos, rightFlat);
 
         bool bothFlat = leftTracked && rightTracked && leftFlat && rightFlat;
 
@@ -190,8 +195,11 @@ public class CalibrationGuide : MonoBehaviour
         if (leftPalmIndicator != null) Destroy(leftPalmIndicator);
         if (rightPalmIndicator != null) Destroy(rightPalmIndicator);
         if (progressIndicator != null) Destroy(progressIndicator);
+        if (leftPalmMaterial != null) Destroy(leftPalmMaterial);
+        if (rightPalmMaterial != null) Destroy(rightPalmMaterial);
+        if (progressMaterial != null) Destroy(progressMaterial);
         if (dotGrid != null) dotGrid.Cleanup();
-        ClearPlaneHighlights();
+        DestroyPlaneHighlights();
     }
 
     // ================================================================
@@ -200,14 +208,35 @@ public class CalibrationGuide : MonoBehaviour
 
     private void OnCandidatesUpdated(List<ARTableDetector.CandidatePlane> candidates)
     {
-        ClearPlaneHighlights();
+        int needed = Mathf.Min(candidates.Count, 5);
 
-        for (int i = 0; i < candidates.Count && i < 5; i++)
+        // Grow pool if needed
+        while (planeHighlights.Count < needed)
+        {
+            var obj = CreatePlaneHighlightPooled();
+            planeHighlights.Add(obj);
+        }
+
+        // Activate and position needed highlights
+        for (int i = 0; i < needed; i++)
         {
             var plane = candidates[i].plane;
-            var highlight = CreatePlaneHighlight(plane, i == 0);
-            planeHighlights.Add(highlight);
+            var highlight = planeHighlights[i];
+
+            highlight.transform.position = plane.transform.position + Vector3.up * 0.001f;
+            highlight.transform.rotation = Quaternion.Euler(90f, plane.transform.eulerAngles.y, 0f);
+            highlight.transform.localScale = new Vector3(plane.size.x, plane.size.y, 1f);
+
+            var rend = highlight.GetComponent<Renderer>();
+            if (rend != null)
+                rend.sharedMaterial = (i == 0) ? GetHighlightMaterial(true) : GetHighlightMaterial(false);
+
+            highlight.SetActive(true);
         }
+
+        // Deactivate excess highlights
+        for (int i = needed; i < planeHighlights.Count; i++)
+            planeHighlights[i].SetActive(false);
     }
 
     private void OnProgress(float progress)
@@ -221,14 +250,13 @@ public class CalibrationGuide : MonoBehaviour
             float scale = Mathf.Lerp(0.01f, 0.05f, progress);
             progressIndicator.transform.localScale = Vector3.one * scale;
 
-            var rend = progressIndicator.GetComponent<Renderer>();
-            if (rend != null)
-                rend.material.color = Color.Lerp(Color.yellow, Color.green, progress);
+            if (progressMaterial != null)
+                progressMaterial.color = Color.Lerp(Color.yellow, Color.green, progress);
         }
 
         // Update palm indicators to confirming color
-        SetPalmColor(leftPalmIndicator, Color.Lerp(palmFlatColor, palmConfirmingColor, progress));
-        SetPalmColor(rightPalmIndicator, Color.Lerp(palmFlatColor, palmConfirmingColor, progress));
+        SetPalmColor(leftPalmMaterial, Color.Lerp(palmFlatColor, palmConfirmingColor, progress));
+        SetPalmColor(rightPalmMaterial, Color.Lerp(palmFlatColor, palmConfirmingColor, progress));
     }
 
     private void OnConfirmed(ARTableDetector.DetectedTable table)
@@ -313,6 +341,8 @@ public class CalibrationGuide : MonoBehaviour
             leftPalmIndicator.name = "LeftPalmIndicator";
             PassthroughManager.SetLayerRecursive(leftPalmIndicator, passthroughLayer);
             leftPalmIndicator.SetActive(false);
+            var rend = leftPalmIndicator.GetComponent<Renderer>();
+            if (rend != null) leftPalmMaterial = rend.material;  // cache the instance
         }
         if (rightPalmIndicator == null)
         {
@@ -322,6 +352,8 @@ public class CalibrationGuide : MonoBehaviour
             rightPalmIndicator.name = "RightPalmIndicator";
             PassthroughManager.SetLayerRecursive(rightPalmIndicator, passthroughLayer);
             rightPalmIndicator.SetActive(false);
+            var rend = rightPalmIndicator.GetComponent<Renderer>();
+            if (rend != null) rightPalmMaterial = rend.material;  // cache the instance
         }
     }
 
@@ -358,6 +390,8 @@ public class CalibrationGuide : MonoBehaviour
             PassthroughManager.SetLayerRecursive(progressIndicator, passthroughLayer);
             progressIndicator.transform.localScale = Vector3.one * 0.01f;
             progressIndicator.SetActive(false);
+            var rend = progressIndicator.GetComponent<Renderer>();
+            if (rend != null) progressMaterial = rend.material;  // cache the instance
         }
     }
 
@@ -373,7 +407,7 @@ public class CalibrationGuide : MonoBehaviour
         Debug.Log("[CalibrationGuide] Auto-created SurfaceDotGrid (none assigned in inspector).");
     }
 
-    private void UpdatePalmIndicator(GameObject indicator, bool tracked, Vector3 pos, bool flat)
+    private void UpdatePalmIndicator(GameObject indicator, Material mat, bool tracked, Vector3 pos, bool flat)
     {
         if (indicator == null) return;
 
@@ -387,15 +421,13 @@ public class CalibrationGuide : MonoBehaviour
         indicator.transform.position = pos + Vector3.up * 0.02f;
         indicator.transform.localScale = Vector3.one * 0.02f;
 
-        SetPalmColor(indicator, flat ? palmFlatColor : palmIdleColor);
+        SetPalmColor(mat, flat ? palmFlatColor : palmIdleColor);
     }
 
-    private void SetPalmColor(GameObject indicator, Color color)
+    private void SetPalmColor(Material mat, Color color)
     {
-        if (indicator == null) return;
-        var rend = indicator.GetComponent<Renderer>();
-        if (rend != null)
-            rend.material.color = color;
+        if (mat != null)
+            mat.color = color;
     }
 
     private void HidePalmIndicators()
@@ -415,7 +447,62 @@ public class CalibrationGuide : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns a shared material for plane highlights (avoids per-frame allocation).
+    /// </summary>
+    private Material GetHighlightMaterial(bool isBest)
+    {
+        if (isBest)
+        {
+            if (highlightMaterialBest == null)
+                highlightMaterialBest = CreateTransparentMaterial(bestCandidateColor);
+            return highlightMaterialBest;
+        }
+        else
+        {
+            if (highlightMaterialCandidate == null)
+                highlightMaterialCandidate = CreateTransparentMaterial(candidateColor);
+            return highlightMaterialCandidate;
+        }
+    }
+
+    private Material CreateTransparentMaterial(Color color)
+    {
+        var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+        mat.SetFloat("_Surface", 1f);
+        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.SetFloat("_Blend", 0f);
+        mat.SetFloat("_ZWrite", 0f);
+        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        mat.color = color;
+        return mat;
+    }
+
+    /// <summary>
+    /// Create a poolable plane highlight quad (no material assigned yet).
+    /// </summary>
+    private GameObject CreatePlaneHighlightPooled()
+    {
+        var obj = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        obj.name = "PlaneHighlight_Pooled";
+
+        var col = obj.GetComponent<Collider>();
+        if (col != null) Object.Destroy(col);
+
+        var rend = obj.GetComponent<Renderer>();
+        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        rend.receiveShadows = false;
+
+        PassthroughManager.SetLayerRecursive(obj, passthroughLayer);
+        obj.SetActive(false);
+
+        return obj;
+    }
+
+    /// <summary>
     /// Create a flat quad outline on the passthrough layer to highlight an AR plane.
+    /// Kept for any external callers — delegates to pooled approach internally.
     /// </summary>
     private GameObject CreatePlaneHighlight(UnityEngine.XR.ARFoundation.ARPlane plane, bool isBest)
     {
@@ -455,8 +542,27 @@ public class CalibrationGuide : MonoBehaviour
     {
         foreach (var obj in planeHighlights)
         {
+            if (obj != null) obj.SetActive(false);
+        }
+    }
+
+    private void DestroyPlaneHighlights()
+    {
+        foreach (var obj in planeHighlights)
+        {
             if (obj != null) Destroy(obj);
         }
         planeHighlights.Clear();
+
+        if (highlightMaterialBest != null)
+        {
+            Destroy(highlightMaterialBest);
+            highlightMaterialBest = null;
+        }
+        if (highlightMaterialCandidate != null)
+        {
+            Destroy(highlightMaterialCandidate);
+            highlightMaterialCandidate = null;
+        }
     }
 }

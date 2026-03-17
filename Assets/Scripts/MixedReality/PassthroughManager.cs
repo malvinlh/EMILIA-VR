@@ -121,6 +121,25 @@ public class PassthroughManager : MonoBehaviour
     /// </summary>
     public int GetPassthroughUILayer() => passthroughUILayer;
 
+    /// <summary>
+    /// Force-cancels any in-progress transition and resets the fade quad.
+    /// Call from JournalSessionManager.CancelSession() so a mid-transition
+    /// cancel doesn't leave the screen black.
+    /// </summary>
+    public void CancelTransition()
+    {
+        if (!IsTransitioning) return;
+
+        StopAllCoroutines();
+        IsTransitioning = false;
+
+        // Reset fade quad to fully transparent
+        if (fadeMaterial != null)
+            fadeMaterial.color = new Color(0f, 0f, 0f, 0f);
+        if (fadeQuadObj != null)
+            fadeQuadObj.SetActive(false);
+    }
+
     // ================================================================
     // TRANSITION
     // ================================================================

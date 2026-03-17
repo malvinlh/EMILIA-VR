@@ -4,12 +4,10 @@ using UnityEngine;
 using UnityEngine.XR.Hands;
 
 /// <summary>
-/// Detects a real-world table surface using a "palms-flat" gesture — similar
-/// to Meta Quest 3's Surface Keyboard detection.
-///
-/// Both palms must face down on a surface for a configurable hold duration.
-/// The table plane is computed from fingertip + palm joint positions.
-/// A visual progress indicator (sphere) scales and colour-lerps during the hold.
+/// [LEGACY] Detects a real-world table surface using a "palms-flat" gesture.
+/// Superseded by ARTableDetector which adds AR plane scanning.
+/// Kept only because the 3D_Journal_playground scene still references this component.
+/// Do not use for new work — use ARTableDetector instead.
 /// </summary>
 public class SurfaceDetector : MonoBehaviour
 {
