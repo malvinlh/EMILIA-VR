@@ -51,6 +51,7 @@ public class JournalStartButton : MonoBehaviour
     private BoxCollider triggerCollider;
     private Material buttonMaterial;
     private Vector3 idleLocalPos;
+    private Vector3 pressLocalAxis;
     private float cooldownTimer;
     private bool isOnCooldown;
     private bool wasHovering;
@@ -72,6 +73,14 @@ public class JournalStartButton : MonoBehaviour
         }
 
         idleLocalPos = transform.localPosition;
+
+        // Stable local-axis press direction (avoids world/local mixing artefacts
+        // when parent objects are rotated or scaled).
+        pressLocalAxis = transform.InverseTransformDirection(transform.forward);
+        if (pressLocalAxis.sqrMagnitude < 0.0001f)
+            pressLocalAxis = Vector3.forward;
+        else
+            pressLocalAxis.Normalize();
     }
 
     private void OnEnable()
@@ -207,7 +216,7 @@ public class JournalStartButton : MonoBehaviour
         Debug.Log("[JournalStartButton] Button triggered.");
 
         SetColor(pressedColor);
-        transform.localPosition = idleLocalPos - transform.forward * pressDepth;
+        transform.localPosition = idleLocalPos - pressLocalAxis * pressDepth;
 
         isOnCooldown = true;
         cooldownTimer = 0f;

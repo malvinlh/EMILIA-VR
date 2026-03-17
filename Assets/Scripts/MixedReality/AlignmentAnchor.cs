@@ -104,6 +104,16 @@ public class AlignmentAnchor : MonoBehaviour
     /// <summary>Whether the anchor is active and tracking.</summary>
     public bool IsAnchored => isTracking && activeAnchor != null;
 
+    /// <summary>
+    /// Recompute anchor-to-target offset after external code repositions the target.
+    /// Useful when runtime calibration adjusts target height/pose.
+    /// </summary>
+    public void RefreshTargetOffset()
+    {
+        if (!isTracking || activeAnchor == null || targetToAlign == null) return;
+        RecordOffset();
+    }
+
     // ================================================================
     // DRIFT CORRECTION
     // ================================================================

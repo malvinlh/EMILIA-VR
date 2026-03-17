@@ -325,7 +325,7 @@ public class CalibrationGuide : MonoBehaviour
         instructionText.alignment = TextAlignmentOptions.Center;
         instructionText.color = Color.white;
         instructionText.rectTransform.sizeDelta = new Vector2(1.4f, 0.5f);
-        instructionText.enableWordWrapping = true;
+        instructionText.textWrappingMode = TextWrappingModes.Normal;
         instructionText.sortingOrder = 1;
 
         obj.SetActive(false);

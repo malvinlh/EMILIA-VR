@@ -84,6 +84,31 @@ public class JournalSessionManager : MonoBehaviour
              "Moved as a unit during height calibration so the virtual table surface sits at the " +
              "same eye-relative height as the real table detected in passthrough.")]
     public Transform mainIsland;
+    [Tooltip("Optional transform to move for vertical calibration. " +
+             "Recommended: JournalChairTable (or another journaling-only root). " +
+             "If null, falls back to JournalChairTable, then MainIsland.")]
+    public Transform heightAdjustmentRoot;
+
+    [Header("Comfort - Height Alignment")]
+    [Tooltip("If enabled, adjusts XR Origin Y so the returned VR eye height matches the real eye-above-table relationship captured in passthrough.")]
+    public bool calibrateUserEyeHeight = true;
+
+    [Tooltip("Expected real eye-above-table range in metres captured from passthrough. " +
+             "Used to reject outlier hand/head samples.")]
+    public Vector2 realEyeAboveTableClamp = new Vector2(0.25f, 0.85f);
+
+    [Tooltip("If enabled, also moves the scene calibration root vertically. " +
+             "Recommended OFF when island/chair grounding already looks correct.")]
+    public bool applySceneHeightCorrection;
+
+    [Tooltip("Clamp for total vertical correction applied during calibration (metres). " +
+             "Prevents over-correction that can cause uncomfortable seat/table mismatch.")]
+    [Range(0.05f, 1.0f)]
+    public float maxHeightCorrection = 0.45f;
+
+    [Tooltip("Clamp for expected eye-above-table distance in metres. " +
+             "Typical seated range is around 0.55m to 0.90m.")]
+    public Vector2 eyeAboveTableClamp = new Vector2(0.50f, 1.05f);
 
     [Header("UI")]
     [Tooltip("World-space TextMeshPro for instruction prompts (fallback if CalibrationGuide is null). Created at runtime if null.")]
@@ -119,8 +144,8 @@ public class JournalSessionManager : MonoBehaviour
     private float originalXROriginY;
     private float capturedRealEyeHeight;
     private bool placeholderWasVisible;
-    private float originalMainIslandY;  // recorded before AdjustIslandHeight, restored on EndSession
-    private bool hasAdjustedIslandHeight;
+    private float originalHeightAdjustmentY;
+    private bool hasAdjustedHeightAdjustment;
 
     // ================================================================
     // LIFECYCLE
@@ -410,6 +435,8 @@ public class JournalSessionManager : MonoBehaviour
             {
                 TeleportToSeatPoint(table);
                 AdjustTableForDistanceMismatch(table);
+                if (applySceneHeightCorrection)
+                    AdjustIslandHeight(table);
             }
             else
             {
@@ -434,7 +461,8 @@ public class JournalSessionManager : MonoBehaviour
             {
                 TeleportToSeatPoint(pendingTable);
                 AdjustTableForDistanceMismatch(pendingTable);
-                AdjustIslandHeight(pendingTable);  // must come after teleport, before whiteboard placement
+                if (applySceneHeightCorrection)
+                    AdjustIslandHeight(pendingTable);  // optional scene correction
             }
             else
             {
@@ -663,6 +691,21 @@ public class JournalSessionManager : MonoBehaviour
         //    AdjustIslandHeight() will shift the whole island up/down so the
         //    virtual table is at the same eye-relative height as the real one.
         float targetEyeY = seatPoint.position.y;
+
+        // Optional: match real-world eye-above-table relation captured in passthrough.
+        // This keeps chair/table grounded while adapting comfort to each user.
+        if (calibrateUserEyeHeight)
+        {
+            float measuredEyeAboveTable = capturedRealEyeHeight - table.position.y;
+            float clampedEyeAboveTable = Mathf.Clamp(
+                measuredEyeAboveTable,
+                Mathf.Min(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y),
+                Mathf.Max(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y));
+
+            float virtualTableY = GetVirtualTableSurfaceY();
+            targetEyeY = virtualTableY + clampedEyeAboveTable;
+        }
+
         float trackingHeight = cam.transform.position.y - xrOrigin.position.y;
         xrOrigin.position = new Vector3(
             xrOrigin.position.x,
@@ -671,7 +714,7 @@ public class JournalSessionManager : MonoBehaviour
 
         Debug.Log($"[JournalSession] Teleported to SeatPoint. " +
                   $"XR Origin → {xrOrigin.position}, yaw delta={yawDelta:F1}°, " +
-                  $"camera Y → {cam.transform.position.y:F2} (SeatPoint.y={seatPoint.position.y:F2})");
+              $"camera Y → {cam.transform.position.y:F2} (SeatPoint.y={seatPoint.position.y:F2}, targetEyeY={targetEyeY:F2})");
     }
 
     /// <summary>
@@ -730,7 +773,7 @@ public class JournalSessionManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Moves the entire MainIsland vertically so the virtual table surface sits
+    /// Moves the configured height adjustment root vertically so the virtual table surface sits
     /// at the same eye-relative height as the real table detected in passthrough.
     ///
     /// Formula: targetVirtualTableY = cameraY - (realEyeY - realTableY)
@@ -742,28 +785,19 @@ public class JournalSessionManager : MonoBehaviour
     /// </summary>
     private void AdjustIslandHeight(ARTableDetector.DetectedTable table)
     {
-        if (mainIsland == null)
-        {
-            // Auto-find by name if not assigned in Inspector
-            var go = GameObject.Find("MainIsland");
-            if (go != null)
-            {
-                mainIsland = go.transform;
-                Debug.Log("[JournalSession] Auto-found MainIsland by name.");
-            }
-            else
-            {
-                Debug.LogWarning("[JournalSession] mainIsland is null and 'MainIsland' not found. " +
-                                 "Skipping island height adjustment — viewpoint may be too high/low.");
-                return;
-            }
-        }
+        Transform adjustmentRoot = ResolveHeightAdjustmentRoot();
+        if (adjustmentRoot == null)
+            return;
 
         Camera cam = Camera.main;
         if (cam == null) return;
 
         // How high were the player's eyes above the real table during calibration?
         float realEyeAboveTable = capturedRealEyeHeight - table.position.y;
+        realEyeAboveTable = Mathf.Clamp(
+            realEyeAboveTable,
+            Mathf.Min(eyeAboveTableClamp.x, eyeAboveTableClamp.y),
+            Mathf.Max(eyeAboveTableClamp.x, eyeAboveTableClamp.y));
 
         // Find the virtual table surface Y from the whiteboard placeholder
         float virtualTableSurfaceY = GetVirtualTableSurfaceY();
@@ -771,17 +805,45 @@ public class JournalSessionManager : MonoBehaviour
         // We want: virtualTableSurfaceY == cameraY - realEyeAboveTable
         float targetVirtualTableY = cam.transform.position.y - realEyeAboveTable;
         float deltaY = targetVirtualTableY - virtualTableSurfaceY;
+        deltaY = Mathf.Clamp(deltaY, -maxHeightCorrection, maxHeightCorrection);
 
         if (Mathf.Abs(deltaY) < 0.005f) return;  // < 5mm, skip
 
-        originalMainIslandY = mainIsland.position.y;  // record before moving, for restoration
-        hasAdjustedIslandHeight = true;
-        mainIsland.position += new Vector3(0f, deltaY, 0f);
+        originalHeightAdjustmentY = adjustmentRoot.position.y;
+        hasAdjustedHeightAdjustment = true;
+        adjustmentRoot.position += new Vector3(0f, deltaY, 0f);
 
-        Debug.Log($"[JournalSession] Island height adjusted by {deltaY:+0.000;-0.000}m. " +
+        if (alignmentAnchor != null && alignmentAnchor.IsAnchored)
+            alignmentAnchor.RefreshTargetOffset();
+
+        Debug.Log($"[JournalSession] Height adjusted by {deltaY:+0.000;-0.000}m on '{adjustmentRoot.name}'. " +
                   $"realEyeAboveTable={realEyeAboveTable:F3}m, " +
                   $"cameraY={cam.transform.position.y:F3}, " +
                   $"virtualTableY: {virtualTableSurfaceY:F3} → {virtualTableSurfaceY + deltaY:F3}.");
+    }
+
+    private Transform ResolveHeightAdjustmentRoot()
+    {
+        if (heightAdjustmentRoot != null)
+            return heightAdjustmentRoot;
+
+        if (journalChairTable != null)
+            return journalChairTable;
+
+        if (mainIsland != null)
+            return mainIsland;
+
+        var go = GameObject.Find("MainIsland");
+        if (go != null)
+        {
+            mainIsland = go.transform;
+            return mainIsland;
+        }
+
+        Debug.LogWarning("[JournalSession] No height adjustment root found. " +
+                         "Assign Height Adjustment Root (recommended: JournalChairTable). " +
+                         "Skipping height correction.");
+        return null;
     }
 
     /// <summary>
@@ -919,12 +981,13 @@ public class JournalSessionManager : MonoBehaviour
         if (journalTable != null)
             journalTable.localPosition = originalTableLocalPosition;
 
-        // Restore MainIsland to its pre-session height (undoes AdjustIslandHeight)
-        if (mainIsland != null && hasAdjustedIslandHeight)
+        // Restore height adjustment root to pre-session Y
+        Transform adjustmentRoot = ResolveHeightAdjustmentRoot();
+        if (adjustmentRoot != null && hasAdjustedHeightAdjustment)
         {
-            Vector3 p = mainIsland.position;
-            mainIsland.position = new Vector3(p.x, originalMainIslandY, p.z);
-            hasAdjustedIslandHeight = false;
+            Vector3 p = adjustmentRoot.position;
+            adjustmentRoot.position = new Vector3(p.x, originalHeightAdjustmentY, p.z);
+            hasAdjustedHeightAdjustment = false;
         }
 
         RestoreXROriginHeight();
@@ -998,12 +1061,13 @@ public class JournalSessionManager : MonoBehaviour
         if (journalTable != null)
             journalTable.localPosition = originalTableLocalPosition;
 
-        // Restore MainIsland to its pre-session height (undoes AdjustIslandHeight)
-        if (mainIsland != null && hasAdjustedIslandHeight)
+        // Restore height adjustment root to pre-session Y
+        Transform adjustmentRoot = ResolveHeightAdjustmentRoot();
+        if (adjustmentRoot != null && hasAdjustedHeightAdjustment)
         {
-            Vector3 p = mainIsland.position;
-            mainIsland.position = new Vector3(p.x, originalMainIslandY, p.z);
-            hasAdjustedIslandHeight = false;
+            Vector3 p = adjustmentRoot.position;
+            adjustmentRoot.position = new Vector3(p.x, originalHeightAdjustmentY, p.z);
+            hasAdjustedHeightAdjustment = false;
         }
 
         RestoreXROriginHeight();
