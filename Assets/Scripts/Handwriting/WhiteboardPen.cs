@@ -69,6 +69,24 @@ public class WhiteboardPen : MonoBehaviour
     private DigitalInkBridge inkBridge;
     private bool strokeActive;
 
+    // ML Kit logical writing canvas (pixels).
+    private const float MLKIT_AREA_W = 300f;
+    private const float MLKIT_AREA_H = 200f;
+    // Physical-to-pixel factor: 1 m of finger movement = 1000 ML Kit pixels.
+    private const float MLKIT_PX_PER_M = 1000f;
+
+    [Tooltip("Seconds of idle time after which a new logical handwriting segment starts.")]
+    public float inkSegmentResetDelay = 2.2f;
+
+    private bool hasInkSegmentOrigin;
+    private float lastInkPointTime;
+    // World-space reference frame for the current writing segment.
+    // Using touch.point (world-space) instead of UV coordinates makes ML Kit
+    // recognition independent of the whiteboard's rotation / UV orientation.
+    private Vector3 segmentWorldOrigin;
+    private Vector3 segmentCamRight;
+    private Vector3 segmentCamForward;
+
     // Cached Camera Floor Offset Object — needed to convert XRHandJoint
     // session-space positions to world space. The XR Origin uses Device
     // tracking mode with CameraYOffset=2, so joint positions must go through
@@ -246,26 +264,76 @@ public class WhiteboardPen : MonoBehaviour
                 whiteboard.ToggleTouch(true);
 
                 // ── Feed stroke to Digital Ink Recognition ────────
+                // Use touch.point (world-space) projected onto the camera's
+                // horizontal axes so that ML Kit always sees characters in
+                // the correct orientation regardless of the board's rotation.
                 if (inkBridge == null) inkBridge = DigitalInkBridge.Instance;
                 if (inkBridge != null && inkBridge.IsModelReady)
                 {
-                    // ML Kit expects a top-left origin coordinate system
-                    // (Y increases downward), but Unity textureCoord has
-                    // Y increasing upward.  Flip Y for correct orientation.
-                    float pxX = smoothedX * whiteboard.TextureWidth;
-                    float pxY = (1.0f - smoothedY) * whiteboard.TextureHeight;
+                    Vector3 worldPoint = touch.point;
+
+                    bool segmentExpired = !hasInkSegmentOrigin ||
+                                          Time.time - lastInkPointTime > inkSegmentResetDelay;
+
+                    // On a new segment, lock the coordinate frame to the
+                    // camera's current horizontal right / forward directions.
+                    if (!strokeActive && segmentExpired)
+                    {
+                        Camera cam = Camera.main;
+                        if (cam != null)
+                        {
+                            segmentCamRight   = cam.transform.right;
+                            segmentCamForward = cam.transform.forward;
+                        }
+                        else
+                        {
+                            segmentCamRight   = Vector3.right;
+                            segmentCamForward = Vector3.forward;
+                        }
+                        // Project onto horizontal plane
+                        segmentCamRight.y   = 0f;
+                        segmentCamForward.y = 0f;
+                        if (segmentCamRight.sqrMagnitude   > 0.001f) segmentCamRight.Normalize();
+                        else segmentCamRight = Vector3.right;
+                        if (segmentCamForward.sqrMagnitude > 0.001f) segmentCamForward.Normalize();
+                        else segmentCamForward = Vector3.forward;
+
+                        segmentWorldOrigin  = worldPoint;
+                        hasInkSegmentOrigin = true;
+                    }
+
+                    // Project world delta onto the locked camera axes.
+                    // Camera right  → ML Kit +X  (rightward)
+                    // Camera forward → ML Kit -Y  ("away from user" = upward stroke)
+                    Vector3 delta = worldPoint - segmentWorldOrigin;
+                    float pxX = MLKIT_AREA_W * 0.5f
+                              + Vector3.Dot(delta, segmentCamRight)   * MLKIT_PX_PER_M;
+                    float pxY = MLKIT_AREA_H * 0.5f
+                              - Vector3.Dot(delta, segmentCamForward) * MLKIT_PX_PER_M;
+
+                    // If a new stroke starts far outside the canvas, recentre.
+                    if (!strokeActive && (pxX < -20f || pxX > MLKIT_AREA_W + 20f ||
+                                          pxY < -20f || pxY > MLKIT_AREA_H + 20f))
+                    {
+                        segmentWorldOrigin = worldPoint;
+                        pxX = MLKIT_AREA_W * 0.5f;
+                        pxY = MLKIT_AREA_H * 0.5f;
+                    }
+
+                    pxX = Mathf.Clamp(pxX, 0f, MLKIT_AREA_W);
+                    pxY = Mathf.Clamp(pxY, 0f, MLKIT_AREA_H);
 
                     if (!wasTouchingLastFrame)
                     {
-                        // Inform ML Kit of the writing surface dimensions
-                        inkBridge.SetWritingArea(whiteboard.TextureWidth,
-                                                 whiteboard.TextureHeight);
+                        inkBridge.SetWritingArea(MLKIT_AREA_W, MLKIT_AREA_H);
                         inkBridge.BeginStroke(pxX, pxY);
                         strokeActive = true;
+                        lastInkPointTime = Time.time;
                     }
                     else
                     {
                         inkBridge.AddPoint(pxX, pxY);
+                        lastInkPointTime = Time.time;
                     }
                 }
             }
@@ -290,6 +358,12 @@ public class WhiteboardPen : MonoBehaviour
             hasMadeContact = false; // reset contact state
             hasSmoothedPosition = false; // reset smoothing for next stroke
 
+            if (!strokeActive && hasInkSegmentOrigin &&
+                Time.time - lastInkPointTime > inkSegmentResetDelay)
+            {
+                hasInkSegmentOrigin = false;
+            }
+
             // ── Hover detection (pointer cursor, right hand only) ──────
             DetectHover(tip, direction);
         }
@@ -312,6 +386,9 @@ public class WhiteboardPen : MonoBehaviour
                         inkBridge.ClearInk();
                         inkBridge.ClearPreContext();
                     }
+
+                    hasInkSegmentOrigin = false;
+                    strokeActive = false;
 
                     var textDisplay = whiteboard.GetComponent<RecognizedTextDisplay>();
                     if (textDisplay != null) textDisplay.ClearText();

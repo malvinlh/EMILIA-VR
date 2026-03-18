@@ -14272,7 +14272,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 0
+      value: 0.05
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode
@@ -14380,6 +14380,7 @@ MonoBehaviour:
   filterDCutoff: 1
   particleMaterial: {fileID: 2100000, guid: eeb8603d2029eff40abb908f4fceaf0b, type: 2}
   hoverDistance: 1
+  inkSegmentResetDelay: 2.2
 --- !u!114 &3000000018
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14400,6 +14401,7 @@ MonoBehaviour:
   filterDCutoff: 1
   particleMaterial: {fileID: 2100000, guid: eeb8603d2029eff40abb908f4fceaf0b, type: 2}
   hoverDistance: 1
+  inkSegmentResetDelay: 2.2
 --- !u!1001 &3000000019
 PrefabInstance:
   m_ObjectHideFlags: 0
