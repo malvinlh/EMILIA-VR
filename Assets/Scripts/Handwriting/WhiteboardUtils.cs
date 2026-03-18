@@ -31,6 +31,10 @@ public class WhiteboardUtils : MonoBehaviour
 
     private Transform whiteboardTransform;
 
+    // Camera Floor Offset transform — required to convert XRHandJoint session-space
+    // positions to world space when Device tracking mode with CameraYOffset is used.
+    private Transform cameraOffsetTransform;
+
     private const float ADJUSTMENT_DISTANCE = .2f;
     private const int BOARD_LAYER = 10;
     private const float PINCH_THRESHOLD = 0.02f;
@@ -60,6 +64,28 @@ public class WhiteboardUtils : MonoBehaviour
 
         projectionSphereLeft.SetActive(false);
         projectionSphereRight.SetActive(false);
+
+        ResolveCameraOffsetTransform();
+    }
+
+    private void ResolveCameraOffsetTransform()
+    {
+        var xrOrigin = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
+        if (xrOrigin != null && xrOrigin.CameraFloorOffsetObject != null)
+        {
+            cameraOffsetTransform = xrOrigin.CameraFloorOffsetObject.transform;
+            return;
+        }
+        Camera cam = Camera.main;
+        if (cam != null && cam.transform.parent != null)
+            cameraOffsetTransform = cam.transform.parent;
+    }
+
+    private Vector3 JointToWorld(Vector3 sessionPos)
+    {
+        if (cameraOffsetTransform != null)
+            return cameraOffsetTransform.TransformPoint(sessionPos);
+        return sessionPos;
     }
 
     /// <summary>
@@ -85,20 +111,24 @@ public class WhiteboardUtils : MonoBehaviour
 
         if (!leftHand.isTracked || !rightHand.isTracked) return;
 
-        // --- Get required joint poses (right hand) ---
+        // --- Get required joint poses and convert to world space ---
         if (!rightHand.GetJoint(XRHandJointID.ThumbTip).TryGetPose(out Pose rightThumbTipPose)) return;
         if (!rightHand.GetJoint(XRHandJointID.IndexTip).TryGetPose(out Pose rightIndexTipPose)) return;
-
-        // --- Get required joint poses (left hand) ---
         if (!leftHand.GetJoint(XRHandJointID.ThumbTip).TryGetPose(out Pose leftThumbTipPose)) return;
         if (!leftHand.GetJoint(XRHandJointID.IndexTip).TryGetPose(out Pose leftIndexTipPose)) return;
         if (!leftHand.GetJoint(XRHandJointID.MiddleTip).TryGetPose(out Pose leftMiddleTipPose)) return;
 
+        Vector3 rightThumbTip  = JointToWorld(rightThumbTipPose.position);
+        Vector3 rightIndexTip  = JointToWorld(rightIndexTipPose.position);
+        Vector3 leftThumbTip   = JointToWorld(leftThumbTipPose.position);
+        Vector3 leftIndexTip   = JointToWorld(leftIndexTipPose.position);
+        Vector3 leftMiddleTip  = JointToWorld(leftMiddleTipPose.position);
+
         // ---- Left middle-finger pinch → calibration / board creation ----
-        if (IsPinching(leftThumbTipPose.position, leftMiddleTipPose.position))
+        if (IsPinching(leftThumbTip, leftMiddleTip))
         {
             // Point between thumb tip and middle tip
-            Vector3 thumbMiddleMidpoint = (leftThumbTipPose.position + leftMiddleTipPose.position) / 2;
+            Vector3 thumbMiddleMidpoint = (leftThumbTip + leftMiddleTip) / 2;
 
             sizeCalibrationTimer += Time.deltaTime;
 
@@ -150,21 +180,21 @@ public class WhiteboardUtils : MonoBehaviour
         }
 
         // ---- Both hands index-finger pinch → rotate / reposition the board ----
-        bool leftIndexPinch = IsPinching(leftThumbTipPose.position, leftIndexTipPose.position);
-        bool rightIndexPinch = IsPinching(rightThumbTipPose.position, rightIndexTipPose.position);
+        bool leftIndexPinch = IsPinching(leftThumbTip, leftIndexTip);
+        bool rightIndexPinch = IsPinching(rightThumbTip, rightIndexTip);
 
         if (leftIndexPinch && rightIndexPinch)
         {
             projectionSphereLeft.SetActive(true);
             projectionSphereRight.SetActive(true);
 
-            Vector3 leftThumbIndexMidpoint = (leftThumbTipPose.position + leftIndexTipPose.position) / 2;
-            Vector3 rightThumbIndexMidpoint = (rightThumbTipPose.position + rightIndexTipPose.position) / 2;
+            Vector3 leftThumbIndexMidpoint  = (leftThumbTip + leftIndexTip) / 2;
+            Vector3 rightThumbIndexMidpoint = (rightThumbTip + rightIndexTip) / 2;
 
             // Get the index intermediate joint for ray direction
             if (leftHand.GetJoint(XRHandJointID.IndexIntermediate).TryGetPose(out Pose leftIndexIntermPose))
             {
-                Vector3 leftDirection = leftIndexTipPose.position - leftIndexIntermPose.position;
+                Vector3 leftDirection = leftIndexTip - JointToWorld(leftIndexIntermPose.position);
 
                 if (Physics.Raycast(leftThumbIndexMidpoint, leftDirection, out touch, ADJUSTMENT_DISTANCE, 1 << BOARD_LAYER))
                 {
