@@ -75,17 +75,24 @@ public class WhiteboardPen : MonoBehaviour
     // Physical-to-pixel factor: 1 m of finger movement = 1000 ML Kit pixels.
     private const float MLKIT_PX_PER_M = 1000f;
 
-    [Tooltip("Seconds of idle time after which a new logical handwriting segment starts.")]
-    public float inkSegmentResetDelay = 2.2f;
+    [Tooltip("Seconds of idle time after the last stroke before auto-recognition fires.")]
+    public float autoRecognizeDelay = 1.0f;
 
-    private bool hasInkSegmentOrigin;
-    private float lastInkPointTime;
-    // World-space reference frame for the current writing segment.
-    // Using touch.point (world-space) instead of UV coordinates makes ML Kit
-    // recognition independent of the whiteboard's rotation / UV orientation.
-    private Vector3 segmentWorldOrigin;
-    private Vector3 segmentCamRight;
-    private Vector3 segmentCamForward;
+    // ── Buffered strokes for PCA-based rotation ─────────────────────
+    // Strokes are buffered in world-space instead of being sent to ML Kit
+    // in real-time.  When recognition triggers (idle timer), PCA determines
+    // the principal writing direction and all coordinates are rotated so
+    // ML Kit always sees left-to-right text — regardless of the physical
+    // writing orientation on the board.
+    private struct BufferedInkPoint
+    {
+        public Vector3 worldPos;
+        public long timestamp;
+    }
+    private readonly List<List<BufferedInkPoint>> bufferedStrokes = new List<List<BufferedInkPoint>>();
+    private List<BufferedInkPoint> currentStrokeBuffer;
+    private float lastStrokeBufferEndTime;
+    private bool hasBufferedStrokes;
 
     // Cached Camera Floor Offset Object — needed to convert XRHandJoint
     // session-space positions to world space. The XR Origin uses Device
@@ -263,77 +270,20 @@ public class WhiteboardPen : MonoBehaviour
                 whiteboard.SetTouchPosition(smoothedX, smoothedY);
                 whiteboard.ToggleTouch(true);
 
-                // ── Feed stroke to Digital Ink Recognition ────────
-                // Use touch.point (world-space) projected onto the camera's
-                // horizontal axes so that ML Kit always sees characters in
-                // the correct orientation regardless of the board's rotation.
-                if (inkBridge == null) inkBridge = DigitalInkBridge.Instance;
-                if (inkBridge != null && inkBridge.IsModelReady)
+                // ── Buffer stroke for deferred PCA-based recognition ─────
                 {
                     Vector3 worldPoint = touch.point;
-
-                    bool segmentExpired = !hasInkSegmentOrigin ||
-                                          Time.time - lastInkPointTime > inkSegmentResetDelay;
-
-                    // On a new segment, lock the coordinate frame to the
-                    // camera's current horizontal right / forward directions.
-                    if (!strokeActive && segmentExpired)
-                    {
-                        Camera cam = Camera.main;
-                        if (cam != null)
-                        {
-                            segmentCamRight   = cam.transform.right;
-                            segmentCamForward = cam.transform.forward;
-                        }
-                        else
-                        {
-                            segmentCamRight   = Vector3.right;
-                            segmentCamForward = Vector3.forward;
-                        }
-                        // Project onto horizontal plane
-                        segmentCamRight.y   = 0f;
-                        segmentCamForward.y = 0f;
-                        if (segmentCamRight.sqrMagnitude   > 0.001f) segmentCamRight.Normalize();
-                        else segmentCamRight = Vector3.right;
-                        if (segmentCamForward.sqrMagnitude > 0.001f) segmentCamForward.Normalize();
-                        else segmentCamForward = Vector3.forward;
-
-                        segmentWorldOrigin  = worldPoint;
-                        hasInkSegmentOrigin = true;
-                    }
-
-                    // Project world delta onto the locked camera axes.
-                    // Camera right  → ML Kit +X  (rightward)
-                    // Camera forward → ML Kit -Y  ("away from user" = upward stroke)
-                    Vector3 delta = worldPoint - segmentWorldOrigin;
-                    float pxX = MLKIT_AREA_W * 0.5f
-                              + Vector3.Dot(delta, segmentCamRight)   * MLKIT_PX_PER_M;
-                    float pxY = MLKIT_AREA_H * 0.5f
-                              - Vector3.Dot(delta, segmentCamForward) * MLKIT_PX_PER_M;
-
-                    // If a new stroke starts far outside the canvas, recentre.
-                    if (!strokeActive && (pxX < -20f || pxX > MLKIT_AREA_W + 20f ||
-                                          pxY < -20f || pxY > MLKIT_AREA_H + 20f))
-                    {
-                        segmentWorldOrigin = worldPoint;
-                        pxX = MLKIT_AREA_W * 0.5f;
-                        pxY = MLKIT_AREA_H * 0.5f;
-                    }
-
-                    pxX = Mathf.Clamp(pxX, 0f, MLKIT_AREA_W);
-                    pxY = Mathf.Clamp(pxY, 0f, MLKIT_AREA_H);
+                    long ts = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
                     if (!wasTouchingLastFrame)
                     {
-                        inkBridge.SetWritingArea(MLKIT_AREA_W, MLKIT_AREA_H);
-                        inkBridge.BeginStroke(pxX, pxY);
+                        currentStrokeBuffer = new List<BufferedInkPoint>();
+                        currentStrokeBuffer.Add(new BufferedInkPoint { worldPos = worldPoint, timestamp = ts });
                         strokeActive = true;
-                        lastInkPointTime = Time.time;
                     }
-                    else
+                    else if (currentStrokeBuffer != null)
                     {
-                        inkBridge.AddPoint(pxX, pxY);
-                        lastInkPointTime = Time.time;
+                        currentStrokeBuffer.Add(new BufferedInkPoint { worldPos = worldPoint, timestamp = ts });
                     }
                 }
             }
@@ -347,10 +297,16 @@ public class WhiteboardPen : MonoBehaviour
                 whiteboard.ToggleTouch(false);
             }
 
-            // End active stroke for recognition
-            if (strokeActive && inkBridge != null)
+            // End active stroke — finalize in buffer
+            if (strokeActive)
             {
-                inkBridge.EndStroke();
+                if (currentStrokeBuffer != null && currentStrokeBuffer.Count > 0)
+                {
+                    bufferedStrokes.Add(currentStrokeBuffer);
+                    currentStrokeBuffer = null;
+                    hasBufferedStrokes = true;
+                    lastStrokeBufferEndTime = Time.time;
+                }
                 strokeActive = false;
             }
 
@@ -358,10 +314,11 @@ public class WhiteboardPen : MonoBehaviour
             hasMadeContact = false; // reset contact state
             hasSmoothedPosition = false; // reset smoothing for next stroke
 
-            if (!strokeActive && hasInkSegmentOrigin &&
-                Time.time - lastInkPointTime > inkSegmentResetDelay)
+            // Auto-recognize after idle delay
+            if (hasBufferedStrokes && !strokeActive &&
+                Time.time - lastStrokeBufferEndTime >= autoRecognizeDelay)
             {
-                hasInkSegmentOrigin = false;
+                FlushAndRecognize();
             }
 
             // ── Hover detection (pointer cursor, right hand only) ──────
@@ -387,7 +344,9 @@ public class WhiteboardPen : MonoBehaviour
                         inkBridge.ClearPreContext();
                     }
 
-                    hasInkSegmentOrigin = false;
+                    bufferedStrokes.Clear();
+                    currentStrokeBuffer = null;
+                    hasBufferedStrokes = false;
                     strokeActive = false;
 
                     var textDisplay = whiteboard.GetComponent<RecognizedTextDisplay>();
@@ -524,6 +483,131 @@ public class WhiteboardPen : MonoBehaviour
         if (touchParticles != null && touchParticles.isPlaying)
         {
             touchParticles.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        }
+    }
+
+    // ==================================================================
+    // PCA-BASED RECOGNITION FLUSH
+    // ==================================================================
+
+    /// <summary>
+    /// Compute PCA on all buffered strokes to find the writing direction,
+    /// rotate coordinates so ML Kit sees left-to-right text, send all
+    /// strokes to the bridge, and trigger recognition.
+    /// </summary>
+    private void FlushAndRecognize()
+    {
+        if (inkBridge == null) inkBridge = DigitalInkBridge.Instance;
+        if (inkBridge == null || !inkBridge.IsModelReady)
+        {
+            bufferedStrokes.Clear();
+            hasBufferedStrokes = false;
+            return;
+        }
+
+        // Wait if a previous recognition is still in progress
+        if (inkBridge.IsRecognizing) return;
+
+        // Collect all world-space points
+        var allPoints = new List<Vector3>();
+        foreach (var stroke in bufferedStrokes)
+            foreach (var pt in stroke)
+                allPoints.Add(pt.worldPos);
+
+        if (allPoints.Count < 2)
+        {
+            bufferedStrokes.Clear();
+            hasBufferedStrokes = false;
+            return;
+        }
+
+        // Compute writing direction via PCA on the XZ plane
+        ComputeWritingDirection(allPoints, out Vector3 right, out Vector3 forward);
+
+        // Use centroid as projection origin
+        Vector3 centroid = Vector3.zero;
+        foreach (var p in allPoints) centroid += p;
+        centroid /= allPoints.Count;
+
+        // Clear any leftover ink and send rotated strokes
+        inkBridge.ClearInk();
+        inkBridge.SetWritingArea(MLKIT_AREA_W, MLKIT_AREA_H);
+
+        foreach (var stroke in bufferedStrokes)
+        {
+            if (stroke.Count == 0) continue;
+
+            for (int i = 0; i < stroke.Count; i++)
+            {
+                Vector3 delta = stroke[i].worldPos - centroid;
+                float pxX = MLKIT_AREA_W * 0.5f + Vector3.Dot(delta, right)   * MLKIT_PX_PER_M;
+                float pxY = MLKIT_AREA_H * 0.5f - Vector3.Dot(delta, forward) * MLKIT_PX_PER_M;
+                pxX = Mathf.Clamp(pxX, 0f, MLKIT_AREA_W);
+                pxY = Mathf.Clamp(pxY, 0f, MLKIT_AREA_H);
+
+                if (i == 0)
+                    inkBridge.BeginStroke(pxX, pxY, stroke[i].timestamp);
+                else
+                    inkBridge.AddPoint(pxX, pxY, stroke[i].timestamp);
+            }
+            inkBridge.EndStroke();
+        }
+
+        inkBridge.Recognize();
+
+        bufferedStrokes.Clear();
+        hasBufferedStrokes = false;
+    }
+
+    /// <summary>
+    /// Determines the writing direction from world-space points using PCA
+    /// on the XZ plane (horizontal table surface).
+    /// Returns 'right' (writing direction) and 'forward' (perpendicular,
+    /// pointing away from user — maps to ML Kit's upward / -Y direction).
+    /// </summary>
+    private void ComputeWritingDirection(List<Vector3> points, out Vector3 right, out Vector3 forward)
+    {
+        // ── Project to XZ plane and compute 2D covariance ────────
+        float meanX = 0f, meanZ = 0f;
+        foreach (var p in points) { meanX += p.x; meanZ += p.z; }
+        meanX /= points.Count;
+        meanZ /= points.Count;
+
+        float covXX = 0f, covXZ = 0f, covZZ = 0f;
+        foreach (var p in points)
+        {
+            float dx = p.x - meanX;
+            float dz = p.z - meanZ;
+            covXX += dx * dx;
+            covXZ += dx * dz;
+            covZZ += dz * dz;
+        }
+
+        // ── Principal eigenvector of 2×2 covariance matrix ───────
+        float theta = 0.5f * Mathf.Atan2(2f * covXZ, covXX - covZZ);
+        right   = new Vector3(Mathf.Cos(theta), 0f, Mathf.Sin(theta));
+        forward = new Vector3(-right.z, 0f, right.x);
+
+        // ── Disambiguate 'right' using temporal flow ─────────────
+        // For left-to-right writing the last point should project
+        // farther along the 'right' axis than the first point.
+        if (Vector3.Dot(points[points.Count - 1] - points[0], right) < 0f)
+            right = -right;
+
+        // ── Disambiguate 'forward' using camera direction ────────
+        // 'forward' should point away from the user so that
+        // "up on paper" maps to ML Kit's negative-Y (top of canvas).
+        Camera cam = Camera.main;
+        if (cam != null)
+        {
+            Vector3 camFwd = cam.transform.forward;
+            camFwd.y = 0f;
+            if (camFwd.sqrMagnitude > 0.001f)
+            {
+                camFwd.Normalize();
+                if (Vector3.Dot(forward, camFwd) < 0f)
+                    forward = -forward;
+            }
         }
     }
 

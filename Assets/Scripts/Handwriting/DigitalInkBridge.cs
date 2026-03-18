@@ -30,7 +30,7 @@ public class DigitalInkBridge : MonoBehaviour
     public string languageTag = "en-US";
 
     [Tooltip("Seconds of inactivity (no new strokes) before auto-recognize fires.")]
-    [Range(0.5f, 10f)]
+    [Range(0f, 10f)]
     public float autoRecognizeDelay = 2.0f;
 
     // ── Events ───────────────────────────────────────────────────────
@@ -45,6 +45,8 @@ public class DigitalInkBridge : MonoBehaviour
 
     // ── Runtime state ────────────────────────────────────────────────
     public bool IsModelReady { get; private set; }
+    /// <summary>True while waiting for a recognition result.</summary>
+    public bool IsRecognizing => waitingForResult;
 
     private AndroidJavaObject plugin;
     private bool waitingForResult;
@@ -154,18 +156,18 @@ public class DigitalInkBridge : MonoBehaviour
     // ==================================================================
 
     /// <summary>Start a new stroke (finger touches the board).</summary>
-    public void BeginStroke(float x, float y)
+    public void BeginStroke(float x, float y, long timestamp = -1)
     {
         if (plugin == null || !IsModelReady) return;
-        long ts = CurrentMillis();
+        long ts = timestamp >= 0 ? timestamp : CurrentMillis();
         plugin.Call("beginStroke", x, y, ts);
     }
 
     /// <summary>Append a point to the current stroke (each frame while touching).</summary>
-    public void AddPoint(float x, float y)
+    public void AddPoint(float x, float y, long timestamp = -1)
     {
         if (plugin == null || !IsModelReady) return;
-        long ts = CurrentMillis();
+        long ts = timestamp >= 0 ? timestamp : CurrentMillis();
         plugin.Call("addPoint", x, y, ts);
     }
 
