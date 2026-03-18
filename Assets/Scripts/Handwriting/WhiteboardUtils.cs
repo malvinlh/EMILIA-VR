@@ -118,19 +118,20 @@ public class WhiteboardUtils : MonoBehaviour
                 {
                     sizeCalibrationInitialPoint = thumbMiddleMidpoint;
                     whiteboard = Instantiate(WhiteboardPrefab, sizeCalibrationInitialPoint, Quaternion.identity);
+                    OnWhiteboardSpawned?.Invoke(whiteboard);
                 }
 
                 float vertDiff = sizeCalibrationInitialPoint.y - thumbMiddleMidpoint.y;
                 float horizDiff = Mathf.Sqrt(
-                    Mathf.Pow((sizeCalibrationInitialPoint.x - thumbMiddleMidpoint.x), 2) +
-                    Mathf.Pow((sizeCalibrationInitialPoint.z - thumbMiddleMidpoint.z), 2));
+                    Mathf.Pow(sizeCalibrationInitialPoint.x - thumbMiddleMidpoint.x, 2) +
+                    Mathf.Pow(sizeCalibrationInitialPoint.z - thumbMiddleMidpoint.z, 2));
 
                 whiteboard.transform.localScale = new Vector3(horizDiff, .1f, Mathf.Abs(vertDiff)) / 10f;
 
                 Vector3 normalVec = GetNormalVector(sizeCalibrationInitialPoint, sizeCalibrationInitialPoint + Vector3.down, thumbMiddleMidpoint);
 
                 whiteboard.transform.LookAt(whiteboard.transform.position + normalVec);
-                whiteboard.transform.Rotate(new Vector3(90, 0, 0), Space.Self);
+                // No X-axis rotation → plane stays horizontal (face up)
 
                 whiteboard.transform.position = (sizeCalibrationInitialPoint + thumbMiddleMidpoint) / 2;
 
