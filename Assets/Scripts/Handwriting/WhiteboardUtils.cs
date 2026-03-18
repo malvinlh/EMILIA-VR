@@ -17,14 +17,7 @@ public class WhiteboardUtils : MonoBehaviour
 
     private GameObject whiteboard;
 
-    private bool isCalibrating = false;
-
     private RaycastHit touch;
-
-    private float sizeCalibrationTimer;
-    private GameObject calibrationIndicator;
-
-    private Vector3 sizeCalibrationInitialPoint;
 
     private GameObject projectionSphereLeft;
     private GameObject projectionSphereRight;
@@ -35,18 +28,11 @@ public class WhiteboardUtils : MonoBehaviour
     // positions to world space when Device tracking mode with CameraYOffset is used.
     private Transform cameraOffsetTransform;
 
+    [SerializeField] private Transform whiteboardPlaceholder;
+
     private const float ADJUSTMENT_DISTANCE = .2f;
     private const int BOARD_LAYER = 10;
     private const float PINCH_THRESHOLD = 0.02f;
-
-    private Vector3 MIN_SIZE = new Vector3(.01f, .01f, .01f);
-    private Vector3 MAX_SIZE = new Vector3(.05f, .05f, .05f);
-
-    private Color MIN_COLOR = Color.red;
-    private Color MAX_COLOR = Color.green;
-
-    // Need to hold middle pinch for 2 seconds to start creating a new board
-    private const float CALIBRATION_TIME = 2f;
 
     /// <summary>
     /// Gets the normal vector of a plane defined by three points.
@@ -66,6 +52,7 @@ public class WhiteboardUtils : MonoBehaviour
         projectionSphereRight.SetActive(false);
 
         ResolveCameraOffsetTransform();
+        SpawnAtPlaceholder();
     }
 
     private void ResolveCameraOffsetTransform()
@@ -86,6 +73,35 @@ public class WhiteboardUtils : MonoBehaviour
         if (cameraOffsetTransform != null)
             return cameraOffsetTransform.TransformPoint(sessionPos);
         return sessionPos;
+    }
+
+    private void SpawnAtPlaceholder()
+    {
+        if (whiteboardPlaceholder == null)
+            whiteboardPlaceholder = GameObject.Find("JournalChairTable/JournalTable/WhiteboardPlaceholder")?.transform;
+
+        if (whiteboardPlaceholder == null)
+        {
+            Debug.LogWarning("[WhiteboardUtils] WhiteboardPlaceholder not found — whiteboard not spawned.");
+            return;
+        }
+
+        BoxCollider box = whiteboardPlaceholder.GetComponent<BoxCollider>();
+        Vector2 size;
+        Vector3 center;
+        if (box != null)
+        {
+            size   = new Vector2(box.bounds.size.x, box.bounds.size.z);
+            center = box.bounds.center;
+        }
+        else
+        {
+            Debug.LogWarning("[WhiteboardUtils] WhiteboardPlaceholder has no BoxCollider — falling back to lossyScale.");
+            size   = new Vector2(whiteboardPlaceholder.lossyScale.x, whiteboardPlaceholder.lossyScale.z);
+            center = whiteboardPlaceholder.position;
+        }
+
+        SpawnAligned(center, whiteboardPlaceholder.rotation, size);
     }
 
     /// <summary>
@@ -116,68 +132,10 @@ public class WhiteboardUtils : MonoBehaviour
         if (!rightHand.GetJoint(XRHandJointID.IndexTip).TryGetPose(out Pose rightIndexTipPose)) return;
         if (!leftHand.GetJoint(XRHandJointID.ThumbTip).TryGetPose(out Pose leftThumbTipPose)) return;
         if (!leftHand.GetJoint(XRHandJointID.IndexTip).TryGetPose(out Pose leftIndexTipPose)) return;
-        if (!leftHand.GetJoint(XRHandJointID.MiddleTip).TryGetPose(out Pose leftMiddleTipPose)) return;
-
         Vector3 rightThumbTip  = JointToWorld(rightThumbTipPose.position);
         Vector3 rightIndexTip  = JointToWorld(rightIndexTipPose.position);
         Vector3 leftThumbTip   = JointToWorld(leftThumbTipPose.position);
         Vector3 leftIndexTip   = JointToWorld(leftIndexTipPose.position);
-        Vector3 leftMiddleTip  = JointToWorld(leftMiddleTipPose.position);
-
-        // ---- Left middle-finger pinch → calibration / board creation ----
-        if (IsPinching(leftThumbTip, leftMiddleTip))
-        {
-            // Point between thumb tip and middle tip
-            Vector3 thumbMiddleMidpoint = (leftThumbTip + leftMiddleTip) / 2;
-
-            sizeCalibrationTimer += Time.deltaTime;
-
-            if (calibrationIndicator == null)
-            {
-                calibrationIndicator = Instantiate(SpherePrefab, thumbMiddleMidpoint, Quaternion.identity);
-            }
-            else
-            {
-                calibrationIndicator.transform.localScale = Vector3.Lerp(MIN_SIZE, MAX_SIZE, sizeCalibrationTimer / CALIBRATION_TIME);
-                calibrationIndicator.GetComponent<Renderer>().material.color = Color.Lerp(MIN_COLOR, MAX_COLOR, sizeCalibrationTimer / CALIBRATION_TIME);
-            }
-
-            if (sizeCalibrationTimer >= CALIBRATION_TIME)
-            {
-                if (!isCalibrating)
-                {
-                    sizeCalibrationInitialPoint = thumbMiddleMidpoint;
-                    whiteboard = Instantiate(WhiteboardPrefab, sizeCalibrationInitialPoint, Quaternion.identity);
-                    OnWhiteboardSpawned?.Invoke(whiteboard);
-                }
-
-                float vertDiff = sizeCalibrationInitialPoint.y - thumbMiddleMidpoint.y;
-                float horizDiff = Mathf.Sqrt(
-                    Mathf.Pow(sizeCalibrationInitialPoint.x - thumbMiddleMidpoint.x, 2) +
-                    Mathf.Pow(sizeCalibrationInitialPoint.z - thumbMiddleMidpoint.z, 2));
-
-                whiteboard.transform.localScale = new Vector3(horizDiff, .1f, Mathf.Abs(vertDiff)) / 10f;
-
-                Vector3 normalVec = GetNormalVector(sizeCalibrationInitialPoint, sizeCalibrationInitialPoint + Vector3.down, thumbMiddleMidpoint);
-
-                whiteboard.transform.LookAt(whiteboard.transform.position + normalVec);
-                // No X-axis rotation → plane stays horizontal (face up)
-
-                whiteboard.transform.position = (sizeCalibrationInitialPoint + thumbMiddleMidpoint) / 2;
-
-                whiteboard.GetComponent<Whiteboard>().Initialize();
-
-                isCalibrating = true;
-            }
-        }
-        else
-        {
-            sizeCalibrationInitialPoint = Vector3.zero;
-            sizeCalibrationTimer = 0;
-            isCalibrating = false;
-            Destroy(calibrationIndicator);
-            calibrationIndicator = null;
-        }
 
         // ---- Both hands index-finger pinch → rotate / reposition the board ----
         bool leftIndexPinch = IsPinching(leftThumbTip, leftIndexTip);
