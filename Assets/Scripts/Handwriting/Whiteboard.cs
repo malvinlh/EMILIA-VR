@@ -253,6 +253,20 @@ public class Whiteboard : MonoBehaviour
     }
 
     /// <summary>
+    /// Clear the whiteboard back to its background colour (preserving the texture).
+    /// Used by ScribbleManager after recognition to wipe handwriting ink.
+    /// </summary>
+    public void ClearToBackground()
+    {
+        if (texture == null) return;
+        Color[] fill = new Color[texturesSizeHorizontal * texturesSizeVertical];
+        for (int i = 0; i < fill.Length; i++)
+            fill[i] = backgroundColor;
+        texture.SetPixels(fill);
+        texture.Apply();
+    }
+
+    /// <summary>
     /// Returns the current whiteboard texture (for VLM image capture).
     /// </summary>
     public Texture2D GetTexture() => texture;

@@ -32,6 +32,9 @@ public class WhiteboardPen : MonoBehaviour
     private const int WHITEBOARD_LAYER = 10;
     private const float PINCH_THRESHOLD = 0.02f;
 
+    // ── Pinky-pinch clear (edge detection) ────────────────────────────
+    private bool pinkyPinchActive;
+
     // Extra depth allowed AFTER contact (meters)
     [Tooltip("Extra depth allowed after the finger has contacted the board.")]
     public float touchTolerance = 0.015f;
@@ -93,6 +96,25 @@ public class WhiteboardPen : MonoBehaviour
     private List<BufferedInkPoint> currentStrokeBuffer;
     private float lastStrokeBufferEndTime;
     private bool hasBufferedStrokes;
+
+    // ── Scribble integration ────────────────────────────────────────
+    /// <summary>Metadata about the strokes that were just flushed for recognition.</summary>
+    public struct StrokeMetadata
+    {
+        public Vector3 center;
+        public Bounds bounds;
+        public Vector3 right;
+        public Vector3 forward;
+    }
+
+    /// <summary>Fired after strokes are flushed for recognition (before buffer is cleared).</summary>
+    public event System.Action<StrokeMetadata> OnStrokesFlushed;
+
+    /// <summary>Fired when the board is cleared via pinky-pinch.</summary>
+    public event System.Action OnBoardCleared;
+
+    /// <summary>World-space touch point while drawing, null when not touching.</summary>
+    public Vector3? CurrentTouchWorldPoint { get; private set; }
 
     // Cached Camera Floor Offset Object — needed to convert XRHandJoint
     // session-space positions to world space. The XR Origin uses Device
@@ -270,6 +292,8 @@ public class WhiteboardPen : MonoBehaviour
                 whiteboard.SetTouchPosition(smoothedX, smoothedY);
                 whiteboard.ToggleTouch(true);
 
+                CurrentTouchWorldPoint = touch.point;
+
                 // ── Buffer stroke for deferred PCA-based recognition ─────
                 {
                     Vector3 worldPoint = touch.point;
@@ -296,6 +320,8 @@ public class WhiteboardPen : MonoBehaviour
             {
                 whiteboard.ToggleTouch(false);
             }
+
+            CurrentTouchWorldPoint = null;
 
             // End active stroke — finalize in buffer
             if (strokeActive)
@@ -327,11 +353,15 @@ public class WhiteboardPen : MonoBehaviour
 
         wasTouchingLastFrame = hitBoard;
 
-        // Pinky pinch → clear board
+        // Pinky pinch → clear board (edge-detected: fires once per pinch)
         if (littleTipJoint.TryGetPose(out Pose littleTipPose))
         {
-            if (IsPinching(thumbTipPose.position, littleTipPose.position))
+            bool pinkyPinching = IsPinching(thumbTipPose.position, littleTipPose.position);
+
+            if (pinkyPinching && !pinkyPinchActive)
             {
+                pinkyPinchActive = true;
+
                 if (whiteboard != null)
                 {
                     // whiteboard.Initialize();
@@ -349,9 +379,15 @@ public class WhiteboardPen : MonoBehaviour
                     hasBufferedStrokes = false;
                     strokeActive = false;
 
+                    OnBoardCleared?.Invoke();
+
                     var textDisplay = whiteboard.GetComponent<RecognizedTextDisplay>();
                     if (textDisplay != null) textDisplay.ClearText();
                 }
+            }
+            else if (!pinkyPinching)
+            {
+                pinkyPinchActive = false;
             }
         }
     }
@@ -555,6 +591,21 @@ public class WhiteboardPen : MonoBehaviour
 
         inkBridge.Recognize();
 
+        // Notify ScribbleManager with stroke metadata before clearing
+        if (OnStrokesFlushed != null)
+        {
+            Bounds strokeBounds = new Bounds(centroid, Vector3.zero);
+            foreach (var p in allPoints) strokeBounds.Encapsulate(p);
+
+            OnStrokesFlushed.Invoke(new StrokeMetadata
+            {
+                center  = centroid,
+                bounds  = strokeBounds,
+                right   = right,
+                forward = forward
+            });
+        }
+
         bufferedStrokes.Clear();
         hasBufferedStrokes = false;
     }
@@ -609,6 +660,20 @@ public class WhiteboardPen : MonoBehaviour
                     forward = -forward;
             }
         }
+    }
+
+    // ==================================================================
+    // SCRIBBLE API
+    // ==================================================================
+
+    /// <summary>Clear buffered strokes without triggering recognition (used by ScribbleManager after scratch-to-delete).</summary>
+    public void ClearStrokeBuffer()
+    {
+        bufferedStrokes.Clear();
+        currentStrokeBuffer = null;
+        hasBufferedStrokes = false;
+        strokeActive = false;
+        if (inkBridge != null) inkBridge.ClearInk();
     }
 
     // ==================================================================

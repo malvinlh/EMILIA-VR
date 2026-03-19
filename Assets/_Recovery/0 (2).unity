@@ -2813,6 +2813,61 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 262d1562b31badd4389ea90daefd1628, type: 3}
+--- !u!1 &1115958157
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1115958159}
+  - component: {fileID: 1115958158}
+  m_Layer: 0
+  m_Name: ScribbleManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1115958158
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1115958157}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ScribbleManager
+  textHeightOffset: 0.002
+  textScale: 0.004
+  fontSize: 36
+  textColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
+  fontAsset: {fileID: 0}
+  wordSpacing: 0.008
+  boardMargin: 0.015
+  minScratchReversals: 4
+  minReversalDisplacement: 0.005
+  maxScratchExtent: 0.15
+  maxUndoSteps: 30
+--- !u!4 &1115958159
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1115958157}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1117264456
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14606,7 +14661,7 @@ GameObject:
   - component: {fileID: 3000000030}
   - component: {fileID: 3000000029}
   m_Layer: 5
-  m_Name: RecognizedTextDisplay
+  m_Name: RecognizedText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -14852,3 +14907,4 @@ SceneRoots:
   - {fileID: 3000000022}
   - {fileID: 3000000032}
   - {fileID: 1261414440}
+  - {fileID: 1115958159}
