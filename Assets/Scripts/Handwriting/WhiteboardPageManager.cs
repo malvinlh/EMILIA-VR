@@ -1,0 +1,399 @@
+using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
+
+/// <summary>
+/// Owns the whiteboard UI canvas (ResultText, PrevArrow, NextArrow) and
+/// audio for page turns.  Canvas *positioning* and *sizing* are driven
+/// by ScribbleManager.Initialize() so the axes always match the
+/// handwriting-text orientation.  This component just exposes references
+/// and handles button events / result-text updates.
+///
+/// Setup in Inspector:
+///   uiCanvas   → the WorldSpace Canvas that holds ResultText and arrow buttons
+///   resultText → the TMP_Text child that shows accumulated page text
+///   prevButton → PreviousArrow Button
+///   nextButton → NextArrow Button
+///   pageTurnSfx → page-turn audio clip (Assets/Sounds/SFX/PageTurning/…)
+/// </summary>
+[DefaultExecutionOrder(100)]
+public class WhiteboardPageManager : MonoBehaviour
+{
+    // ── Serialized references ──────────────────────────────────────────
+    [Header("Whiteboard UI")]
+    [Tooltip("The WorldSpace Canvas that holds all whiteboard UI.")]
+    public Canvas uiCanvas;
+
+    [Tooltip("TMP label showing the accumulated text for the current page.")]
+    public TMP_Text resultText;
+
+    [Tooltip("Previous-page arrow button.")]
+    public Button prevButton;
+
+    [Tooltip("Next-page arrow button.")]
+    public Button nextButton;
+
+    [Header("Audio")]
+    [Tooltip("Played once each time the user flips a page.")]
+    public AudioClip pageTurnSfx;
+
+    [Header("Editor Preview")]
+    [Tooltip("The Whiteboard this UI overlays. Required for editor layout preview.")]
+    public Whiteboard whiteboard;
+
+    [Tooltip("Match boardMargin in ScribbleManager for an accurate text-area overlay.")]
+    public float previewBoardMargin = 0.015f;
+
+    [Tooltip("Match buttonAreaReserve in ScribbleManager for an accurate preview.")]
+    public float previewButtonAreaReserve = 0.14f;
+
+    // ── Canvas pixel density (must match ScribbleManager usage) ───────
+    /// <summary>Canvas pixels per metre.  1 px = 1 mm at PPU = 1000.</summary>
+    public const float PPU = 1000f;
+
+    // ── Properties ─────────────────────────────────────────────────────
+    public static WhiteboardPageManager Instance { get; private set; }
+
+    /// <summary>The RectTransform of the UI canvas — ScribbleManager uses
+    /// this to size/position the canvas and to measure canvas-local coords.</summary>
+    public RectTransform CanvasRect =>
+        uiCanvas != null ? (RectTransform)uiCanvas.transform : null;
+
+    // ── Preview state (written by PreviewLayout, read by editor script) ──
+    /// <summary>True once PreviewLayout() has run successfully at least once.</summary>
+    [HideInInspector] public bool    previewHasData;
+    [HideInInspector] public Vector3 previewCanvasPos;
+    [HideInInspector] public Vector3 previewTextRight;
+    [HideInInspector] public Vector3 previewTextForward;
+    [HideInInspector] public float   previewPhysW;
+    [HideInInspector] public float   previewPhysH;
+
+    // ── Private ────────────────────────────────────────────────────────
+    private AudioSource audioSource;
+    private const string TAG = "[WhiteboardPageManager]";
+
+    // ==================================================================
+    // EDITOR PREVIEW
+    // ==================================================================
+
+    /// <summary>
+    /// Context-menu entry: preview using the last active Scene View camera
+    /// (falls back to Camera.main at runtime).
+    /// </summary>
+    [ContextMenu("Preview Layout")]
+    public void PreviewLayout()
+    {
+        Camera cam = Camera.main;
+#if UNITY_EDITOR
+        var sv = UnityEditor.SceneView.lastActiveSceneView;
+        if (sv != null) cam = sv.camera;
+#endif
+        PreviewLayout(cam);
+    }
+
+    /// <summary>
+    /// Replicates ScribbleManager's orientation logic for the given camera,
+    /// positions the canvas on the whiteboard surface, and stores layout
+    /// data in the preview fields so the editor script can draw overlays.
+    ///
+    /// Safe to call in both Edit mode and Play mode.
+    /// </summary>
+    public void PreviewLayout(Camera cam)
+    {
+        if (uiCanvas == null)
+        {
+            Debug.LogWarning($"{TAG} PreviewLayout: uiCanvas not assigned.");
+            return;
+        }
+        if (whiteboard == null)
+        {
+            Debug.LogWarning($"{TAG} PreviewLayout: whiteboard not assigned.");
+            return;
+        }
+
+        // ── Replicate ScribbleManager.LockTextOrientation() ──────────
+        Transform boardT     = whiteboard.transform;
+        Vector3   boardNormal = boardT.up.normalized;
+
+        if (cam != null)
+        {
+            Vector3 toCam = (cam.transform.position - boardT.position).normalized;
+            if (Vector3.Dot(boardNormal, toCam) < 0f) boardNormal = -boardNormal;
+        }
+
+        Vector3 boardRight = boardT.right.normalized;
+        Vector3 boardFwd   = boardT.forward.normalized;
+
+        Vector3 camRight = (cam != null) ? cam.transform.right : Vector3.right;
+        camRight = Vector3.ProjectOnPlane(camRight, boardNormal);
+        if (camRight.sqrMagnitude > 0.001f) camRight.Normalize();
+        else                                camRight = Vector3.right;
+
+        float dotR = Vector3.Dot(boardRight, camRight);
+        float dotF = Vector3.Dot(boardFwd,   camRight);
+
+        Vector3 textRight, textForward;
+        if (Mathf.Abs(dotR) >= Mathf.Abs(dotF))
+        {
+            textRight   = dotR >= 0f ? boardRight : -boardRight;
+            textForward = Vector3.Cross(boardNormal, textRight).normalized;
+        }
+        else
+        {
+            textRight   = dotF >= 0f ? boardFwd : -boardFwd;
+            textForward = Vector3.Cross(boardNormal, textRight).normalized;
+        }
+
+        if (cam != null)
+        {
+            Vector3 camFwd = cam.transform.forward;
+            camFwd = Vector3.ProjectOnPlane(camFwd, boardNormal);
+            if (camFwd.sqrMagnitude > 0.001f && Vector3.Dot(textForward, camFwd) < 0f)
+                textForward = -textForward;
+        }
+
+        Vector3    canvasForward = Vector3.Cross(textRight, textForward);
+        Quaternion canvasRot     = Quaternion.LookRotation(canvasForward, textForward);
+
+        float   physW     = boardT.lossyScale.x * 10f;
+        float   physH     = boardT.lossyScale.z * 10f;
+        Vector3 canvasPos = boardT.position + boardNormal * 0.003f;
+
+        // ── Store for editor overlay ──────────────────────────────────
+        previewHasData     = true;
+        previewCanvasPos   = canvasPos;
+        previewTextRight   = textRight;
+        previewTextForward = textForward;
+        previewPhysW       = physW;
+        previewPhysH       = physH;
+
+        // ── Apply canvas transform ─────────────────────────────────────
+        PositionCanvas(canvasPos, canvasRot, physW, physH);
+
+        // ── Show sample text so the text area is visible in edit mode ─
+        if (resultText != null)
+            resultText.text = "Sample preview text\nLine 2 of text\nLine 3 of text";
+
+        // ── Remove 'Button' text labels from arrow buttons ─────────────
+#if UNITY_EDITOR
+        EditorCleanButtonLabel(prevButton);
+        EditorCleanButtonLabel(nextButton);
+#endif
+
+        Debug.Log($"{TAG} PreviewLayout — physW={physW * 100f:F1} cm, " +
+                  $"physH={physH * 100f:F1} cm, " +
+                  $"canvas {physW * PPU:F0}×{physH * PPU:F0} px, " +
+                  $"textRight={textRight}, textForward={textForward}.");
+    }
+
+    // ==================================================================
+    // LIFECYCLE
+    // ==================================================================
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(this); return; }
+        Instance = this;
+    }
+
+    private void Start()
+    {
+        // Audio source (3-D so the sound comes from the whiteboard)
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake  = false;
+            audioSource.spatialBlend = 1f;
+            audioSource.rolloffMode  = AudioRolloffMode.Linear;
+            audioSource.maxDistance  = 3f;
+        }
+
+        // Wire buttons → ScribbleManager (which manages page logic)
+        if (prevButton != null)
+            prevButton.onClick.AddListener(OnPrevClicked);
+        if (nextButton != null)
+            nextButton.onClick.AddListener(OnNextClicked);
+
+        // Remove the auto-generated "Button" text label from arrow buttons
+        CleanButtonLabel(prevButton);
+        CleanButtonLabel(nextButton);
+
+        // Start hidden; ScribbleManager calls UpdateUI() once initialized.
+        SetButtonVisibility(false, false);
+
+        Debug.Log($"{TAG} Ready. Canvas will be positioned by ScribbleManager.");
+    }
+
+    private void OnDestroy()
+    {
+        if (prevButton != null) prevButton.onClick.RemoveListener(OnPrevClicked);
+        if (nextButton != null) nextButton.onClick.RemoveListener(OnNextClicked);
+        if (Instance == this) Instance = null;
+    }
+
+    // ── Button label cleanup ───────────────────────────────────────────
+
+    /// <summary>Destroys any TMP / legacy Text children of <paramref name="btn"/> at runtime.</summary>
+    private static void CleanButtonLabel(Button btn)
+    {
+        if (btn == null) return;
+        foreach (var t in btn.GetComponentsInChildren<TMP_Text>(true))
+            Destroy(t.gameObject);
+        foreach (var t in btn.GetComponentsInChildren<Text>(true))
+            Destroy(t.gameObject);
+    }
+
+#if UNITY_EDITOR
+    /// <summary>Editor-mode variant using DestroyImmediate.</summary>
+    private static void EditorCleanButtonLabel(Button btn)
+    {
+        if (btn == null) return;
+        foreach (var t in btn.GetComponentsInChildren<TMP_Text>(true))
+            DestroyImmediate(t.gameObject);
+        foreach (var t in btn.GetComponentsInChildren<Text>(true))
+            DestroyImmediate(t.gameObject);
+    }
+#endif
+
+    // ==================================================================
+    // CANVAS SETUP  (called once by ScribbleManager.Initialize)
+    // ==================================================================
+
+    /// <summary>
+    /// Detaches the canvas from whatever parent it has in the scene
+    /// (e.g. JournalTable with a huge non-uniform scale) and places it
+    /// flat on the whiteboard surface using the text orientation axes
+    /// computed by ScribbleManager.
+    ///
+    /// <paramref name="canvasPos"/>   world-space centre of the canvas
+    /// <paramref name="canvasRot"/>   rotation so canvas face points UP
+    /// <paramref name="physW"/>       board width  in metres (canvas +X direction)
+    /// <paramref name="physH"/>       board height in metres (canvas +Y direction)
+    /// </summary>
+    public void PositionCanvas(Vector3 canvasPos, Quaternion canvasRot,
+                               float physW, float physH)
+    {
+        if (uiCanvas == null)
+        {
+            Debug.LogWarning($"{TAG} uiCanvas not assigned — skipping canvas setup.");
+            return;
+        }
+
+        var rt = (RectTransform)uiCanvas.transform;
+
+        // Detach from parent so our world-space assignment is not distorted
+        // by the parent's non-uniform scale (e.g. JournalTable).
+        rt.SetParent(null, worldPositionStays: false);
+
+        rt.position   = canvasPos;
+        rt.rotation   = canvasRot;
+        rt.localScale = Vector3.one * (1f / PPU);   // 1 px = 1 mm
+        rt.sizeDelta  = new Vector2(physW * PPU, physH * PPU);
+        rt.pivot      = new Vector2(0.5f, 0.5f);
+
+        uiCanvas.renderMode = RenderMode.WorldSpace;
+
+        // Layout children inside the newly-sized canvas
+        LayoutChildren(physW * PPU, physH * PPU);
+
+        Debug.Log($"{TAG} Canvas positioned at {canvasPos}, " +
+                  $"size=({physW * PPU:F0}×{physH * PPU:F0} px), scale=1/{PPU:F0}.");
+    }
+
+    /// <summary>
+    /// Positions ResultText and arrow buttons within the canvas.
+    /// Call this whenever the canvas size changes.
+    /// </summary>
+    public void LayoutChildren(float canvasW, float canvasH)
+    {
+        const float btnSize    = 50f;   // button square size in canvas pixels
+        const float btnPadding = 10f;   // gap from canvas bottom edge
+
+        float btnCentreY = -canvasH * 0.5f + btnPadding + btnSize * 0.5f;
+
+        if (prevButton != null)
+        {
+            var rt = (RectTransform)prevButton.transform;
+            rt.anchorMin        = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot            = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta        = new Vector2(btnSize, btnSize);
+            rt.anchoredPosition = new Vector2(-canvasW * 0.25f, btnCentreY);
+            rt.localRotation    = Quaternion.identity; // flat in canvas plane
+        }
+
+        if (nextButton != null)
+        {
+            var rt = (RectTransform)nextButton.transform;
+            rt.anchorMin        = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot            = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta        = new Vector2(btnSize, btnSize);
+            rt.anchoredPosition = new Vector2(canvasW * 0.25f, btnCentreY);
+            rt.localRotation    = Quaternion.identity;
+        }
+
+        if (resultText != null)
+        {
+            var rt = (RectTransform)resultText.transform;
+            float bottomReserve = btnPadding * 2f + btnSize;  // space for buttons
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = new Vector2(20f, bottomReserve);   // left, bottom
+            rt.offsetMax = new Vector2(-20f, -20f);           // right, top
+            rt.localRotation = Quaternion.identity;
+
+            // Prevent text from rendering outside the RectTransform bounds.
+            // Word wrapping handles normal line breaks; Truncate clips anything
+            // that still exceeds the box (e.g. single oversized words).
+            resultText.enableWordWrapping = true;
+            resultText.overflowMode       = TMPro.TextOverflowModes.Truncate;
+        }
+
+        Debug.Log($"{TAG} Children laid out: canvas {canvasW:F0}×{canvasH:F0} px.");
+    }
+
+    // ==================================================================
+    // BUTTON EVENTS
+    // ==================================================================
+
+    private void OnPrevClicked()
+    {
+        PlayPageTurn();
+        ScribbleManager.Instance?.GoToPrevPage();
+    }
+
+    private void OnNextClicked()
+    {
+        PlayPageTurn();
+        ScribbleManager.Instance?.GoToNextPage();
+    }
+
+    private void PlayPageTurn()
+    {
+        if (pageTurnSfx != null && audioSource != null)
+            audioSource.PlayOneShot(pageTurnSfx);
+    }
+
+    // ==================================================================
+    // CALLED BY ScribbleManager
+    // ==================================================================
+
+    /// <summary>
+    /// Updates ResultText and arrow button visibility.
+    /// Called by ScribbleManager whenever words change or the page turns.
+    /// </summary>
+    public void UpdateUI(string pageText, int pageIndex, int totalPages)
+    {
+        if (resultText != null)
+            resultText.text = pageText;
+
+        SetButtonVisibility(hasPrev: pageIndex > 0,
+                            hasNext: pageIndex < totalPages - 1);
+    }
+
+    private void SetButtonVisibility(bool hasPrev, bool hasNext)
+    {
+        if (prevButton != null) prevButton.gameObject.SetActive(hasPrev);
+        if (nextButton != null) nextButton.gameObject.SetActive(hasNext);
+    }
+}

@@ -381,8 +381,8 @@ public class WhiteboardPen : MonoBehaviour
 
                     OnBoardCleared?.Invoke();
 
-                    var textDisplay = whiteboard.GetComponent<RecognizedTextDisplay>();
-                    if (textDisplay != null) textDisplay.ClearText();
+                    // var textDisplay = whiteboard.GetComponent<RecognizedTextDisplay>();
+                    // if (textDisplay != null) textDisplay.ClearText();
                 }
             }
             else if (!pinkyPinching)
