@@ -565,7 +565,19 @@ public class ScribbleManager : MonoBehaviour
 
     private bool IsBoardFull()
     {
-        // Check whether there is room for at least one more line below the current one
+        // Primary: ask TMP whether the current text already overflows the
+        // ResultText bounds.  preferredHeight is the natural (unconstrained)
+        // height TMP needs; rect.height is the actual visible area.
+        var pm = WhiteboardPageManager.Instance;
+        if (pm?.resultText != null)
+        {
+            pm.resultText.ForceMeshUpdate();
+            float needed   = pm.resultText.preferredHeight;
+            float available = ((RectTransform)pm.resultText.transform).rect.height;
+            return needed > available;
+        }
+
+        // Fallback when UI is unavailable: use layout estimate
         return (currentLineIndex + 1) * lineHeightWorld >= textAreaHeight;
     }
 

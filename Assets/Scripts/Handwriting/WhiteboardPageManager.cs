@@ -33,6 +33,9 @@ public class WhiteboardPageManager : MonoBehaviour
     [Tooltip("Next-page arrow button.")]
     public Button nextButton;
 
+    [Tooltip("TMP label showing the current page number (e.g. '1 / 2').")]
+    public TMP_Text pageNumberText;
+
     [Header("Audio")]
     [Tooltip("Played once each time the user flips a page.")]
     public AudioClip pageTurnSfx;
@@ -170,10 +173,6 @@ public class WhiteboardPageManager : MonoBehaviour
         // ── Apply canvas transform ─────────────────────────────────────
         PositionCanvas(canvasPos, canvasRot, physW, physH);
 
-        // ── Show sample text so the text area is visible in edit mode ─
-        if (resultText != null)
-            resultText.text = "Sample preview text\nLine 2 of text\nLine 3 of text";
-
         // ── Remove 'Button' text labels from arrow buttons ─────────────
 #if UNITY_EDITOR
         EditorCleanButtonLabel(prevButton);
@@ -218,6 +217,13 @@ public class WhiteboardPageManager : MonoBehaviour
         // Remove the auto-generated "Button" text label from arrow buttons
         CleanButtonLabel(prevButton);
         CleanButtonLabel(nextButton);
+
+        // Ensure ResultText never renders outside its RectTransform bounds
+        if (resultText != null)
+        {
+            resultText.enableWordWrapping = true;
+            resultText.overflowMode       = TMPro.TextOverflowModes.Truncate;
+        }
 
         // Start hidden; ScribbleManager calls UpdateUI() once initialized.
         SetButtonVisibility(false, false);
@@ -294,8 +300,9 @@ public class WhiteboardPageManager : MonoBehaviour
 
         uiCanvas.renderMode = RenderMode.WorldSpace;
 
-        // Layout children inside the newly-sized canvas
-        LayoutChildren(physW * PPU, physH * PPU);
+        // Children (ResultText, PrevButton, NextButton) keep whatever positions
+        // you set in the Inspector — do NOT call LayoutChildren here so the
+        // manually designed scene layout is preserved at runtime.
 
         Debug.Log($"{TAG} Canvas positioned at {canvasPos}, " +
                   $"size=({physW * PPU:F0}×{physH * PPU:F0} px), scale=1/{PPU:F0}.");
@@ -342,11 +349,6 @@ public class WhiteboardPageManager : MonoBehaviour
             rt.offsetMax = new Vector2(-20f, -20f);           // right, top
             rt.localRotation = Quaternion.identity;
 
-            // Prevent text from rendering outside the RectTransform bounds.
-            // Word wrapping handles normal line breaks; Truncate clips anything
-            // that still exceeds the box (e.g. single oversized words).
-            resultText.enableWordWrapping = true;
-            resultText.overflowMode       = TMPro.TextOverflowModes.Truncate;
         }
 
         Debug.Log($"{TAG} Children laid out: canvas {canvasW:F0}×{canvasH:F0} px.");
@@ -387,6 +389,9 @@ public class WhiteboardPageManager : MonoBehaviour
         if (resultText != null)
             resultText.text = pageText;
 
+        if (pageNumberText != null)
+            pageNumberText.text = $"{pageIndex + 1} / {totalPages}";
+
         SetButtonVisibility(hasPrev: pageIndex > 0,
                             hasNext: pageIndex < totalPages - 1);
     }
@@ -395,5 +400,76 @@ public class WhiteboardPageManager : MonoBehaviour
     {
         if (prevButton != null) prevButton.gameObject.SetActive(hasPrev);
         if (nextButton != null) nextButton.gameObject.SetActive(hasNext);
+    }
+
+    // ==================================================================
+    // EDITOR SIMULATION  (tests overflow detection without a build)
+    // ==================================================================
+
+    /// <summary>
+    /// Fills ResultText with repeated sample words one at a time until TMP
+    /// reports overflow, then shows the → button and page-number as they
+    /// would appear at runtime when page 1 is full.
+    ///
+    /// Call via the Inspector context menu or the Editor tool button.
+    /// Revert with "Reset Simulate" in the same menu.
+    /// </summary>
+    [ContextMenu("Simulate: Fill Page")]
+    public void SimulatePageFill()
+    {
+        if (resultText == null)
+        {
+            Debug.LogWarning($"{TAG} SimulatePageFill: resultText not assigned.");
+            return;
+        }
+
+        resultText.enableWordWrapping = true;
+        resultText.overflowMode       = TMPro.TextOverflowModes.Truncate;
+
+        var    rt        = (RectTransform)resultText.transform;
+        string[] words   = { "the", "quick", "brown", "fox", "jumps", "over",
+                              "the", "lazy", "dog", "and", "wrote", "in", "journal" };
+        var    sb        = new System.Text.StringBuilder();
+        int    wordCount = 0;
+
+        while (wordCount < 2000)
+        {
+            string next      = words[wordCount % words.Length];
+            string candidate = sb.Length > 0 ? sb + " " + next : next;
+
+            resultText.text = candidate;
+            resultText.ForceMeshUpdate();
+
+            if (resultText.preferredHeight > rt.rect.height)
+            {
+                // Revert to last state that still fit
+                resultText.text = sb.ToString();
+                resultText.ForceMeshUpdate();
+
+                // Show what runtime would show: next button visible, page "1 / 2"
+                SetButtonVisibility(hasPrev: false, hasNext: true);
+                if (pageNumberText != null) pageNumberText.text = "1 / 2";
+
+                Debug.Log($"{TAG} SimulatePageFill: page full after {wordCount} words " +
+                          $"({sb.Length} chars). preferredH={resultText.preferredHeight:F1} " +
+                          $"available={rt.rect.height:F1} px.");
+                return;
+            }
+
+            sb.Append(sb.Length > 0 ? " " + next : next);
+            wordCount++;
+        }
+
+        Debug.LogWarning($"{TAG} SimulatePageFill: reached limit without overflow — " +
+                         "check that the canvas has been positioned (Apply Layout Preview).");
+    }
+
+    [ContextMenu("Simulate: Reset")]
+    public void SimulateReset()
+    {
+        if (resultText != null) resultText.text = string.Empty;
+        if (pageNumberText != null) pageNumberText.text = "1 / 1";
+        SetButtonVisibility(hasPrev: false, hasNext: false);
+        Debug.Log($"{TAG} SimulateReset complete.");
     }
 }

@@ -34,6 +34,33 @@ public class WhiteboardPageManagerEditor : Editor
                 ApplyPreview(pm);
         }
 
+        EditorGUILayout.Space(4);
+        EditorGUILayout.LabelField("─── Page-Full Simulation ───", EditorStyles.boldLabel);
+
+        bool canSimulate = pm.resultText != null;
+        using (new EditorGUI.DisabledScope(!canSimulate))
+        {
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("▶  Simulate Fill Page"))
+            {
+                Undo.RecordObject(pm, "Simulate Page Fill");
+                pm.SimulatePageFill();
+                EditorUtility.SetDirty(pm);
+                SceneView.RepaintAll();
+            }
+            if (GUILayout.Button("↺  Reset", GUILayout.Width(70)))
+            {
+                Undo.RecordObject(pm, "Simulate Reset");
+                pm.SimulateReset();
+                EditorUtility.SetDirty(pm);
+                SceneView.RepaintAll();
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+
+        if (!canSimulate)
+            EditorGUILayout.HelpBox("Assign 'resultText' to enable simulation.", MessageType.Info);
+
         if (!ready)
         {
             EditorGUILayout.HelpBox(
