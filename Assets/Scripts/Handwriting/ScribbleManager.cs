@@ -129,6 +129,9 @@ public class ScribbleManager : MonoBehaviour
     // ── Scratch ──────────────────────────────────────────────────────────
     private readonly List<Vector3> scratchPoints = new List<Vector3>();
     private bool wasPenDrawing;
+    // Indices of words currently targeted by the live scratch preview
+    private readonly HashSet<int> scratchPreviewTargets = new HashSet<int>();
+    private bool hasScratchPreview;
 
     // ── Undo button (hand menu) ──────────────────────────────────────────
     private Button undoButton;
@@ -689,23 +692,18 @@ public class ScribbleManager : MonoBehaviour
         if (drawing)
         {
             Vector3? tp = pen.CurrentTouchWorldPoint;
-            if (tp.HasValue) scratchPoints.Add(tp.Value);
-
-            if (scratchPoints.Count >= 15 && scratchPoints.Count % 5 == 0)
+            if (tp.HasValue)
             {
-                int reversals = CountReversals(scratchPoints);
-                if (verboseScratchLog)
-                    Debug.Log($"{TAG} Scratch mid-stroke — pts={scratchPoints.Count}, " +
-                              $"reversals={reversals}/{minScratchReversals}.");
-                if (reversals >= minScratchReversals)
-                {
-                    TryHandleScratch(reversals);
-                    return;
-                }
+                scratchPoints.Add(tp.Value);
+                UpdateScratchPreview(); // live strikethrough feedback while scratching
             }
         }
         else if (wasPenDrawing)
         {
+            // Pen just lifted — commit or cancel the gesture.
+            // Always clear any live preview first so the display is consistent.
+            ClearScratchPreview();
+
             if (scratchPoints.Count >= 10)
             {
                 int reversals = CountReversals(scratchPoints);
@@ -713,9 +711,13 @@ public class ScribbleManager : MonoBehaviour
                     Debug.Log($"{TAG} Scratch end-of-stroke — pts={scratchPoints.Count}, " +
                               $"reversals={reversals}/{minScratchReversals}.");
                 if (reversals >= minScratchReversals)
-                {
                     TryHandleScratch(reversals);
-                }
+                else
+                    RefreshUI(); // too few reversals — restore normal display
+            }
+            else
+            {
+                RefreshUI(); // too few points — restore normal display
             }
             scratchPoints.Clear();
         }
@@ -756,6 +758,77 @@ public class ScribbleManager : MonoBehaviour
             lastDir = dir;
         }
         return reversals;
+    }
+
+    /// <summary>
+    /// Builds the current scratch AABB, finds targeted words, and renders a
+    /// live strikethrough preview in ResultText — matching Apple Scribble UX.
+    /// Called each time a new scratch point is collected.
+    /// </summary>
+    private void UpdateScratchPreview()
+    {
+        if (scratchPoints.Count < 5) return;
+
+        Bounds scratch = new Bounds(scratchPoints[0], Vector3.zero);
+        foreach (var p in scratchPoints) scratch.Encapsulate(p);
+        scratch.Expand(0.01f);
+
+        var words = CurrentPage.words;
+        var newTargets = new HashSet<int>();
+        for (int i = 0; i < words.Count; i++)
+        {
+            if (OverlapsXZ(scratch, words[i].worldBounds))
+                newTargets.Add(i);
+        }
+
+        // Only re-render when the targeted set actually changes.
+        if (newTargets.SetEquals(scratchPreviewTargets)) return;
+
+        scratchPreviewTargets.Clear();
+        foreach (int idx in newTargets) scratchPreviewTargets.Add(idx);
+        hasScratchPreview = scratchPreviewTargets.Count > 0;
+        RenderScratchPreview();
+    }
+
+    /// <summary>
+    /// Writes ResultText with targeted words wrapped in TMP &lt;s&gt; strikethrough tags.
+    /// </summary>
+    private void RenderScratchPreview()
+    {
+        var pm = WhiteboardPageManager.Instance;
+        if (pm?.resultText == null) return;
+
+        if (!hasScratchPreview)
+        {
+            pm.resultText.text = CurrentPage.GetFullText();
+            return;
+        }
+
+        var words = CurrentPage.words;
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < words.Count; i++)
+        {
+            if (i > 0) sb.Append(' ');
+            if (scratchPreviewTargets.Contains(i))
+                sb.Append("<s>").Append(words[i].text).Append("</s>");
+            else
+                sb.Append(words[i].text);
+        }
+        pm.resultText.text = sb.ToString();
+    }
+
+    /// <summary>
+    /// Clears the live scratch preview and restores normal text display.
+    /// Called when the pen lifts, regardless of whether deletion fires.
+    /// </summary>
+    private void ClearScratchPreview()
+    {
+        if (!hasScratchPreview) return;
+        hasScratchPreview = false;
+        scratchPreviewTargets.Clear();
+        var pm = WhiteboardPageManager.Instance;
+        if (pm?.resultText != null)
+            pm.resultText.text = CurrentPage.GetFullText();
     }
 
     private bool TryHandleScratch(int reversals = -1)
@@ -822,10 +895,26 @@ public class ScribbleManager : MonoBehaviour
         Debug.Log($"{TAG} Deleted \"{word.text}\" at index {index}.");
     }
 
-    private static bool OverlapsXZ(Bounds a, Bounds b)
+    private const float ScratchOverlapRatio = 0.4f; // word must be ≥40 % covered
+
+    private static bool OverlapsXZ(Bounds scratch, Bounds word)
     {
-        return Mathf.Abs(a.center.x - b.center.x) < (a.extents.x + b.extents.x)
-            && Mathf.Abs(a.center.z - b.center.z) < (a.extents.z + b.extents.z);
+        // Standard XZ AABB intersection
+        if (Mathf.Abs(scratch.center.x - word.center.x) >= scratch.extents.x + word.extents.x) return false;
+        if (Mathf.Abs(scratch.center.z - word.center.z) >= scratch.extents.z + word.extents.z) return false;
+
+        // Require the scratch to cover ≥40 % of the word's width so that words
+        // adjacent to the scratch region aren't caught by a barely-touching AABB.
+        float wordWidth = word.size.x;
+        if (wordWidth > 0.005f)
+        {
+            float overlapLeft  = Mathf.Max(scratch.min.x, word.min.x);
+            float overlapRight = Mathf.Min(scratch.max.x, word.max.x);
+            float overlap      = overlapRight - overlapLeft;
+            if (overlap / wordWidth < ScratchOverlapRatio) return false;
+        }
+
+        return true;
     }
 
     // ==================================================================
