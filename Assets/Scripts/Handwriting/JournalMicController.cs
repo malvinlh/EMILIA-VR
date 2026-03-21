@@ -35,6 +35,11 @@ public class JournalMicController : MonoBehaviour
     [SerializeField] private float pulseMaxAlpha = 1.0f;
     [SerializeField] private float pulseSpeed    = 2.5f;
 
+    public static JournalMicController Instance { get; private set; }
+
+    /// <summary>Exposes the mic Button for external poke detection (JournalInlineCursor).</summary>
+    public Button MicButton => micButton;
+
     private enum MicState { Idle, Recording, Transcribing }
     private MicState  _micState = MicState.Idle;
     private Coroutine _pulseCo;
@@ -44,6 +49,12 @@ public class JournalMicController : MonoBehaviour
     // ==================================================================
     // LIFECYCLE
     // ==================================================================
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(this); return; }
+        Instance = this;
+    }
 
     private void Start()
     {
@@ -67,6 +78,8 @@ public class JournalMicController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (Instance == this) Instance = null;
+
         if (micButton != null)
             micButton.onClick.RemoveListener(OnMicClicked);
 
@@ -83,6 +96,7 @@ public class JournalMicController : MonoBehaviour
 
     private void OnMicClicked()
     {
+        Debug.Log($"{TAG} OnMicClicked state={_micState}");
         if (recorder == null) return;
         if (_micState == MicState.Transcribing) return; // busy
 

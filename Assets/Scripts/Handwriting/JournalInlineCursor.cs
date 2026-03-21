@@ -621,12 +621,13 @@ public class JournalInlineCursor : MonoBehaviour
 
     private void CheckButtonPoke(Vector3 fingertipWorld)
     {
-        var pm = WhiteboardPageManager.Instance;
+        var pm  = WhiteboardPageManager.Instance;
         if (pm == null) return;
 
         Button[] btns =
         {
-            pm.prevButton, pm.undoButton, pm.backspaceButton, pm.nextButton
+            pm.prevButton, pm.undoButton, pm.backspaceButton, pm.nextButton,
+            JournalMicController.Instance?.MicButton
         };
 
         if (_btnInZone == null || _btnInZone.Length != btns.Length)
