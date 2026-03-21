@@ -41,7 +41,7 @@ public class ScribbleManager : MonoBehaviour
 
     [Header("Scratch Detection")]
     [Tooltip("Minimum direction reversals to detect a scratch gesture.")]
-    public int minScratchReversals = 4;
+    public int minScratchReversals = 3;
 
     [Tooltip("Minimum displacement (m) between direction reversals.")]
     public float minReversalDisplacement = 0.005f;
@@ -152,10 +152,6 @@ public class ScribbleManager : MonoBehaviour
 
     private void Start()
     {
-        var utils = FindAnyObjectByType<WhiteboardUtils>();
-        if (utils != null)
-            utils.OnWhiteboardSpawned += OnWhiteboardSpawned;
-
         whiteboard = FindAnyObjectByType<Whiteboard>();
         if (whiteboard != null)
         {
@@ -164,21 +160,7 @@ public class ScribbleManager : MonoBehaviour
         }
         else
         {
-            Debug.Log($"{TAG} No Whiteboard yet — waiting for OnWhiteboardSpawned.");
-        }
-    }
-
-    private void OnWhiteboardSpawned(GameObject wb)
-    {
-        whiteboard = wb.GetComponent<Whiteboard>();
-        if (whiteboard != null && !initialized)
-        {
-            Debug.Log($"{TAG} OnWhiteboardSpawned: '{wb.name}' — initializing.");
-            Initialize();
-        }
-        else if (whiteboard == null)
-        {
-            Debug.LogWarning($"{TAG} OnWhiteboardSpawned: '{wb.name}' has no Whiteboard component.");
+            Debug.LogWarning($"{TAG} No Whiteboard found in scene — ScribbleManager inactive.");
         }
     }
 
@@ -715,8 +697,11 @@ public class ScribbleManager : MonoBehaviour
                 if (verboseScratchLog)
                     Debug.Log($"{TAG} Scratch mid-stroke — pts={scratchPoints.Count}, " +
                               $"reversals={reversals}/{minScratchReversals}.");
-                if (reversals >= minScratchReversals && TryHandleScratch(reversals))
+                if (reversals >= minScratchReversals)
+                {
+                    TryHandleScratch(reversals);
                     return;
+                }
             }
         }
         else if (wasPenDrawing)
@@ -728,7 +713,9 @@ public class ScribbleManager : MonoBehaviour
                     Debug.Log($"{TAG} Scratch end-of-stroke — pts={scratchPoints.Count}, " +
                               $"reversals={reversals}/{minScratchReversals}.");
                 if (reversals >= minScratchReversals)
+                {
                     TryHandleScratch(reversals);
+                }
             }
             scratchPoints.Clear();
         }
@@ -947,6 +934,57 @@ public class ScribbleManager : MonoBehaviour
             CurrentPage.GetFullText(),
             currentPageIndex,
             pages.Count);
+        UpdateWordBoundsFromTMP();
+    }
+
+    /// <summary>
+    /// Reads the actual rendered positions of each word from TMP's characterInfo
+    /// and updates worldBounds for accurate scratch-to-delete hit testing.
+    /// This is required because TMP alignment (centre, right, etc.) places text
+    /// at positions that differ from our left-aligned cursor calculations.
+    /// </summary>
+    private void UpdateWordBoundsFromTMP()
+    {
+        var pm = WhiteboardPageManager.Instance;
+        if (pm?.resultText == null) return;
+
+        pm.resultText.ForceMeshUpdate();
+        TMP_TextInfo textInfo = pm.resultText.textInfo;
+        var rt    = (RectTransform)pm.resultText.transform;
+        var words = CurrentPage.words;
+
+        int charOffset = 0;
+        for (int wi = 0; wi < words.Count; wi++)
+        {
+            int wordLen    = words[wi].text.Length;
+            int lastCharIdx = charOffset + wordLen - 1;
+            if (lastCharIdx >= textInfo.characterCount) break;
+
+            TMP_CharacterInfo fc = textInfo.characterInfo[charOffset];
+            TMP_CharacterInfo lc = textInfo.characterInfo[lastCharIdx];
+
+            // Convert all four corners from ResultText local (canvas px) to world space.
+            // rt.TransformPoint handles canvas position, rotation, and 0.001 scale.
+            Vector3 w0 = rt.TransformPoint(fc.bottomLeft.x,  fc.bottomLeft.y,  0f);
+            Vector3 w1 = rt.TransformPoint(fc.topLeft.x,     fc.topLeft.y,     0f);
+            Vector3 w2 = rt.TransformPoint(lc.bottomRight.x, lc.bottomRight.y, 0f);
+            Vector3 w3 = rt.TransformPoint(lc.topRight.x,    lc.topRight.y,    0f);
+
+            float minX = Mathf.Min(w0.x, w1.x, w2.x, w3.x);
+            float maxX = Mathf.Max(w0.x, w1.x, w2.x, w3.x);
+            float minZ = Mathf.Min(w0.z, w1.z, w2.z, w3.z);
+            float maxZ = Mathf.Max(w0.z, w1.z, w2.z, w3.z);
+
+            Vector3 center = new Vector3((minX + maxX) * 0.5f,
+                                         (w0.y + w2.y) * 0.5f,
+                                         (minZ + maxZ) * 0.5f);
+            Vector3 size   = new Vector3(maxX - minX + 0.01f, 0.05f, maxZ - minZ + 0.01f);
+
+            words[wi].worldCenter = center;
+            words[wi].worldBounds = new Bounds(center, size);
+
+            charOffset += wordLen + 1; // +1 for the space separator
+        }
     }
 
     private void FireTextChanged()

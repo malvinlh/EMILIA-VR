@@ -52,7 +52,9 @@ public class WhiteboardUtils : MonoBehaviour
         projectionSphereRight.SetActive(false);
 
         ResolveCameraOffsetTransform();
-        SpawnAtPlaceholder();
+        // SpawnAtPlaceholder is intentionally NOT called here.
+        // The whiteboard is placed statically in the scene; calling this would
+        // instantiate a duplicate that overlaps the existing one.
     }
 
     private void ResolveCameraOffsetTransform()

@@ -253,6 +253,30 @@ public class WhiteboardPen : MonoBehaviour
         }
 
         // ===============================================================
+        // THUMB + INDEX PINCH-TO-DRAW
+        // Alternative input: close thumb and index fingertips above the
+        // whiteboard. The pinch midpoint is projected straight down onto
+        // the board surface, producing a draw point without physical contact.
+        // ===============================================================
+        if (!hitBoard)
+        {
+            Vector3 thumbWorld = JointToWorld(thumbTipPose.position);
+            if (IsPinching(thumbWorld, tip))
+            {
+                Vector3 pinchMid = (thumbWorld + tip) * 0.5f;
+                // Cast from 10 cm above the midpoint straight down onto the whiteboard layer
+                if (Physics.Raycast(pinchMid + Vector3.up * 0.1f, Vector3.down,
+                                    out touch, 0.3f, 1 << WHITEBOARD_LAYER))
+                {
+                    hitBoard       = true;
+                    hasMadeContact = true;
+                    boardNormal    = touch.normal;
+                    boardPoint     = touch.point;
+                }
+            }
+        }
+
+        // ===============================================================
         // APPLY RESULT
         // ===============================================================
         if (hitBoard)

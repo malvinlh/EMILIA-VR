@@ -225,7 +225,7 @@ public class WhiteboardPageManager : MonoBehaviour
             resultText.overflowMode       = TMPro.TextOverflowModes.Truncate;
         }
 
-        // Start hidden; ScribbleManager calls UpdateUI() once initialized.
+        // Start dimmed (interactable=false); ScribbleManager calls UpdateUI() once initialized.
         SetButtonVisibility(false, false);
 
         Debug.Log($"{TAG} Ready. Canvas will be positioned by ScribbleManager.");
@@ -360,14 +360,25 @@ public class WhiteboardPageManager : MonoBehaviour
 
     private void OnPrevClicked()
     {
+        if (IsWritingInProgress()) return;
         PlayPageTurn();
         ScribbleManager.Instance?.GoToPrevPage();
     }
 
     private void OnNextClicked()
     {
+        if (IsWritingInProgress()) return;
         PlayPageTurn();
         ScribbleManager.Instance?.GoToNextPage();
+    }
+
+    /// <summary>Returns true while any WhiteboardPen is actively touching the board.</summary>
+    private static bool IsWritingInProgress()
+    {
+        foreach (var p in FindObjectsByType<WhiteboardPen>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+            if (p.IsDrawing) return true;
+        return false;
     }
 
     private void PlayPageTurn()
@@ -398,8 +409,10 @@ public class WhiteboardPageManager : MonoBehaviour
 
     private void SetButtonVisibility(bool hasPrev, bool hasNext)
     {
-        if (prevButton != null) prevButton.gameObject.SetActive(hasPrev);
-        if (nextButton != null) nextButton.gameObject.SetActive(hasNext);
+        // Keep buttons always visible — use interactable so Unity automatically
+        // applies DisabledColor (semi-transparent) when the action is unavailable.
+        if (prevButton != null) prevButton.interactable = hasPrev;
+        if (nextButton != null) nextButton.interactable = hasNext;
     }
 
     // ==================================================================

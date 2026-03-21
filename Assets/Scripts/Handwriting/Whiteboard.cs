@@ -60,20 +60,32 @@ public class Whiteboard : MonoBehaviour
 
     public bool isActive;
 
+    private void Awake()
+    {
+        // Self-initialize so the whiteboard works whether it was placed
+        // statically in the scene or instantiated at runtime via SpawnAligned.
+        Initialize();
+    }
+
     public void Initialize()
     {
         //Scale the texture on the whiteboard based on the size of the whiteboard.
         // texturesSizeHorizontal = (int)(transform.localScale.x * WHITEBOARD_SCALE * TEXTURE_SCALE);
         // texturesSizeVertical = (int)(transform.localScale.z * WHITEBOARD_SCALE * TEXTURE_SCALE);
 
+        // Use lossyScale (world-space scale) so that a whiteboard nested under
+        // a parent with non-uniform scale (e.g. JournalTable at 160×16×280)
+        // computes the correct texture resolution. For root-level whiteboards
+        // (spawned by SpawnAligned) lossyScale == localScale, so no difference.
+        Vector3 ws = transform.lossyScale;
         texturesSizeHorizontal = Mathf.Max(
             16,
-            (int)(transform.localScale.x * WHITEBOARD_SCALE * TEXTURE_SCALE)
+            (int)(ws.x * WHITEBOARD_SCALE * TEXTURE_SCALE)
         );
 
         texturesSizeVertical = Mathf.Max(
             16,
-            (int)(transform.localScale.z * WHITEBOARD_SCALE * TEXTURE_SCALE)
+            (int)(ws.z * WHITEBOARD_SCALE * TEXTURE_SCALE)
         );
 
         //Create a new texture and set it as the default texture of this whiteboard
