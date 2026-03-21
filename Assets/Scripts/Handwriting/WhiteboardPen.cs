@@ -277,6 +277,14 @@ public class WhiteboardPen : MonoBehaviour
         }
 
         // ===============================================================
+        // HANDWRITING AREA BOUNDS CHECK
+        // Reject touches that land on the whiteboard but outside the
+        // HandwritingArea RectTransform (e.g. header, footer, margins).
+        // ===============================================================
+        if (hitBoard && !IsInsideHandwritingArea(touch.point))
+            hitBoard = false;
+
+        // ===============================================================
         // APPLY RESULT
         // ===============================================================
         if (hitBoard)
@@ -430,7 +438,7 @@ public class WhiteboardPen : MonoBehaviour
                             hoverDistance, 1 << WHITEBOARD_LAYER))
         {
             Whiteboard wb = hoverHit.collider.GetComponent<Whiteboard>();
-            if (wb != null)
+            if (wb != null && IsInsideHandwritingArea(hoverHit.point))
             {
                 // Switched to a different board → clear old hover
                 if (hoverWhiteboard != null && hoverWhiteboard != wb)
@@ -445,7 +453,7 @@ public class WhiteboardPen : MonoBehaviour
             }
         }
 
-        // No board hit → clear hover
+        // No board hit or outside HandwritingArea → clear hover
         if (hoverWhiteboard != null)
         {
             hoverWhiteboard.ToggleHover(false);
@@ -703,6 +711,23 @@ public class WhiteboardPen : MonoBehaviour
     // ==================================================================
     // HELPERS
     // ==================================================================
+
+    /// <summary>
+    /// Returns true if <paramref name="worldPoint"/> falls within the
+    /// HandwritingArea RectTransform bounds. If no HandwritingArea is
+    /// assigned, returns true (no constraint).
+    /// </summary>
+    private bool IsInsideHandwritingArea(Vector3 worldPoint)
+    {
+        var pm = WhiteboardPageManager.Instance;
+        if (pm == null || pm.handwritingArea == null) return true;
+
+        RectTransform ha = pm.handwritingArea;
+        Vector3 local = ha.InverseTransformPoint(worldPoint);
+        Rect r = ha.rect;
+        return local.x >= r.xMin && local.x <= r.xMax
+            && local.y >= r.yMin && local.y <= r.yMax;
+    }
 
     public static bool IsPinching(Vector3 a, Vector3 b)
     {

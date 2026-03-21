@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 using TMPro;
 
 /// <summary>
@@ -217,6 +218,21 @@ public class WhiteboardPageManager : MonoBehaviour
             audioSource.maxDistance  = 3f;
         }
 
+        // Ensure XRI TrackedDeviceGraphicRaycaster is on the canvas so
+        // hand-tracked poke/ray interactions can hit the UI buttons.
+        if (uiCanvas != null)
+        {
+            if (uiCanvas.GetComponent<TrackedDeviceGraphicRaycaster>() == null)
+            {
+                // Remove standard GraphicRaycaster — it doesn't process XRI events
+                var legacy = uiCanvas.GetComponent<GraphicRaycaster>();
+                if (legacy != null) Destroy(legacy);
+
+                uiCanvas.gameObject.AddComponent<TrackedDeviceGraphicRaycaster>();
+                Debug.Log($"{TAG} Added TrackedDeviceGraphicRaycaster to canvas.");
+            }
+        }
+
         // Wire buttons → ScribbleManager (which manages page logic)
         if (prevButton     != null) prevButton.onClick.AddListener(OnPrevClicked);
         if (nextButton     != null) nextButton.onClick.AddListener(OnNextClicked);
@@ -367,6 +383,7 @@ public class WhiteboardPageManager : MonoBehaviour
 
     private void OnPrevClicked()
     {
+        Debug.Log($"{TAG} OnPrevClicked");
         if (IsWritingInProgress()) return;
         PlayPageTurn();
         ScribbleManager.Instance?.GoToPrevPage();
@@ -374,6 +391,7 @@ public class WhiteboardPageManager : MonoBehaviour
 
     private void OnNextClicked()
     {
+        Debug.Log($"{TAG} OnNextClicked");
         if (IsWritingInProgress()) return;
         PlayPageTurn();
         ScribbleManager.Instance?.GoToNextPage();
@@ -381,12 +399,18 @@ public class WhiteboardPageManager : MonoBehaviour
 
     private void OnUndoClicked()
     {
+        Debug.Log($"{TAG} OnUndoClicked");
         ScribbleManager.Instance?.Undo();
     }
 
     private void OnBackspaceClicked()
     {
-        ScribbleManager.Instance?.DeleteLastWord();
+        Debug.Log($"{TAG} OnBackspaceClicked");
+        var cursor = JournalInlineCursor.Instance;
+        if (cursor != null && cursor.HasActiveSelection)
+            cursor.DeleteSelection();
+        else
+            ScribbleManager.Instance?.DeleteLastWord();
     }
 
     /// <summary>Returns true while any WhiteboardPen is actively touching the board.</summary>

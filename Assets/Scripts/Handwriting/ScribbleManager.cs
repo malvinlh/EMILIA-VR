@@ -108,6 +108,7 @@ public class ScribbleManager : MonoBehaviour
     private float   textAreaHeight;      // usable height in metres (excludes button area)
     private float   cursorOffsetRight;
     private int     currentLineIndex;
+    private int     _insertCursor = -1;  // ≥0 = insert before that word index; -1 = append
 
     // ── Event delegates (stored for clean unsubscription) ────────────────
     private Action<string>                      onTextRecognizedDelegate;
@@ -457,28 +458,38 @@ public class ScribbleManager : MonoBehaviour
             Debug.Log($"{TAG} Word truncated to fit board: \"{word}\"");
         }
 
-        // ── Line-wrap if necessary ───────────────────────────────────
-        if (cursorOffsetRight + wordWidthWorld > boardWidthWorld &&
-            cursorOffsetRight > 0.001f)
+        var sw = new ScribbleWord { text = word };
+        int insertIndex;
+
+        if (_insertCursor >= 0 && _insertCursor <= CurrentPage.words.Count)
         {
-            currentLineIndex++;
-            lineStartPosition -= textForward * lineHeightWorld;
-            cursorPosition     = lineStartPosition;
-            cursorOffsetRight  = 0f;
-            Debug.Log($"{TAG} Line wrap → line {currentLineIndex}.");
+            // ── Insert at inline cursor (inline editing mode) ─────────
+            CurrentPage.words.Insert(_insertCursor, sw);
+            insertIndex = _insertCursor;
+            _insertCursor++;
+            RecomputeCursor(); // fix layout state after mid-list insertion
+        }
+        else
+        {
+            // ── Append mode: use layout state for line-wrap detection ─
+            if (cursorOffsetRight + wordWidthWorld > boardWidthWorld &&
+                cursorOffsetRight > 0.001f)
+            {
+                currentLineIndex++;
+                lineStartPosition -= textForward * lineHeightWorld;
+                cursorOffsetRight  = 0f;
+                Debug.Log($"{TAG} Line wrap → line {currentLineIndex}.");
+            }
+            cursorOffsetRight += wordWidthWorld + wordSpacing;
+            CurrentPage.words.Add(sw);
+            insertIndex = CurrentPage.words.Count - 1;
         }
 
-        // ── Advance cursor ───────────────────────────────────────────
-        cursorOffsetRight += wordWidthWorld + wordSpacing;
-
-        var sw = new ScribbleWord { text = word };
-
-        CurrentPage.words.Add(sw);
         PushUndo(new ScribbleAction
         {
             type      = ActionType.Add,
             word      = sw,
-            listIndex = CurrentPage.words.Count - 1
+            listIndex = insertIndex
         });
 
         // ── Update display ───────────────────────────────────────────
@@ -543,6 +554,7 @@ public class ScribbleManager : MonoBehaviour
         if (index < 0 || index >= pages.Count) return;
 
         currentPageIndex = index;
+        _insertCursor = -1;
 
         // Clear ink — past pages show only typed text, not ink strokes
         if (whiteboard != null) whiteboard.ClearToBackground();
@@ -658,6 +670,7 @@ public class ScribbleManager : MonoBehaviour
         CurrentPage.words.Clear();
         CurrentPage.undoStack.Clear();
         pendingMeta.Clear();
+        _insertCursor = -1;
 
         if (whiteboard != null) whiteboard.ClearToBackground();
 
@@ -674,6 +687,7 @@ public class ScribbleManager : MonoBehaviour
         pages.Clear();
         pages.Add(new PageData());
         currentPageIndex = 0;
+        _insertCursor = -1;
 
         pendingMeta.Clear();
 
@@ -699,8 +713,87 @@ public class ScribbleManager : MonoBehaviour
         if (!initialized) return;
         var words = CurrentPage.words;
         if (words.Count == 0) return;
-        DeleteWord(words[words.Count - 1]);
+
+        if (_insertCursor > 0 && _insertCursor <= words.Count)
+        {
+            // Backspace at cursor: delete the word just before the cursor position
+            int targetIndex = _insertCursor - 1;
+            DeleteWord(words[targetIndex]);
+            _insertCursor = Mathf.Max(0, _insertCursor - 1);
+        }
+        else
+        {
+            DeleteWord(words[words.Count - 1]);
+        }
     }
+
+    /// <summary>
+    /// Deletes words at indices [startWordIndex .. endWordIndex] inclusive,
+    /// then places the insert cursor at startWordIndex.
+    /// Called by JournalInlineCursor when the user backspaces a word selection.
+    /// </summary>
+    public void DeleteWordRange(int startWordIndex, int endWordIndex)
+    {
+        if (!initialized) return;
+        var words = CurrentPage.words;
+        if (words.Count == 0) return;
+
+        startWordIndex = Mathf.Clamp(startWordIndex, 0, words.Count - 1);
+        endWordIndex   = Mathf.Clamp(endWordIndex,   0, words.Count - 1);
+        if (startWordIndex > endWordIndex) return;
+
+        int count = endWordIndex - startWordIndex + 1;
+        for (int i = 0; i < count; i++)
+        {
+            var w = words[startWordIndex];
+            words.RemoveAt(startWordIndex);
+            PushUndo(new ScribbleAction
+            {
+                type      = ActionType.Delete,
+                word      = w,
+                listIndex = startWordIndex
+            });
+        }
+
+        _insertCursor = Mathf.Clamp(startWordIndex, 0, words.Count);
+        RecomputeCursor();
+        RefreshUI();
+        FireTextChanged();
+
+        Debug.Log($"{TAG} DeleteWordRange [{startWordIndex}..{endWordIndex}] — {count} word(s) removed.");
+    }
+
+    /// <summary>
+    /// Sets the inline-edit insert cursor to the given word-gap index.
+    /// Index 0 = before first word; index N = after word N-1 (between N-1 and N).
+    /// While active, new words and backspace operate at this position.
+    /// Called by JournalInlineCursor.
+    /// </summary>
+    public void SetInsertCursor(int wordIndex)
+    {
+        _insertCursor = Mathf.Clamp(wordIndex, 0, CurrentPage.words.Count);
+        Debug.Log($"{TAG} Insert cursor → {_insertCursor} (of {CurrentPage.words.Count} words).");
+    }
+
+    /// <summary>Clears the inline cursor, returning to end-of-text append mode.</summary>
+    public void ClearInsertCursor()
+    {
+        if (_insertCursor < 0) return;
+        _insertCursor = -1;
+        Debug.Log($"{TAG} Insert cursor cleared.");
+    }
+
+    /// <summary>Word count on the current page. Used by JournalInlineCursor.</summary>
+    public int CurrentWordCount => CurrentPage.words.Count;
+
+    /// <summary>Current insert-cursor word-gap index (≥0), or -1 in append mode.
+    /// JournalInlineCursor reads this to keep its caret visual in sync after
+    /// words are inserted.</summary>
+    public int InsertCursorIndex => _insertCursor;
+
+    /// <summary>Zero-based index of the page currently on screen.
+    /// JournalInlineCursor watches this to dismiss selection/cursor on page turn.</summary>
+    public int CurrentPageIndex => currentPageIndex;
 
     /// <summary>
     /// Injects voice-transcribed text into the current page.
