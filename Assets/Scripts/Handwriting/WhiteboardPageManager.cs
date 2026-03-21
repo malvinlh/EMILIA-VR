@@ -30,11 +30,20 @@ public class WhiteboardPageManager : MonoBehaviour
     [Tooltip("Previous-page arrow button.")]
     public Button prevButton;
 
+    [Tooltip("Undo last word button.")]
+    public Button undoButton;
+
+    [Tooltip("Delete last word (Backspace) button.")]
+    public Button backspaceButton;
+
     [Tooltip("Next-page arrow button.")]
     public Button nextButton;
 
     [Tooltip("TMP label showing the current page number (e.g. '1 / 2').")]
     public TMP_Text pageNumberText;
+
+    [Tooltip("HandwritingArea RectTransform — ScribbleManager uses its width for line-wrap.")]
+    public RectTransform handwritingArea;
 
     [Header("Audio")]
     [Tooltip("Played once each time the user flips a page.")]
@@ -209,14 +218,10 @@ public class WhiteboardPageManager : MonoBehaviour
         }
 
         // Wire buttons → ScribbleManager (which manages page logic)
-        if (prevButton != null)
-            prevButton.onClick.AddListener(OnPrevClicked);
-        if (nextButton != null)
-            nextButton.onClick.AddListener(OnNextClicked);
-
-        // Remove the auto-generated "Button" text label from arrow buttons
-        CleanButtonLabel(prevButton);
-        CleanButtonLabel(nextButton);
+        if (prevButton     != null) prevButton.onClick.AddListener(OnPrevClicked);
+        if (nextButton     != null) nextButton.onClick.AddListener(OnNextClicked);
+        if (undoButton     != null) undoButton.onClick.AddListener(OnUndoClicked);
+        if (backspaceButton!= null) backspaceButton.onClick.AddListener(OnBackspaceClicked);
 
         // Ensure ResultText never renders outside its RectTransform bounds
         if (resultText != null)
@@ -225,16 +230,18 @@ public class WhiteboardPageManager : MonoBehaviour
             resultText.overflowMode       = TMPro.TextOverflowModes.Truncate;
         }
 
-        // Start dimmed (interactable=false); ScribbleManager calls UpdateUI() once initialized.
-        SetButtonVisibility(false, false);
+        // Start all buttons dimmed; ScribbleManager calls UpdateUI() once initialized.
+        SetButtonStates(hasPrev: false, hasNext: false, hasWords: false);
 
         Debug.Log($"{TAG} Ready. Canvas will be positioned by ScribbleManager.");
     }
 
     private void OnDestroy()
     {
-        if (prevButton != null) prevButton.onClick.RemoveListener(OnPrevClicked);
-        if (nextButton != null) nextButton.onClick.RemoveListener(OnNextClicked);
+        if (prevButton      != null) prevButton.onClick.RemoveListener(OnPrevClicked);
+        if (nextButton      != null) nextButton.onClick.RemoveListener(OnNextClicked);
+        if (undoButton      != null) undoButton.onClick.RemoveListener(OnUndoClicked);
+        if (backspaceButton != null) backspaceButton.onClick.RemoveListener(OnBackspaceClicked);
         if (Instance == this) Instance = null;
     }
 
@@ -372,6 +379,16 @@ public class WhiteboardPageManager : MonoBehaviour
         ScribbleManager.Instance?.GoToNextPage();
     }
 
+    private void OnUndoClicked()
+    {
+        ScribbleManager.Instance?.Undo();
+    }
+
+    private void OnBackspaceClicked()
+    {
+        ScribbleManager.Instance?.DeleteLastWord();
+    }
+
     /// <summary>Returns true while any WhiteboardPen is actively touching the board.</summary>
     private static bool IsWritingInProgress()
     {
@@ -403,16 +420,20 @@ public class WhiteboardPageManager : MonoBehaviour
         if (pageNumberText != null)
             pageNumberText.text = $"{pageIndex + 1} / {totalPages}";
 
-        SetButtonVisibility(hasPrev: pageIndex > 0,
-                            hasNext: pageIndex < totalPages - 1);
+        bool hasWords = !string.IsNullOrEmpty(pageText);
+        SetButtonStates(hasPrev:  pageIndex > 0,
+                        hasNext:  pageIndex < totalPages - 1,
+                        hasWords: hasWords);
     }
 
-    private void SetButtonVisibility(bool hasPrev, bool hasNext)
+    private void SetButtonStates(bool hasPrev, bool hasNext, bool hasWords)
     {
-        // Keep buttons always visible — use interactable so Unity automatically
-        // applies DisabledColor (semi-transparent) when the action is unavailable.
-        if (prevButton != null) prevButton.interactable = hasPrev;
-        if (nextButton != null) nextButton.interactable = hasNext;
+        // Buttons remain visible at all times; interactable=false applies the
+        // DisabledColor tint so users see when an action is unavailable.
+        if (prevButton      != null) prevButton.interactable      = hasPrev;
+        if (nextButton      != null) nextButton.interactable      = hasNext;
+        if (undoButton      != null) undoButton.interactable      = hasWords;
+        if (backspaceButton != null) backspaceButton.interactable = hasWords;
     }
 
     // ==================================================================
@@ -460,7 +481,7 @@ public class WhiteboardPageManager : MonoBehaviour
                 resultText.ForceMeshUpdate();
 
                 // Show what runtime would show: next button visible, page "1 / 2"
-                SetButtonVisibility(hasPrev: false, hasNext: true);
+                SetButtonStates(hasPrev: false, hasNext: true, hasWords: true);
                 if (pageNumberText != null) pageNumberText.text = "1 / 2";
 
                 Debug.Log($"{TAG} SimulatePageFill: page full after {wordCount} words " +
@@ -482,7 +503,7 @@ public class WhiteboardPageManager : MonoBehaviour
     {
         if (resultText != null) resultText.text = string.Empty;
         if (pageNumberText != null) pageNumberText.text = "1 / 1";
-        SetButtonVisibility(hasPrev: false, hasNext: false);
+        SetButtonStates(hasPrev: false, hasNext: false, hasWords: false);
         Debug.Log($"{TAG} SimulateReset complete.");
     }
 }

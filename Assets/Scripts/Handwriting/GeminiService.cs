@@ -73,6 +73,39 @@ public class GeminiService : MonoBehaviour
     }
 
     // ==================================================================
+    // AUDIO (STT) — Speech-to-text transcription via Gemini
+    // ==================================================================
+
+    /// <summary>
+    /// Send a WAV recording to Gemini for speech-to-text transcription.
+    /// <paramref name="callback"/> receives the transcribed text, or null on failure.
+    /// </summary>
+    public Coroutine TranscribeAudio(byte[] wavBytes, Action<string> callback)
+    {
+        if (!IsConfigured || wavBytes == null || wavBytes.Length == 0)
+        {
+            callback?.Invoke(null);
+            return null;
+        }
+
+        return StartCoroutine(PostAudio(textModel, wavBytes, callback));
+    }
+
+    private IEnumerator PostAudio(string model, byte[] wavBytes, Action<string> callback)
+    {
+        string url    = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
+        string base64 = Convert.ToBase64String(wavBytes);
+
+        string body =
+            "{\"contents\":[{\"parts\":[" +
+            "{\"text\":\"Transcribe the speech in this audio exactly. Return only the spoken words, no extra commentary.\"}," +
+            "{\"inline_data\":{\"mime_type\":\"audio/wav\",\"data\":\"" + base64 + "\"}}" +
+            "]}]}";
+
+        yield return SendRequest(url, body, callback);
+    }
+
+    // ==================================================================
     // VISION (VLM) — OCR on whiteboard image
     // ==================================================================
 

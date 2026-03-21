@@ -39,23 +39,9 @@ public class ScribbleManager : MonoBehaviour
     [Tooltip("Metres reserved at the canvas bottom for navigation buttons.")]
     public float buttonAreaReserve = 0.14f;
 
-    [Header("Scratch Detection")]
-    [Tooltip("Minimum direction reversals to detect a scratch gesture.")]
-    public int minScratchReversals = 3;
-
-    [Tooltip("Minimum displacement (m) between direction reversals.")]
-    public float minReversalDisplacement = 0.005f;
-
-    [Tooltip("Maximum bounding-box diagonal (m) for a scratch gesture.")]
-    public float maxScratchExtent = 0.15f;
-
     [Header("Undo")]
     [Tooltip("Maximum undo history size per page.")]
     public int maxUndoSteps = 30;
-
-    [Header("Debug")]
-    [Tooltip("Log scratch evaluation details even when no words are hit.")]
-    public bool verboseScratchLog = false;
 
     // ── Public API ──────────────────────────────────────────────────────
     public event Action<string> OnTextChanged;
@@ -64,9 +50,7 @@ public class ScribbleManager : MonoBehaviour
     // ── Inner types ─────────────────────────────────────────────────────
     private class ScribbleWord
     {
-        public string  text;
-        public Vector3 worldCenter;
-        public Bounds  worldBounds;
+        public string text;
     }
 
     private enum ActionType { Add, Delete }
@@ -118,23 +102,12 @@ public class ScribbleManager : MonoBehaviour
     private Quaternion textBaseRotation;  // canvas rotation
 
     // ── Layout state ─────────────────────────────────────────────────────
-    private Vector3 cursorPosition;
     private Vector3 lineStartPosition;   // top-left corner of text area (world space)
     private float   lineHeightWorld;
     private float   boardWidthWorld;     // usable width in metres
     private float   textAreaHeight;      // usable height in metres (excludes button area)
     private float   cursorOffsetRight;
     private int     currentLineIndex;
-
-    // ── Scratch ──────────────────────────────────────────────────────────
-    private readonly List<Vector3> scratchPoints = new List<Vector3>();
-    private bool wasPenDrawing;
-    // Indices of words currently targeted by the live scratch preview
-    private readonly HashSet<int> scratchPreviewTargets = new HashSet<int>();
-    private bool hasScratchPreview;
-
-    // ── Undo button (hand menu) ──────────────────────────────────────────
-    private Button undoButton;
 
     // ── Event delegates (stored for clean unsubscription) ────────────────
     private Action<string>                      onTextRecognizedDelegate;
@@ -209,9 +182,6 @@ public class ScribbleManager : MonoBehaviour
 
         // ── Measurement TMP ──────────────────────────────────────────
         SetupMeasureTMP();
-
-        // ── Undo button on hand menu ──────────────────────────────────
-        SetupHandMenuUndo();
 
         initialized = true;
 
@@ -321,34 +291,32 @@ public class ScribbleManager : MonoBehaviour
         float physW = boardT.lossyScale.x * 10f;
         float physH = boardT.lossyScale.z * 10f;
 
-        boardWidthWorld = physW - 2f * boardMargin;
-        textAreaHeight  = physH - buttonAreaReserve - 2f * boardMargin;
+        var pm = WhiteboardPageManager.Instance;
+
+        // Use HandwritingArea canvas width if assigned, else fall back to board width.
+        if (pm?.handwritingArea != null)
+            boardWidthWorld = pm.handwritingArea.rect.width / WhiteboardPageManager.PPU;
+        else
+            boardWidthWorld = physW - 2f * boardMargin;
+
+        textAreaHeight = physH - buttonAreaReserve - 2f * boardMargin;
 
         // Line height: read ResultText font size if available, otherwise default 24 px
-        var pm = WhiteboardPageManager.Instance;
-        float fontSizePx = (pm != null && pm.resultText != null)
-            ? pm.resultText.fontSize
-            : 24f;
+        float fontSizePx = (pm?.resultText != null) ? pm.resultText.fontSize : 24f;
         lineHeightWorld = fontSizePx * 1.2f / WhiteboardPageManager.PPU;
 
-        // Canvas origin (world) — matches where PositionCanvas placed it
+        // lineStartPosition is still used by SetupCanvas/canvas orientation — keep it.
         Vector3 canvasOrigin = boardT.position + textSurfaceNormal * 0.003f;
-
-        // Text area top: canvas centre + physH/2 - margin, in textForward direction
-        // textForward = "away from user" = canvas +Y = "up on the page"
         float topOffset = physH * 0.5f - boardMargin;
-
         lineStartPosition = canvasOrigin
             + textForward * topOffset
             - textRight   * (physW * 0.5f - boardMargin);
 
-        cursorPosition    = lineStartPosition;
         cursorOffsetRight = 0f;
         currentLineIndex  = 0;
 
-        Debug.Log($"{TAG} Layout: physW={physW:F3}m physH={physH:F3}m " +
-                  $"usable={boardWidthWorld:F3}×{textAreaHeight:F3}m " +
-                  $"lineH={lineHeightWorld:F4}m startPos={lineStartPosition}.");
+        Debug.Log($"{TAG} Layout: boardW={boardWidthWorld:F3}m textH={textAreaHeight:F3}m " +
+                  $"lineH={lineHeightWorld:F4}m.");
     }
 
     // ==================================================================
@@ -437,8 +405,6 @@ public class ScribbleManager : MonoBehaviour
                 SubscribeToPen();
             }
         }
-
-        CheckScratchGesture();
     }
 
     // ==================================================================
@@ -502,30 +468,10 @@ public class ScribbleManager : MonoBehaviour
             Debug.Log($"{TAG} Line wrap → line {currentLineIndex}.");
         }
 
-        // ── Estimated world bounds (for scratch detection) ───────────
-        // textRight and textForward may have components in both X and Z
-        // (rotated board), so we project onto world AABB.
-        Vector3 wordWorldCenter = cursorPosition + textRight * (wordWidthWorld * 0.5f);
-        Vector3 halfExtentRight = textRight   * (wordWidthWorld * 0.5f + 0.005f);
-        Vector3 halfExtentFwd   = textForward * (lineHeightWorld * 0.5f + 0.005f);
-        Bounds  wb = new Bounds(wordWorldCenter, new Vector3(
-            Mathf.Abs(halfExtentRight.x) + Mathf.Abs(halfExtentFwd.x),
-            0.05f,
-            Mathf.Abs(halfExtentRight.z) + Mathf.Abs(halfExtentFwd.z)));
-
-        Debug.Log($"{TAG} Placed \"{word}\" at {cursorPosition}, " +
-                  $"width={wordWidthWorld:F4}m, line={currentLineIndex}.");
-
         // ── Advance cursor ───────────────────────────────────────────
         cursorOffsetRight += wordWidthWorld + wordSpacing;
-        cursorPosition     = lineStartPosition + textRight * cursorOffsetRight;
 
-        var sw = new ScribbleWord
-        {
-            text        = word,
-            worldCenter = wb.center,
-            worldBounds = wb
-        };
+        var sw = new ScribbleWord { text = word };
 
         CurrentPage.words.Add(sw);
         PushUndo(new ScribbleAction
@@ -670,204 +616,10 @@ public class ScribbleManager : MonoBehaviour
             if (cursorOffsetRight + ww > boardWidthWorld && cursorOffsetRight > 0.001f)
             {
                 currentLineIndex++;
-                lineStartPosition -= textForward * lineHeightWorld;
-                cursorPosition     = lineStartPosition;
-                cursorOffsetRight  = 0f;
+                cursorOffsetRight = 0f;
             }
             cursorOffsetRight += ww + wordSpacing;
-            cursorPosition     = lineStartPosition + textRight * cursorOffsetRight;
         }
-    }
-
-    // ==================================================================
-    // SCRATCH DETECTION
-    // ==================================================================
-
-    private void CheckScratchGesture()
-    {
-        if (pen == null) return;
-
-        bool drawing = pen.IsDrawing;
-
-        if (drawing)
-        {
-            Vector3? tp = pen.CurrentTouchWorldPoint;
-            if (tp.HasValue)
-            {
-                scratchPoints.Add(tp.Value);
-                UpdateScratchPreview(); // live strikethrough feedback while scratching
-            }
-        }
-        else if (wasPenDrawing)
-        {
-            // Pen just lifted — commit or cancel the gesture.
-            // Always clear any live preview first so the display is consistent.
-            ClearScratchPreview();
-
-            if (scratchPoints.Count >= 10)
-            {
-                int reversals = CountReversals(scratchPoints);
-                if (verboseScratchLog || reversals >= minScratchReversals)
-                    Debug.Log($"{TAG} Scratch end-of-stroke — pts={scratchPoints.Count}, " +
-                              $"reversals={reversals}/{minScratchReversals}.");
-                if (reversals >= minScratchReversals)
-                    TryHandleScratch(reversals);
-                else
-                    RefreshUI(); // too few reversals — restore normal display
-            }
-            else
-            {
-                RefreshUI(); // too few points — restore normal display
-            }
-            scratchPoints.Clear();
-        }
-
-        wasPenDrawing = drawing;
-    }
-
-    private int CountReversals(List<Vector3> pts)
-    {
-        if (pts.Count < 10) return 0;
-
-        float minX = float.MaxValue, maxX = float.MinValue;
-        float minZ = float.MaxValue, maxZ = float.MinValue;
-        foreach (var p in pts)
-        {
-            if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-            if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
-        }
-        float extX = maxX - minX, extZ = maxZ - minZ;
-        float diag = Mathf.Sqrt(extX * extX + extZ * extZ);
-        if (diag > maxScratchExtent || diag < 0.005f) return 0;
-
-        bool useX = extX >= extZ;
-        int  reversals = 0;
-        float lastDir = 0f, accum = 0f;
-
-        for (int i = 1; i < pts.Count; i++)
-        {
-            float d = useX ? (pts[i].x - pts[i-1].x) : (pts[i].z - pts[i-1].z);
-            accum += Mathf.Abs(d);
-            if (Mathf.Abs(d) < 0.0005f) continue;
-            float dir = Mathf.Sign(d);
-            if (lastDir != 0f && dir != lastDir && accum >= minReversalDisplacement)
-            {
-                reversals++;
-                accum = 0f;
-            }
-            lastDir = dir;
-        }
-        return reversals;
-    }
-
-    /// <summary>
-    /// Builds the current scratch AABB, finds targeted words, and renders a
-    /// live strikethrough preview in ResultText — matching Apple Scribble UX.
-    /// Called each time a new scratch point is collected.
-    /// </summary>
-    private void UpdateScratchPreview()
-    {
-        if (scratchPoints.Count < 5) return;
-
-        Bounds scratch = new Bounds(scratchPoints[0], Vector3.zero);
-        foreach (var p in scratchPoints) scratch.Encapsulate(p);
-        scratch.Expand(0.01f);
-
-        var words = CurrentPage.words;
-        var newTargets = new HashSet<int>();
-        for (int i = 0; i < words.Count; i++)
-        {
-            if (OverlapsXZ(scratch, words[i].worldBounds))
-                newTargets.Add(i);
-        }
-
-        // Only re-render when the targeted set actually changes.
-        if (newTargets.SetEquals(scratchPreviewTargets)) return;
-
-        scratchPreviewTargets.Clear();
-        foreach (int idx in newTargets) scratchPreviewTargets.Add(idx);
-        hasScratchPreview = scratchPreviewTargets.Count > 0;
-        RenderScratchPreview();
-    }
-
-    /// <summary>
-    /// Writes ResultText with targeted words wrapped in TMP &lt;s&gt; strikethrough tags.
-    /// </summary>
-    private void RenderScratchPreview()
-    {
-        var pm = WhiteboardPageManager.Instance;
-        if (pm?.resultText == null) return;
-
-        if (!hasScratchPreview)
-        {
-            pm.resultText.text = CurrentPage.GetFullText();
-            return;
-        }
-
-        var words = CurrentPage.words;
-        var sb = new System.Text.StringBuilder();
-        for (int i = 0; i < words.Count; i++)
-        {
-            if (i > 0) sb.Append(' ');
-            if (scratchPreviewTargets.Contains(i))
-                sb.Append("<s>").Append(words[i].text).Append("</s>");
-            else
-                sb.Append(words[i].text);
-        }
-        pm.resultText.text = sb.ToString();
-    }
-
-    /// <summary>
-    /// Clears the live scratch preview and restores normal text display.
-    /// Called when the pen lifts, regardless of whether deletion fires.
-    /// </summary>
-    private void ClearScratchPreview()
-    {
-        if (!hasScratchPreview) return;
-        hasScratchPreview = false;
-        scratchPreviewTargets.Clear();
-        var pm = WhiteboardPageManager.Instance;
-        if (pm?.resultText != null)
-            pm.resultText.text = CurrentPage.GetFullText();
-    }
-
-    private bool TryHandleScratch(int reversals = -1)
-    {
-        Bounds scratch = new Bounds(scratchPoints[0], Vector3.zero);
-        foreach (var p in scratchPoints) scratch.Encapsulate(p);
-        scratch.Expand(0.01f);
-
-        bool deleted = false;
-        var  deletedWords = new List<string>();
-
-        for (int i = CurrentPage.words.Count - 1; i >= 0; i--)
-        {
-            var w = CurrentPage.words[i];
-            if (OverlapsXZ(scratch, w.worldBounds))
-            {
-                deletedWords.Add(w.text);
-                DeleteWord(w);
-                deleted = true;
-            }
-        }
-
-        if (deleted)
-        {
-            if (pen != null)       pen.ClearStrokeBuffer();
-            if (whiteboard != null) whiteboard.ClearToBackground();
-            scratchPoints.Clear();
-
-            string revStr = reversals >= 0 ? $"reversals={reversals}, " : "";
-            Debug.Log($"{TAG} Scratch-to-delete — {revStr}" +
-                      $"deleted [{string.Join(", ", deletedWords)}]. " +
-                      $"Words remaining: {CurrentPage.words.Count}.");
-        }
-        else if (verboseScratchLog)
-        {
-            Debug.Log($"{TAG} Scratch detected (reversals={reversals}) — no words overlapped.");
-        }
-
-        return deleted;
     }
 
     private void DeleteWord(ScribbleWord word)
@@ -895,28 +647,6 @@ public class ScribbleManager : MonoBehaviour
         Debug.Log($"{TAG} Deleted \"{word.text}\" at index {index}.");
     }
 
-    private const float ScratchOverlapRatio = 0.4f; // word must be ≥40 % covered
-
-    private static bool OverlapsXZ(Bounds scratch, Bounds word)
-    {
-        // Standard XZ AABB intersection
-        if (Mathf.Abs(scratch.center.x - word.center.x) >= scratch.extents.x + word.extents.x) return false;
-        if (Mathf.Abs(scratch.center.z - word.center.z) >= scratch.extents.z + word.extents.z) return false;
-
-        // Require the scratch to cover ≥40 % of the word's width so that words
-        // adjacent to the scratch region aren't caught by a barely-touching AABB.
-        float wordWidth = word.size.x;
-        if (wordWidth > 0.005f)
-        {
-            float overlapLeft  = Mathf.Max(scratch.min.x, word.min.x);
-            float overlapRight = Mathf.Min(scratch.max.x, word.max.x);
-            float overlap      = overlapRight - overlapLeft;
-            if (overlap / wordWidth < ScratchOverlapRatio) return false;
-        }
-
-        return true;
-    }
-
     // ==================================================================
     // CLEAR / RESET
     // ==================================================================
@@ -928,7 +658,6 @@ public class ScribbleManager : MonoBehaviour
         CurrentPage.words.Clear();
         CurrentPage.undoStack.Clear();
         pendingMeta.Clear();
-        scratchPoints.Clear();
 
         if (whiteboard != null) whiteboard.ClearToBackground();
 
@@ -947,7 +676,6 @@ public class ScribbleManager : MonoBehaviour
         currentPageIndex = 0;
 
         pendingMeta.Clear();
-        scratchPoints.Clear();
 
         if (whiteboard != null) whiteboard.ClearToBackground();
 
@@ -959,46 +687,44 @@ public class ScribbleManager : MonoBehaviour
     }
 
     // ==================================================================
-    // UNDO — HAND MENU BUTTON
+    // PUBLIC HELPERS
     // ==================================================================
 
     /// <summary>
-    /// Finds the wrist / hand menu and repurposes its first button as "Undo".
-    /// Uses TMP_Text (base class) so it works regardless of component type.
+    /// Deletes the last word on the current page.
+    /// Called by the Backspace button in the Footer.
     /// </summary>
-    private void SetupHandMenuUndo()
+    public void DeleteLastWord()
     {
-        var handMenu = GameObject.Find("Hand Menu With Button Activation");
-        if (handMenu == null)
-        {
-            Debug.LogWarning($"{TAG} Hand menu not found — Undo button not configured.");
-            return;
-        }
-
-        var buttons = handMenu.GetComponentsInChildren<Button>(true);
-        if (buttons.Length == 0)
-        {
-            Debug.LogWarning($"{TAG} No Button in hand menu — Undo button not configured.");
-            return;
-        }
-
-        undoButton = buttons[0];
-
-        var label = undoButton.GetComponentInChildren<TMP_Text>(true);
-        if (label != null)
-            label.text = "Undo";
-        else
-            Debug.LogWarning($"{TAG} No TMP_Text on '{undoButton.gameObject.name}' — label unchanged.");
-
-        undoButton.onClick.RemoveAllListeners();
-        undoButton.onClick.AddListener(Undo);
-
-        Debug.Log($"{TAG} Undo button configured on '{undoButton.gameObject.name}'.");
+        if (!initialized) return;
+        var words = CurrentPage.words;
+        if (words.Count == 0) return;
+        DeleteWord(words[words.Count - 1]);
     }
 
-    // ==================================================================
-    // PUBLIC HELPERS
-    // ==================================================================
+    /// <summary>
+    /// Injects voice-transcribed text into the current page.
+    /// Does NOT clear whiteboard ink — active strokes remain until the recognition timer fires.
+    /// Called by JournalMicController after Gemini speech-to-text.
+    /// </summary>
+    public void AddVoiceText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return;
+        if (!initialized) return;
+
+        Debug.Log($"{TAG} AddVoiceText: \"{text}\"");
+
+        string[] parts = text.Trim().Split(
+            new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (string word in parts)
+            PlaceWord(word);
+
+        RefreshUI();
+        FireTextChanged();
+
+        Debug.Log($"{TAG} Voice added — page {currentPageIndex + 1}: \"{CurrentPage.GetFullText()}\"");
+    }
 
     /// <summary>Returns accumulated text across all pages.</summary>
     public string GetFullJournalText()
@@ -1023,57 +749,6 @@ public class ScribbleManager : MonoBehaviour
             CurrentPage.GetFullText(),
             currentPageIndex,
             pages.Count);
-        UpdateWordBoundsFromTMP();
-    }
-
-    /// <summary>
-    /// Reads the actual rendered positions of each word from TMP's characterInfo
-    /// and updates worldBounds for accurate scratch-to-delete hit testing.
-    /// This is required because TMP alignment (centre, right, etc.) places text
-    /// at positions that differ from our left-aligned cursor calculations.
-    /// </summary>
-    private void UpdateWordBoundsFromTMP()
-    {
-        var pm = WhiteboardPageManager.Instance;
-        if (pm?.resultText == null) return;
-
-        pm.resultText.ForceMeshUpdate();
-        TMP_TextInfo textInfo = pm.resultText.textInfo;
-        var rt    = (RectTransform)pm.resultText.transform;
-        var words = CurrentPage.words;
-
-        int charOffset = 0;
-        for (int wi = 0; wi < words.Count; wi++)
-        {
-            int wordLen    = words[wi].text.Length;
-            int lastCharIdx = charOffset + wordLen - 1;
-            if (lastCharIdx >= textInfo.characterCount) break;
-
-            TMP_CharacterInfo fc = textInfo.characterInfo[charOffset];
-            TMP_CharacterInfo lc = textInfo.characterInfo[lastCharIdx];
-
-            // Convert all four corners from ResultText local (canvas px) to world space.
-            // rt.TransformPoint handles canvas position, rotation, and 0.001 scale.
-            Vector3 w0 = rt.TransformPoint(fc.bottomLeft.x,  fc.bottomLeft.y,  0f);
-            Vector3 w1 = rt.TransformPoint(fc.topLeft.x,     fc.topLeft.y,     0f);
-            Vector3 w2 = rt.TransformPoint(lc.bottomRight.x, lc.bottomRight.y, 0f);
-            Vector3 w3 = rt.TransformPoint(lc.topRight.x,    lc.topRight.y,    0f);
-
-            float minX = Mathf.Min(w0.x, w1.x, w2.x, w3.x);
-            float maxX = Mathf.Max(w0.x, w1.x, w2.x, w3.x);
-            float minZ = Mathf.Min(w0.z, w1.z, w2.z, w3.z);
-            float maxZ = Mathf.Max(w0.z, w1.z, w2.z, w3.z);
-
-            Vector3 center = new Vector3((minX + maxX) * 0.5f,
-                                         (w0.y + w2.y) * 0.5f,
-                                         (minZ + maxZ) * 0.5f);
-            Vector3 size   = new Vector3(maxX - minX + 0.01f, 0.05f, maxZ - minZ + 0.01f);
-
-            words[wi].worldCenter = center;
-            words[wi].worldBounds = new Bounds(center, size);
-
-            charOffset += wordLen + 1; // +1 for the space separator
-        }
     }
 
     private void FireTextChanged()
@@ -1097,9 +772,6 @@ public class ScribbleManager : MonoBehaviour
             if (onStrokesFlushedDelegate != null) pen.OnStrokesFlushed -= onStrokesFlushedDelegate;
             if (onBoardClearedDelegate   != null) pen.OnBoardCleared   -= onBoardClearedDelegate;
         }
-
-        if (undoButton != null)
-            undoButton.onClick.RemoveListener(Undo);
 
         if (measureTMP != null && measureTMP.gameObject != null)
             Destroy(measureTMP.gameObject);
