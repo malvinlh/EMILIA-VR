@@ -66,13 +66,6 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("The Chair child.")]
     public Transform chair;
 
-    [Header("Whiteboard Placeholder")]
-    [Tooltip("A collider on the virtual table that defines where and at what scale the " +
-             "whiteboard should spawn. Place a Box Collider (set as trigger) on the table " +
-             "surface to visualize the whiteboard area in the editor. " +
-             "If null, the whiteboard spawns at the raw MR-detected position.")]
-    public Transform whiteboardPlaceholder;
-
     [Header("SeatPoint Calibration")]
     [Tooltip("The SeatPoint transform where the player will be teleported after calibration. " +
              "Its forward direction defines the player's seated facing direction. " +
@@ -125,8 +118,11 @@ public class JournalSessionManager : MonoBehaviour
 
     [Header("Fallback")]
     [Tooltip("Seconds to wait in detection before offering fallback spawn.")]
-    [Range(5f, 30f)]
-    public float detectionTimeout = 15f;
+    [Range(5f, 120f)]
+    public float detectionTimeout = 60f;
+
+    // ── Singleton ───────────────────────────────────────────────────────
+    public static JournalSessionManager Instance { get; private set; }
 
     // ── State ───────────────────────────────────────────────────────────
     public SessionState CurrentState { get; private set; } = SessionState.Idle;
@@ -136,20 +132,25 @@ public class JournalSessionManager : MonoBehaviour
     private Vector3 originalTableLocalPosition;
     private float detectionTimeoutTimer;
     private bool hasTimedOut;
-    private GameObject spawnedWhiteboard;
     private ARTableDetector.DetectedTable pendingTable;
+    private bool calibrationDataValid;
     private bool scenePermissionGranted;
     private XRHandSubsystem handSubsystem;
     private List<LocomotionProvider> disabledLocomotionProviders = new List<LocomotionProvider>();
     private float originalXROriginY;
     private float capturedRealEyeHeight;
-    private bool placeholderWasVisible;
     private float originalHeightAdjustmentY;
     private bool hasAdjustedHeightAdjustment;
 
     // ================================================================
     // LIFECYCLE
     // ================================================================
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(this); return; }
+        Instance = this;
+    }
 
     private void Start()
     {
@@ -181,6 +182,9 @@ public class JournalSessionManager : MonoBehaviour
             CreateInstructionText();
 
         HideInstruction();
+
+        // Whiteboard UI is only shown while journaling.
+        SetWhiteboardUIActive(false);
     }
 
     private void Update()
@@ -296,7 +300,7 @@ public class JournalSessionManager : MonoBehaviour
     {
         CurrentState = SessionState.Passthrough;
 
-        ShowInstruction("Switching to your real surroundings...");
+        ShowInstruction("Find a flat surface and place both hands\npalm facing downward.");
 
         if (passthroughManager != null)
             passthroughManager.EnterPassthrough(() => EnterPlaneDiscovery());
@@ -361,7 +365,7 @@ public class JournalSessionManager : MonoBehaviour
         if (calibrationGuide != null)
             calibrationGuide.Show();
 
-        ShowInstruction("Place both hands flat on your table.\nHold for 2 seconds.");
+        ShowInstruction("Find a flat surface and place both hands\npalm facing downward.");
     }
 
     private void OnTableConfirmed(ARTableDetector.DetectedTable table)
@@ -407,10 +411,13 @@ public class JournalSessionManager : MonoBehaviour
         // Step 1: Spawn whiteboard on real table in passthrough
         SpawnWhiteboardForPreview(table);
 
-        ShowInstruction("Journal ready! Transitioning...");
+        ShowInstruction("Calibrating...");
 
         // Step 2: Let user see the whiteboard on their real table
-        yield return new WaitForSeconds(previewDuration);
+        yield return new WaitForSeconds(previewDuration * 0.6f);
+
+        ShowInstruction("Done, returning to the game world.");
+        yield return new WaitForSeconds(previewDuration * 0.4f);
 
         // Step 3: Transition to VR
         CurrentState = SessionState.TransitionToVR;
@@ -425,25 +432,17 @@ public class JournalSessionManager : MonoBehaviour
             passthroughManager.ExitPassthrough(() =>
             {
                 CurrentState = SessionState.Journaling;
+                SetWhiteboardUIActive(true);
                 LockLocomotion();
                 Debug.Log("[JournalSession] Journaling session started.");
             });
         }
         else
         {
-            if (seatPoint != null && xrOrigin != null)
-            {
-                TeleportToSeatPoint(table);
-                AdjustTableForDistanceMismatch(table);
-                if (applySceneHeightCorrection)
-                    AdjustIslandHeight(table);
-            }
-            else
-            {
-                AlignVRWorldToTable(table);
-            }
+            TeleportToSeatPoint();
             MoveWhiteboardToVRLayer();
             CurrentState = SessionState.Journaling;
+            SetWhiteboardUIActive(true);
             LockLocomotion();
             Debug.Log("[JournalSession] Journaling session started (no passthrough).");
         }
@@ -457,21 +456,10 @@ public class JournalSessionManager : MonoBehaviour
         // fade-from-black coroutine, leaving the screen permanently black.
         try
         {
-            if (seatPoint != null && xrOrigin != null)
-            {
-                TeleportToSeatPoint(pendingTable);
-                AdjustTableForDistanceMismatch(pendingTable);
-                if (applySceneHeightCorrection)
-                    AdjustIslandHeight(pendingTable);  // optional scene correction
-            }
-            else
-            {
-                AlignVRWorldToTable(pendingTable);
-            }
-
+            // Scene is fully static — only the player (XR Origin) is repositioned.
+            TeleportToSeatPoint();
             MoveWhiteboardToVRLayer();
 
-            // Create spatial anchor for drift resistance
             if (alignmentAnchor != null)
             {
                 Pose tablePose = new Pose(pendingTable.position, pendingTable.rotation);
@@ -491,95 +479,15 @@ public class JournalSessionManager : MonoBehaviour
     private void SpawnWhiteboardForPreview(ARTableDetector.DetectedTable table)
     {
         pendingTable = table;
-
-        if (whiteboardUtils == null || whiteboardUtils.WhiteboardPrefab == null) return;
-
-        var wbComponent = whiteboardUtils.WhiteboardPrefab.GetComponent<Whiteboard>();
-        if (wbComponent != null)
-            wbComponent.backgroundColor = journalBackgroundColor;
-
-        // Spawn at the hand-detected position (palm midpoint on real table).
-        // Use the placeholder's BoxCollider size so the passthrough preview
-        // matches the game-world whiteboard exactly.
-        Vector3 spawnPos = table.position + Vector3.up * 0.002f;
-        Vector2 spawnSize = GetPlaceholderWorldSize(table.size);
-
-        spawnedWhiteboard = whiteboardUtils.SpawnAligned(spawnPos, table.rotation, spawnSize);
-
-        if (spawnedWhiteboard != null)
-        {
-            int ptLayer = passthroughManager != null
-                ? passthroughManager.GetPassthroughUILayer()
-                : 31;
-            PassthroughManager.SetLayerRecursive(spawnedWhiteboard, ptLayer);
-
-            Debug.Log($"[JournalSession] Whiteboard spawned at {spawnPos}, " +
-                      $"size={spawnSize} on layer {ptLayer} (passthrough preview).");
-        }
-    }
-
-    /// <summary>
-    /// Returns the whiteboard size from the placeholder's BoxCollider (world-space
-    /// X and Z dimensions). Falls back to the MR-detected size if no placeholder
-    /// or no BoxCollider is assigned.
-    /// </summary>
-    private Vector2 GetPlaceholderWorldSize(Vector2 fallbackSize)
-    {
-        if (whiteboardPlaceholder == null) return fallbackSize;
-
-        BoxCollider boxCol = whiteboardPlaceholder.GetComponent<BoxCollider>();
-        if (boxCol == null) return fallbackSize;
-
-        Vector3 worldSize = Vector3.Scale(boxCol.size, whiteboardPlaceholder.lossyScale);
-        return new Vector2(worldSize.x, worldSize.z);
+        calibrationDataValid = true;
+        Debug.Log($"[JournalSession] Table confirmed at {table.position}. " +
+                  "Using static whiteboard — no preview spawn.");
     }
 
     private void MoveWhiteboardToVRLayer()
     {
-        if (spawnedWhiteboard == null) return;
-
-        const int WHITEBOARD_LAYER = 10;
-        PassthroughManager.SetLayerRecursive(spawnedWhiteboard, WHITEBOARD_LAYER);
-
-        // Reposition the whiteboard onto the placeholder if one is assigned.
-        // Uses the BoxCollider (if present) for precise center alignment and
-        // resizes the whiteboard to match the placeholder's defined area.
-        if (whiteboardPlaceholder != null)
-        {
-            BoxCollider boxCol = whiteboardPlaceholder.GetComponent<BoxCollider>();
-            if (boxCol != null)
-            {
-                // Use box collider's world-space center for precise alignment
-                Vector3 worldCenter = whiteboardPlaceholder.TransformPoint(boxCol.center);
-                spawnedWhiteboard.transform.position = worldCenter + Vector3.up * 0.002f;
-
-                // Match the whiteboard scale to the placeholder's box collider size
-                Vector3 worldSize = Vector3.Scale(boxCol.size, whiteboardPlaceholder.lossyScale);
-                float scaleX = worldSize.x / 10f;
-                float scaleZ = worldSize.z / 10f;
-                spawnedWhiteboard.transform.localScale = new Vector3(scaleX, 0.1f / 10f, scaleZ);
-
-                // Reinitialize the whiteboard texture for the new size
-                var wb = spawnedWhiteboard.GetComponent<Whiteboard>();
-                if (wb != null) wb.Initialize();
-            }
-            else
-            {
-                spawnedWhiteboard.transform.position =
-                    whiteboardPlaceholder.position + Vector3.up * 0.002f;
-            }
-            spawnedWhiteboard.transform.rotation = whiteboardPlaceholder.rotation;
-
-            Debug.Log($"[JournalSession] Whiteboard repositioned to placeholder at " +
-                      $"{spawnedWhiteboard.transform.position}, " +
-                      $"scale={spawnedWhiteboard.transform.localScale}.");
-
-            // Hide the placeholder during journaling
-            placeholderWasVisible = whiteboardPlaceholder.gameObject.activeSelf;
-            whiteboardPlaceholder.gameObject.SetActive(false);
-        }
-
-        Debug.Log("[JournalSession] Whiteboard moved to layer 10 for VR interaction.");
+        // Static whiteboard is already on the correct VR layer (10) — nothing to do.
+        Debug.Log("[JournalSession] Static whiteboard in scene — no layer move required.");
     }
 
     // ================================================================
@@ -660,50 +568,62 @@ public class JournalSessionManager : MonoBehaviour
     // ================================================================
 
     /// <summary>
-    /// Teleports the XR Origin so the player's camera ends up at SeatPoint's
-    /// position (XZ) and forward direction (yaw). The camera Y is set to
-    /// SeatPoint's designed eye height — AdjustIslandHeight() then moves the
-    /// entire island so the virtual table surface sits at the correct
-    /// eye-relative height to match the real table detected in passthrough.
+    /// Teleports the XR Origin so the player's camera ends up at SeatPoint's XZ
+    /// position and forward direction (yaw). Camera Y is calibrated from passthrough:
+    ///   targetEyeY = virtualTableSurfaceY + (realEyeY - realTableY)
+    /// This makes the virtual whiteboard appear at the same eye-relative height as the
+    /// real table the user placed their palms on. Scene objects are never moved.
+    /// Falls back to SeatPoint.y if no calibration data is available (e.g. timeout).
     /// </summary>
-    private void TeleportToSeatPoint(ARTableDetector.DetectedTable table)
+    private void TeleportToSeatPoint()
     {
-        if (seatPoint == null || xrOrigin == null) return;
+        if (seatPoint == null) return;
+
+        // Auto-find XR Origin if not wired in the inspector
+        if (xrOrigin == null)
+        {
+            var origin = FindFirstObjectByType<Unity.XR.CoreUtils.XROrigin>();
+            if (origin != null) xrOrigin = origin.transform;
+        }
+        if (xrOrigin == null) return;
 
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        // Save original Y for restoration when session ends
         originalXROriginY = xrOrigin.position.y;
 
         // 1. Rotate XR Origin so camera faces SeatPoint's forward direction
-        float currentCamYaw = cam.transform.eulerAngles.y;
-        float targetYaw = seatPoint.eulerAngles.y;
-        float yawDelta = targetYaw - currentCamYaw;
+        float yawDelta = seatPoint.eulerAngles.y - cam.transform.eulerAngles.y;
         xrOrigin.RotateAround(cam.transform.position, Vector3.up, yawDelta);
 
-        // 2. Translate XR Origin so camera ends up at SeatPoint XZ position
+        // 2. Translate XR Origin so camera XZ is at SeatPoint XZ
         Vector3 offset = seatPoint.position - cam.transform.position;
         offset.y = 0f;
         xrOrigin.position += offset;
 
-        // 3. Set camera Y to SeatPoint's designed eye height.
-        //    AdjustIslandHeight() will shift the whole island up/down so the
-        //    virtual table is at the same eye-relative height as the real one.
-        float targetEyeY = seatPoint.position.y;
-
-        // Optional: match real-world eye-above-table relation captured in passthrough.
-        // This keeps chair/table grounded while adapting comfort to each user.
-        if (calibrateUserEyeHeight)
+        // 3. Determine target eye height.
+        //    If passthrough calibration ran: preserve the user's real eye-above-table
+        //    distance so the virtual whiteboard feels at the same height as the real table.
+        //    Otherwise: use SeatPoint's authored eye height as-is.
+        float targetEyeY;
+        if (calibrationDataValid)
         {
-            float measuredEyeAboveTable = capturedRealEyeHeight - table.position.y;
-            float clampedEyeAboveTable = Mathf.Clamp(
-                measuredEyeAboveTable,
+            float realEyeAboveTable = capturedRealEyeHeight - pendingTable.position.y;
+            realEyeAboveTable = Mathf.Clamp(
+                realEyeAboveTable,
                 Mathf.Min(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y),
                 Mathf.Max(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y));
 
-            float virtualTableY = GetVirtualTableSurfaceY();
-            targetEyeY = virtualTableY + clampedEyeAboveTable;
+            targetEyeY = GetVirtualTableSurfaceY() + realEyeAboveTable;
+
+            Debug.Log($"[JournalSession] Eye-height calibrated: realEyeAboveTable=" +
+                      $"{realEyeAboveTable:F3}m, virtualTableY={GetVirtualTableSurfaceY():F3}m, " +
+                      $"targetEyeY={targetEyeY:F3}m");
+        }
+        else
+        {
+            targetEyeY = seatPoint.position.y;
+            Debug.Log($"[JournalSession] No calibration data — using SeatPoint eye height {targetEyeY:F3}m");
         }
 
         float trackingHeight = cam.transform.position.y - xrOrigin.position.y;
@@ -714,62 +634,7 @@ public class JournalSessionManager : MonoBehaviour
 
         Debug.Log($"[JournalSession] Teleported to SeatPoint. " +
                   $"XR Origin → {xrOrigin.position}, yaw delta={yawDelta:F1}°, " +
-              $"camera Y → {cam.transform.position.y:F2} (SeatPoint.y={seatPoint.position.y:F2}, targetEyeY={targetEyeY:F2})");
-    }
-
-    /// <summary>
-    /// Handles the distance mismatch between the real-world chair-to-table
-    /// distance and the virtual SeatPoint-to-JournalTable distance.
-    ///
-    /// Approach: Offset the JournalTable along SeatPoint's forward axis
-    /// so the virtual table sits at the same relative distance as the real one.
-    /// This keeps the whiteboard reachable and prevents arm-length discomfort.
-    /// </summary>
-    private void AdjustTableForDistanceMismatch(ARTableDetector.DetectedTable table)
-    {
-        if (seatPoint == null || journalTable == null || journalChairTable == null) return;
-
-        // When a placeholder defines the whiteboard position, the scene layout
-        // is authoritative — moving journalTable would shift the placeholder
-        // away from its designed position. TeleportToSeatPoint already places
-        // the user at the correct viewing distance.
-        if (whiteboardPlaceholder != null)
-        {
-            Debug.Log("[JournalSession] Skipping distance adjustment — " +
-                      "whiteboardPlaceholder defines authoritative position.");
-            return;
-        }
-
-        // Real-world horizontal distance from user's head to detected table center
-        Vector3 headXZ = new Vector3(table.userHeadPosition.x, 0f, table.userHeadPosition.z);
-        Vector3 tableXZ = new Vector3(table.position.x, 0f, table.position.z);
-        float realDistance = Vector3.Distance(headXZ, tableXZ);
-
-        // Virtual horizontal distance from SeatPoint to JournalTable
-        Vector3 seatXZ = new Vector3(seatPoint.position.x, 0f, seatPoint.position.z);
-        Vector3 virtualTableXZ = new Vector3(journalTable.position.x, 0f, journalTable.position.z);
-        float virtualDistance = Vector3.Distance(seatXZ, virtualTableXZ);
-
-        float distanceDelta = realDistance - virtualDistance;
-
-        // Only adjust if the difference is noticeable (>5cm) to avoid unnecessary jitter
-        if (Mathf.Abs(distanceDelta) < 0.05f)
-        {
-            Debug.Log($"[JournalSession] Distance mismatch is negligible " +
-                      $"(real={realDistance:F2}m, virtual={virtualDistance:F2}m). No offset applied.");
-            return;
-        }
-
-        // Push the table forward/backward along SeatPoint's forward axis
-        Vector3 seatForward = seatPoint.forward;
-        seatForward.y = 0f;
-        seatForward.Normalize();
-
-        journalTable.position += seatForward * distanceDelta;
-
-        Debug.Log($"[JournalSession] Table distance offset applied: {distanceDelta:F3}m " +
-                  $"(real={realDistance:F2}m, virtual={virtualDistance:F2}m). " +
-                  $"JournalTable now at {journalTable.position}.");
+                  $"camera Y → {cam.transform.position.y:F2}");
     }
 
     /// <summary>
@@ -846,20 +711,8 @@ public class JournalSessionManager : MonoBehaviour
         return null;
     }
 
-    /// <summary>
-    /// Returns the world-space Y of the virtual writing surface.
-    /// Uses the whiteboardPlaceholder BoxCollider center for precision,
-    /// falls back to the placeholder or journalTable position.
-    /// </summary>
     private float GetVirtualTableSurfaceY()
     {
-        if (whiteboardPlaceholder != null)
-        {
-            BoxCollider boxCol = whiteboardPlaceholder.GetComponent<BoxCollider>();
-            if (boxCol != null)
-                return whiteboardPlaceholder.TransformPoint(boxCol.center).y;
-            return whiteboardPlaceholder.position.y;
-        }
         if (journalTable != null)
             return journalTable.position.y;
         return 0f;
@@ -878,9 +731,6 @@ public class JournalSessionManager : MonoBehaviour
 
         if (alignmentAnchor != null)
             alignmentAnchor.ReleaseAnchor();
-
-        if (spawnedWhiteboard != null)
-            spawnedWhiteboard.SetActive(false);
 
         if (passthroughManager != null)
             passthroughManager.EnterPassthrough(() => EnterPlaneDiscovery());
@@ -912,23 +762,11 @@ public class JournalSessionManager : MonoBehaviour
 
     private void SpawnAtDefaultPosition()
     {
+        TeleportToSeatPoint();
         CurrentState = SessionState.Journaling;
+        SetWhiteboardUIActive(true);
         LockLocomotion();
-
-        if (whiteboardUtils != null && whiteboardUtils.WhiteboardPrefab != null && journalTable != null)
-        {
-            var wbComponent = whiteboardUtils.WhiteboardPrefab.GetComponent<Whiteboard>();
-            if (wbComponent != null)
-                wbComponent.backgroundColor = journalBackgroundColor;
-
-            Vector3 pos = journalTable.position + Vector3.up * 0.002f;
-            Quaternion rot = Quaternion.LookRotation(journalTable.forward, Vector3.up);
-            Vector2 size = new Vector2(0.4f, 0.3f);
-
-            spawnedWhiteboard = whiteboardUtils.SpawnAligned(pos, rot, size);
-        }
-
-        Debug.Log("[JournalSession] Fallback: spawned whiteboard at default position.");
+        Debug.Log("[JournalSession] Fallback timeout — entering journaling with static whiteboard.");
     }
 
     // ================================================================
@@ -945,9 +783,9 @@ public class JournalSessionManager : MonoBehaviour
 
     private IEnumerator EndSessionCoroutine()
     {
-        ShowInstruction("Saving your reflections...");
+        SetWhiteboardUIActive(false);
 
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.5f);
 
         CleanupWhiteboard();
         HideInstruction();
@@ -955,41 +793,8 @@ public class JournalSessionManager : MonoBehaviour
         if (alignmentAnchor != null)
             alignmentAnchor.ReleaseAnchor();
 
-        if (journalChairTable != null)
-        {
-            Vector3 startPos = journalChairTable.position;
-            Quaternion startRot = journalChairTable.rotation;
-            float elapsed = 0f;
-            float duration = 0.5f;
-
-            while (elapsed < duration)
-            {
-                elapsed += Time.deltaTime;
-                float t = Mathf.Clamp01(elapsed / duration);
-                t = t * t * (3f - 2f * t);
-
-                journalChairTable.position = Vector3.Lerp(startPos, originalChairTablePosition, t);
-                journalChairTable.rotation = Quaternion.Slerp(startRot, originalChairTableRotation, t);
-                yield return null;
-            }
-
-            journalChairTable.position = originalChairTablePosition;
-            journalChairTable.rotation = originalChairTableRotation;
-        }
-
-        // Restore table local position if it was offset for distance mismatch
-        if (journalTable != null)
-            journalTable.localPosition = originalTableLocalPosition;
-
-        // Restore height adjustment root to pre-session Y
-        Transform adjustmentRoot = ResolveHeightAdjustmentRoot();
-        if (adjustmentRoot != null && hasAdjustedHeightAdjustment)
-        {
-            Vector3 p = adjustmentRoot.position;
-            adjustmentRoot.position = new Vector3(p.x, originalHeightAdjustmentY, p.z);
-            hasAdjustedHeightAdjustment = false;
-        }
-
+        calibrationDataValid = false;
+        // Scene objects are never moved during a session — only restore the XR Origin.
         RestoreXROriginHeight();
         UnlockLocomotion();
 
@@ -1051,25 +856,9 @@ public class JournalSessionManager : MonoBehaviour
 
     private void ResetToIdle()
     {
-        if (journalChairTable != null)
-        {
-            journalChairTable.position = originalChairTablePosition;
-            journalChairTable.rotation = originalChairTableRotation;
-        }
-
-        // Restore table local position if it was offset for distance mismatch
-        if (journalTable != null)
-            journalTable.localPosition = originalTableLocalPosition;
-
-        // Restore height adjustment root to pre-session Y
-        Transform adjustmentRoot = ResolveHeightAdjustmentRoot();
-        if (adjustmentRoot != null && hasAdjustedHeightAdjustment)
-        {
-            Vector3 p = adjustmentRoot.position;
-            adjustmentRoot.position = new Vector3(p.x, originalHeightAdjustmentY, p.z);
-            hasAdjustedHeightAdjustment = false;
-        }
-
+        calibrationDataValid = false;
+        SetWhiteboardUIActive(false);
+        // Scene objects are never moved during a session — only restore the XR Origin.
         RestoreXROriginHeight();
         UnlockLocomotion();
 
@@ -1148,17 +937,16 @@ public class JournalSessionManager : MonoBehaviour
             startButton.gameObject.SetActive(visible);
     }
 
+    private void SetWhiteboardUIActive(bool active)
+    {
+        var pm = WhiteboardPageManager.Instance;
+        if (pm != null && pm.uiCanvas != null)
+            pm.uiCanvas.gameObject.SetActive(active);
+    }
+
     private void CleanupWhiteboard()
     {
-        if (spawnedWhiteboard != null)
-        {
-            Destroy(spawnedWhiteboard);
-            spawnedWhiteboard = null;
-        }
-
-        // Restore placeholder visibility
-        if (whiteboardPlaceholder != null && placeholderWasVisible)
-            whiteboardPlaceholder.gameObject.SetActive(true);
+        // Static whiteboard stays in scene — nothing to destroy or restore.
     }
 
     // ================================================================
@@ -1228,6 +1016,8 @@ public class JournalSessionManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (Instance == this) Instance = null;
+
         if (startButton != null)
             startButton.OnButtonPressed -= OnStartButtonPressed;
 

@@ -96,6 +96,13 @@ public class JournalInlineCursor : MonoBehaviour
     /// <summary>True while a word-range selection (not just a cursor) is active.</summary>
     public bool HasActiveSelection => _state == CursorState.SelectionActive;
 
+    /// <summary>Current world-space ray from the index finger tip, updated every tracked frame.</summary>
+    public Ray     CurrentRay       { get; private set; }
+    /// <summary>World-space position of the right-hand index finger tip.</summary>
+    public Vector3 TipWorldPosition { get; private set; }
+    /// <summary>True when the right hand is tracked and joint data is valid this frame.</summary>
+    public bool    IsHandTracked    { get; private set; }
+
     private const string TAG = "[JournalInlineCursor]";
 
     // ==================================================================
@@ -148,6 +155,7 @@ public class JournalInlineCursor : MonoBehaviour
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        IsHandTracked = false;
         if (_blinkCo != null) StopCoroutine(_blinkCo);
         ScribbleManager.Instance?.ClearInsertCursor();
         foreach (var h in _highlights)
@@ -160,15 +168,25 @@ public class JournalInlineCursor : MonoBehaviour
 
     private void Update()
     {
+        // Only active during a journaling session — no interaction on the
+        // whiteboard until the user has started the journal session.
+        if (JournalSessionManager.Instance == null ||
+            JournalSessionManager.Instance.CurrentState != JournalSessionManager.SessionState.Journaling)
+        {
+            SetRayVisible(false);
+            IsHandTracked = false;
+            return;
+        }
+
         // ── Lazy subsystem init ───────────────────────────────────────
         if (_handSubsystem == null)
         {
             _handSubsystem = WhiteboardPen.GetHandSubsystem();
-            if (_handSubsystem == null) return;
+            if (_handSubsystem == null) { IsHandTracked = false; return; }
         }
 
         var rightHand = _handSubsystem.rightHand;
-        if (!rightHand.isTracked) { SetRayVisible(false); return; }
+        if (!rightHand.isTracked) { SetRayVisible(false); IsHandTracked = false; return; }
 
         // ── Page-change guard ─────────────────────────────────────────
         // Dismiss cursor / selection if the user navigated to a different page.
@@ -185,12 +203,16 @@ public class JournalInlineCursor : MonoBehaviour
         bool gotThumb    = rightHand.GetJoint(XRHandJointID.ThumbTip)
                                     .TryGetPose(out Pose thumbPose);
 
-        if (!gotTip || !gotThumb) { SetRayVisible(false); return; }
+        if (!gotTip || !gotThumb) { SetRayVisible(false); IsHandTracked = false; return; }
 
         // Convert from session/tracking space to world space
         Vector3 tipWorld      = JointToWorld(tipPose.position);
         Vector3 thumbWorld    = JointToWorld(thumbPose.position);
         Vector3 proximalWorld = gotProximal ? JointToWorld(proximalPose.position) : Vector3.zero;
+
+        // Expose tip position for external components (e.g. JournalDoneButton)
+        TipWorldPosition = tipWorld;
+        IsHandTracked    = true;
 
         // ── Button poke detection (independent of pinch / cursor logic) ──
         CheckButtonPoke(tipWorld);
@@ -206,6 +228,7 @@ public class JournalInlineCursor : MonoBehaviour
             : tipPose.forward;
         if (rayDir.sqrMagnitude < 0.001f) rayDir = Vector3.forward;
         var ray = new Ray(rayOrigin, rayDir);
+        CurrentRay = ray;
 
         // ── Hit tests ─────────────────────────────────────────────────
         Vector3 rtHit = Vector3.zero;

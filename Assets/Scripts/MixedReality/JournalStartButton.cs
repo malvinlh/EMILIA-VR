@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.XR;
 using UnityEngine.XR.Hands;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -55,6 +56,7 @@ public class JournalStartButton : MonoBehaviour
     private float cooldownTimer;
     private bool isOnCooldown;
     private bool wasHovering;
+    private bool _wasTriggerDown;
 
     private void Awake()
     {
@@ -92,6 +94,16 @@ public class JournalStartButton : MonoBehaviour
             xrInteractable.hoverEntered.AddListener(OnControllerHoverEnter);
             xrInteractable.hoverExited.AddListener(OnControllerHoverExit);
         }
+
+        // Always restore to idle appearance when the button is shown.
+        // This prevents the pressed/green tint persisting after a session ends.
+        isOnCooldown = false;
+        cooldownTimer = 0f;
+        _wasTriggerDown = false;
+        wasHovering = false;
+        SetColor(idleColor);
+        if (idleLocalPos != Vector3.zero)   // Awake sets this; guard against OnEnable before Awake
+            transform.localPosition = idleLocalPos;
     }
 
     private void OnDisable()
@@ -102,6 +114,28 @@ public class JournalStartButton : MonoBehaviour
             xrInteractable.hoverEntered.RemoveListener(OnControllerHoverEnter);
             xrInteractable.hoverExited.RemoveListener(OnControllerHoverExit);
         }
+    }
+
+    // ================================================================
+    // CONTROLLER INPUT — DIRECT TRIGGER
+    // ================================================================
+
+    /// <summary>
+    /// Reads the right-hand controller trigger directly via XR InputDevice API.
+    /// This fires regardless of how the XRI ray interactor's "select" action is bound,
+    /// ensuring trigger (not grip) activates the button.
+    /// </summary>
+    private void CheckControllerTrigger()
+    {
+        var device = InputDevices.GetDeviceAtXRNode(XRNode.RightHand);
+        bool triggerDown = false;
+        if (device.isValid)
+            device.TryGetFeatureValue(CommonUsages.triggerButton, out triggerDown);
+
+        if (triggerDown && !_wasTriggerDown)
+            TriggerPress();  // TriggerPress() guards against cooldown internally
+
+        _wasTriggerDown = triggerDown;
     }
 
     // ================================================================
@@ -134,6 +168,9 @@ public class JournalStartButton : MonoBehaviour
 
     private void Update()
     {
+        // Direct controller trigger detection (works regardless of XRI select bindings)
+        CheckControllerTrigger();
+
         // Cooldown timer (shared between hand and controller paths)
         if (isOnCooldown)
         {

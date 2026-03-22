@@ -162,6 +162,19 @@ public class WhiteboardPen : MonoBehaviour
 
     private void Update()
     {
+        // Only active during a journaling session — blocks drawing, hover,
+        // pinky-pinch clear, and accidental content wipes outside of session.
+        if (JournalSessionManager.Instance == null ||
+            JournalSessionManager.Instance.CurrentState != JournalSessionManager.SessionState.Journaling)
+        {
+            if (whiteboard != null) whiteboard.ToggleTouch(false);
+            if (hoverWhiteboard != null) { hoverWhiteboard.ToggleHover(false); hoverWhiteboard = null; }
+            wasTouchingLastFrame = false;
+            hasMadeContact = false;
+            CurrentTouchWorldPoint = null;
+            return;
+        }
+
         // Only the right hand can draw on the whiteboard.
         if (handedness == Handedness.Left) return;
 
