@@ -181,6 +181,11 @@ public class JournalSessionManager : MonoBehaviour
         if (calibrationGuide == null && instructionText == null)
             CreateInstructionText();
 
+        // Always own the instruction text so CalibrationGuide's internal event
+        // handlers (OnProgress / OnConfirmed) cannot overwrite our messages.
+        if (instructionText == null)
+            CreateInstructionText();
+
         HideInstruction();
 
         // Whiteboard UI is only shown while journaling.
@@ -208,12 +213,9 @@ public class JournalSessionManager : MonoBehaviour
                 UpdateCalibrationPalmIndicators();
         }
 
-        // Keep fallback instruction text facing user during passthrough
-        if (calibrationGuide == null && instructionText != null
-            && instructionText.gameObject.activeSelf)
-        {
+        // Keep instruction text facing user and at arm's length during passthrough
+        if (instructionText != null && instructionText.gameObject.activeSelf)
             UpdateInstructionPosition();
-        }
     }
 
     /// <summary>
@@ -300,7 +302,7 @@ public class JournalSessionManager : MonoBehaviour
     {
         CurrentState = SessionState.Passthrough;
 
-        ShowInstruction("Find a flat surface and place both hands\npalm facing downward.");
+        ShowInstruction("Find a flat surface and place both hands\nwith palms facing downward.");
 
         if (passthroughManager != null)
             passthroughManager.EnterPassthrough(() => EnterPlaneDiscovery());
@@ -363,9 +365,13 @@ public class JournalSessionManager : MonoBehaviour
         }
 
         if (calibrationGuide != null)
+        {
             calibrationGuide.Show();
+            // Suppress CalibrationGuide's own instruction TMP — we own the text.
+            calibrationGuide.HideInstruction();
+        }
 
-        ShowInstruction("Find a flat surface and place both hands\npalm facing downward.");
+        ShowInstruction("Find a flat surface and place both hands\nwith palms facing downward.");
     }
 
     private void OnTableConfirmed(ARTableDetector.DetectedTable table)
@@ -955,14 +961,11 @@ public class JournalSessionManager : MonoBehaviour
 
     private void ShowInstruction(string message)
     {
-        // Prefer CalibrationGuide if available
-        if (calibrationGuide != null)
-        {
-            calibrationGuide.SetInstruction(message);
-            return;
-        }
-
-        // Fallback: world-space TextMeshPro
+        // Always use our own world-space TMP so CalibrationGuide's internal
+        // event handlers (OnConfirmationProgress / OnTableConfirmed) cannot
+        // overwrite the message we set.
+        if (instructionText == null)
+            CreateInstructionText();
         if (instructionText == null) return;
 
         instructionText.text = message;
@@ -972,9 +975,6 @@ public class JournalSessionManager : MonoBehaviour
 
     private void HideInstruction()
     {
-        if (calibrationGuide != null)
-            calibrationGuide.HideInstruction();
-
         if (instructionText != null)
             instructionText.gameObject.SetActive(false);
     }

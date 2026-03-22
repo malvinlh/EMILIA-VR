@@ -216,78 +216,30 @@ public class ARTableDetector : MonoBehaviour
 
         if (leftFlat && rightFlat)
         {
-            bool nearSurface;
-
+            // Try to match palms to an AR plane candidate
             if (!usingFallback)
-            {
-                // AR-plane path: palms must be within handPlaneMatchRadius of a
-                // tracked horizontal plane. The plane itself is the surface evidence —
-                // no extra work needed.
                 matchedPlane = FindMatchingPlane(leftPalmPos, rightPalmPos);
-                nearSurface = (matchedPlane != null);
-            }
-            else
+
+            holdTimer += Time.deltaTime;
+            float progress = Mathf.Clamp01(holdTimer / holdDuration);
+
+            IsConfirming = true;
+            OnConfirmationProgress?.Invoke(progress);
+
+            if (holdTimer >= holdDuration)
             {
-                // Fallback path: no AR planes available.
-                // Two checks to discriminate resting-on-surface from floating:
-                //
-                // 1. Co-planarity: both palms should be at nearly the same world-space
-                //    Y (both on the same flat table surface). When floating, people
-                //    rarely keep both hands at exactly the same height.
-                //
-                // 2. Stability: the palm midpoint must not drift more than
-                //    fallbackStabilityThreshold metres vertically during the hold.
-                //    A hand resting on a rigid surface stays still; a floating hand
-                //    drifts even when the user is trying to hold steady.
-                float palmHeightDiff = Mathf.Abs(leftPalmPos.y - rightPalmPos.y);
-                if (palmHeightDiff > 0.03f) // palms more than 3 cm apart in Y → not coplanar
-                {
-                    nearSurface = false;
-                    ResetConfirmation();
-                }
+                HasConfirmed = true;
+                IsConfirming = false;
+
+                DetectedTable result;
+                if (matchedPlane != null)
+                    result = BuildFromARPlane(matchedPlane, leftPalmPos, rightPalmPos);
                 else
-                {
-                    float palmMidY = (leftPalmPos.y + rightPalmPos.y) * 0.5f;
-                    holdMinY = Mathf.Min(holdMinY, palmMidY);
-                    holdMaxY = Mathf.Max(holdMaxY, palmMidY);
-                    nearSurface = (holdMaxY - holdMinY <= fallbackStabilityThreshold);
-                    if (!nearSurface)
-                        ResetConfirmation(); // resets min/max for the next attempt
-                }
-            }
+                    result = BuildFromHands(leftHand, rightHand, leftPalmPos, rightPalmPos);
 
-            if (nearSurface)
-            {
-                holdTimer += Time.deltaTime;
-                float progress = Mathf.Clamp01(holdTimer / holdDuration);
-
-                IsConfirming = true;
-                OnConfirmationProgress?.Invoke(progress);
-
-                if (holdTimer >= holdDuration)
-                {
-                    HasConfirmed = true;
-                    IsConfirming = false;
-
-                    DetectedTable result;
-                    if (matchedPlane != null)
-                        result = BuildFromARPlane(matchedPlane, leftPalmPos, rightPalmPos);
-                    else
-                        result = BuildFromHands(leftHand, rightHand, leftPalmPos, rightPalmPos);
-
-                    Debug.Log($"[ARTableDetector] Table confirmed at {result.position}, " +
-                              $"size={result.size}, AR={matchedPlane != null}");
-                    OnTableConfirmed?.Invoke(result);
-                }
-            }
-            else
-            {
-                // Palms flat but not near any surface — silently wait, don't advance.
-                if (wasConfirming)
-                {
-                    ResetConfirmation();
-                    OnConfirmationLost?.Invoke();
-                }
+                Debug.Log($"[ARTableDetector] Table confirmed at {result.position}, " +
+                          $"size={result.size}, AR={matchedPlane != null}");
+                OnTableConfirmed?.Invoke(result);
             }
         }
         else
@@ -576,13 +528,6 @@ public class ARTableDetector : MonoBehaviour
             palmDown = xrOrigin.TransformDirection(palmDown);
         float angle = Vector3.Angle(palmDown, Vector3.down);
         if (angle > palmDownAngleThreshold)
-            return false;
-
-        // Height sanity check: palm must be within plausible table-height range.
-        // palmPose.position.y is in tracking/session space where Y=0 is floor level
-        // (Quest calibrates the floor plane), so this directly gives metres above floor.
-        float palmTrackingY = palmPose.position.y;
-        if (palmTrackingY < minTableHeight || palmTrackingY > maxTableHeight)
             return false;
 
         float palmY = palmPose.position.y;
