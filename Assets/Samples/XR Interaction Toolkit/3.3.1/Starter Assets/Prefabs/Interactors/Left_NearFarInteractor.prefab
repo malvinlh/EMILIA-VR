@@ -52,11 +52,11 @@ MonoBehaviour:
   m_LineOriginTransform: {fileID: 5745700813747042508}
   m_VisualPointCount: 20
   m_MaxVisualCurveDistance: 10
-  m_RestingVisualLineLength: 0.25
+  m_RestingVisualLineLength: 3
   m_LineDynamicsMode: 1
-  m_RetractDelay: 1
-  m_RetractDuration: 1
-  m_ExtendLineToEmptyHit: 0
+  m_RetractDelay: 0.1
+  m_RetractDuration: 0.1
+  m_ExtendLineToEmptyHit: 1
   m_ExtensionRate: 10
   m_EndPointExpansionRate: 10
   m_ComputeMidPointWithComplexCurves: 0
