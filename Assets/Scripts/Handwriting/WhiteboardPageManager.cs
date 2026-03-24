@@ -43,6 +43,12 @@ public class WhiteboardPageManager : MonoBehaviour
     [Tooltip("TMP label showing the current page number (e.g. '1 / 2').")]
     public TMP_Text pageNumberText;
 
+    [Tooltip("TMP label shown only on the title page — displays the auto-stamped session timestamp.")]
+    public TMP_Text createdAtLabel;
+
+    [Tooltip("TMP hint shown on the title page when the user hasn't written anything yet.")]
+    public TMP_Text titleHintText;
+
     [Tooltip("HandwritingArea RectTransform — ScribbleManager uses its width for line-wrap.")]
     public RectTransform handwritingArea;
 
@@ -381,8 +387,21 @@ public class WhiteboardPageManager : MonoBehaviour
     // BUTTON EVENTS
     // ==================================================================
 
+    // Shared cooldown prevents double-fires when the ray passes through a button
+    // and back (XRI pointer can fire PointerClick on both entry and exit within one gesture).
+    private float _lastButtonTime = -1f;
+    private const float ButtonCooldown = 0.4f;
+
+    private bool ButtonReady()
+    {
+        if (Time.unscaledTime - _lastButtonTime < ButtonCooldown) return false;
+        _lastButtonTime = Time.unscaledTime;
+        return true;
+    }
+
     private void OnPrevClicked()
     {
+        if (!ButtonReady()) return;
         Debug.Log($"{TAG} OnPrevClicked");
         if (IsWritingInProgress()) return;
         PlayPageTurn();
@@ -391,6 +410,7 @@ public class WhiteboardPageManager : MonoBehaviour
 
     private void OnNextClicked()
     {
+        if (!ButtonReady()) return;
         Debug.Log($"{TAG} OnNextClicked");
         if (IsWritingInProgress()) return;
         PlayPageTurn();
@@ -399,12 +419,14 @@ public class WhiteboardPageManager : MonoBehaviour
 
     private void OnUndoClicked()
     {
+        if (!ButtonReady()) return;
         Debug.Log($"{TAG} OnUndoClicked");
         ScribbleManager.Instance?.Undo();
     }
 
     private void OnBackspaceClicked()
     {
+        if (!ButtonReady()) return;
         Debug.Log($"{TAG} OnBackspaceClicked");
         var cursor = JournalInlineCursor.Instance;
         if (cursor != null && cursor.HasActiveSelection)
@@ -435,19 +457,50 @@ public class WhiteboardPageManager : MonoBehaviour
     /// <summary>
     /// Updates ResultText and arrow button visibility.
     /// Called by ScribbleManager whenever words change or the page turns.
+    /// Page 0 is always the title page; pages 1+ are content pages.
     /// </summary>
     public void UpdateUI(string pageText, int pageIndex, int totalPages)
     {
         if (resultText != null)
             resultText.text = pageText;
 
+        bool isTitlePage = pageIndex == 0;
+
+        // Page number: "Title" on title page, "N / M" on content pages.
         if (pageNumberText != null)
-            pageNumberText.text = $"{pageIndex + 1} / {totalPages}";
+        {
+            if (isTitlePage)
+                pageNumberText.text = "Title";
+            else
+            {
+                int contentIndex = pageIndex;           // 1-based content page index
+                int totalContent = totalPages - 1;      // subtract title page
+                pageNumberText.text = $"{contentIndex} / {totalContent}";
+            }
+        }
+
+        // Title page overlays: hint watermark and auto timestamp.
+        if (titleHintText != null)
+            titleHintText.gameObject.SetActive(isTitlePage && string.IsNullOrEmpty(pageText));
+        if (createdAtLabel != null)
+            createdAtLabel.gameObject.SetActive(isTitlePage);
 
         bool hasWords = !string.IsNullOrEmpty(pageText);
+        // Next is always available on title page so user can always proceed to content.
+        bool hasNext = isTitlePage || pageIndex < totalPages - 1;
         SetButtonStates(hasPrev:  pageIndex > 0,
-                        hasNext:  pageIndex < totalPages - 1,
+                        hasNext:  hasNext,
                         hasWords: hasWords);
+    }
+
+    /// <summary>
+    /// Sets the auto-stamped session timestamp shown on the title page.
+    /// Called by JournalSessionManager when a journaling session starts.
+    /// </summary>
+    public void SetCreatedAt(string formattedTimestamp)
+    {
+        if (createdAtLabel != null)
+            createdAtLabel.text = formattedTimestamp;
     }
 
     private void SetButtonStates(bool hasPrev, bool hasNext, bool hasWords)

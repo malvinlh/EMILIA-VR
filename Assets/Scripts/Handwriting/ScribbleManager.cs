@@ -80,7 +80,8 @@ public class ScribbleManager : MonoBehaviour
     }
 
     // ── State ────────────────────────────────────────────────────────────
-    private readonly List<PageData> pages = new List<PageData> { new PageData() };
+    // Page 0 is always the title page; pages 1+ are journal content pages.
+    private readonly List<PageData> pages = new List<PageData> { new PageData(), new PageData() };
     private int currentPageIndex;
     private PageData CurrentPage => pages[currentPageIndex];
 
@@ -496,7 +497,8 @@ public class ScribbleManager : MonoBehaviour
         RefreshUI();
 
         // ── Board-full: silently create next page so Next button appears ─
-        if (IsBoardFull() && currentPageIndex == pages.Count - 1)
+        // Guard: never auto-create from title page (index 0); the title is always short.
+        if (currentPageIndex >= 1 && IsBoardFull() && currentPageIndex == pages.Count - 1)
         {
             pages.Add(new PageData());
             Debug.Log($"{TAG} Board full — created page {pages.Count}. " +
@@ -681,11 +683,12 @@ public class ScribbleManager : MonoBehaviour
         Debug.Log($"{TAG} ClearCurrentPage — removed {count} word(s).");
     }
 
-    /// <summary>Clear all pages and reset to a single blank page.</summary>
+    /// <summary>Clear all pages and reset to title page + one blank content page.</summary>
     public void ClearAll()
     {
         pages.Clear();
-        pages.Add(new PageData());
+        pages.Add(new PageData()); // page 0 = title
+        pages.Add(new PageData()); // page 1 = first content page
         currentPageIndex = 0;
         _insertCursor = -1;
 
@@ -819,7 +822,7 @@ public class ScribbleManager : MonoBehaviour
         Debug.Log($"{TAG} Voice added — page {currentPageIndex + 1}: \"{CurrentPage.GetFullText()}\"");
     }
 
-    /// <summary>Returns accumulated text across all pages.</summary>
+    /// <summary>Returns accumulated text across all pages (includes title as [Page 1]).</summary>
     public string GetFullJournalText()
     {
         var sb = new System.Text.StringBuilder();
@@ -828,6 +831,23 @@ public class ScribbleManager : MonoBehaviour
             if (sb.Length > 0) sb.Append('\n');
             sb.Append($"[Page {i + 1}] ");
             sb.Append(pages[i].GetFullText());
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Returns the text written on the title page (page 0).</summary>
+    public string GetTitleText() => pages.Count > 0 ? pages[0].GetFullText() : string.Empty;
+
+    /// <summary>Returns the journal content from all content pages (pages 1+), newline-separated.</summary>
+    public string GetContentText()
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 1; i < pages.Count; i++)
+        {
+            var text = pages[i].GetFullText();
+            if (string.IsNullOrWhiteSpace(text)) continue;
+            if (sb.Length > 0) sb.Append('\n');
+            sb.Append(text);
         }
         return sb.ToString();
     }

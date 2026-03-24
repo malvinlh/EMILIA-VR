@@ -1,5 +1,7 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.Hands;
@@ -66,6 +68,12 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("The Chair child.")]
     public Transform chair;
 
+    [Header("Table Placement")]
+    [Tooltip("Vertical bias applied to the detected table Y position (metres). " +
+             "Negative values lower the whiteboard. Palm thickness sits ~2–3 cm above " +
+             "the physical surface, so a small negative value corrects that overshoot.")]
+    public float tableHeightBias = -0.03f;
+
     [Header("SeatPoint Calibration")]
     [Tooltip("The SeatPoint transform where the player will be teleported after calibration. " +
              "Its forward direction defines the player's seated facing direction. " +
@@ -121,6 +129,10 @@ public class JournalSessionManager : MonoBehaviour
     [Range(5f, 120f)]
     public float detectionTimeout = 60f;
 
+    [Header("Journal Data")]
+    [Tooltip("PlayerPrefs key used to look up the current user ID. Must match the key used at login.")]
+    public string playerPrefsUserIdKey = "Nickname";
+
     // ── Singleton ───────────────────────────────────────────────────────
     public static JournalSessionManager Instance { get; private set; }
 
@@ -135,6 +147,8 @@ public class JournalSessionManager : MonoBehaviour
     private ARTableDetector.DetectedTable pendingTable;
     private bool calibrationDataValid;
     private bool scenePermissionGranted;
+    private string _sessionCreatedAtIso;    // ISO timestamp for DB (UTC+7)
+    private string _sessionCreatedAtDisplay; // formatted timestamp for title-page label
     private XRHandSubsystem handSubsystem;
     private List<LocomotionProvider> disabledLocomotionProviders = new List<LocomotionProvider>();
     private float originalXROriginY;
@@ -438,6 +452,7 @@ public class JournalSessionManager : MonoBehaviour
             passthroughManager.ExitPassthrough(() =>
             {
                 CurrentState = SessionState.Journaling;
+                OnJournalingEntered();
                 SetWhiteboardUIActive(true);
                 LockLocomotion();
                 Debug.Log("[JournalSession] Journaling session started.");
@@ -448,6 +463,7 @@ public class JournalSessionManager : MonoBehaviour
             TeleportToSeatPoint();
             MoveWhiteboardToVRLayer();
             CurrentState = SessionState.Journaling;
+            OnJournalingEntered();
             SetWhiteboardUIActive(true);
             LockLocomotion();
             Debug.Log("[JournalSession] Journaling session started (no passthrough).");
@@ -520,7 +536,7 @@ public class JournalSessionManager : MonoBehaviour
         // 2. Position: place parent so JournalTable child ends up at detected position
         Vector3 tableChildLocalPos = journalTable.localPosition;
         Vector3 targetParentPos = table.position - targetParentRot * tableChildLocalPos;
-        targetParentPos.y = table.position.y - tableChildLocalPos.y;
+        targetParentPos.y = table.position.y - tableChildLocalPos.y + tableHeightBias;
 
         journalChairTable.position = targetParentPos;
         journalChairTable.rotation = targetParentRot;
@@ -539,7 +555,7 @@ public class JournalSessionManager : MonoBehaviour
 
                 Quaternion flippedRot = targetParentRot * Quaternion.Euler(0f, 180f, 0f);
                 Vector3 flippedPos = table.position - flippedRot * tableChildLocalPos;
-                flippedPos.y = table.position.y - tableChildLocalPos.y;
+                flippedPos.y = table.position.y - tableChildLocalPos.y + tableHeightBias;
 
                 journalChairTable.position = flippedPos;
                 journalChairTable.rotation = flippedRot;
@@ -770,9 +786,33 @@ public class JournalSessionManager : MonoBehaviour
     {
         TeleportToSeatPoint();
         CurrentState = SessionState.Journaling;
+        OnJournalingEntered();
         SetWhiteboardUIActive(true);
         LockLocomotion();
         Debug.Log("[JournalSession] Fallback timeout — entering journaling with static whiteboard.");
+    }
+
+    // ================================================================
+    // JOURNALING SESSION INIT
+    // ================================================================
+
+    /// <summary>
+    /// Called once every time the session enters the Journaling state.
+    /// Resets whiteboard pages and stamps the title page with the current time.
+    /// </summary>
+    private void OnJournalingEntered()
+    {
+        // Reset pages: title page (0) + first content page (1)
+        ScribbleManager.Instance?.ClearAll();
+
+        // Stamp timestamps — UTC+7 (Asia/Jakarta) to match legacy JournalManager
+        var now = DateTime.UtcNow.AddHours(7);
+        _sessionCreatedAtIso     = now.ToString("yyyy-MM-ddTHH:mm:ss");
+        _sessionCreatedAtDisplay = now.ToString("dd/MM/yyyy hh:mm tt", CultureInfo.InvariantCulture);
+
+        WhiteboardPageManager.Instance?.SetCreatedAt(_sessionCreatedAtDisplay);
+
+        Debug.Log($"[JournalSession] Title page ready — created at {_sessionCreatedAtDisplay}");
     }
 
     // ================================================================
@@ -789,6 +829,9 @@ public class JournalSessionManager : MonoBehaviour
 
     private IEnumerator EndSessionCoroutine()
     {
+        // Save before tearing down so ScribbleManager data is still intact.
+        yield return SaveJournalCoroutine();
+
         SetWhiteboardUIActive(false);
 
         yield return new WaitForSeconds(0.5f);
@@ -810,6 +853,74 @@ public class JournalSessionManager : MonoBehaviour
         SetButtonVisible(true);
         CurrentState = SessionState.Idle;
         Debug.Log("[JournalSession] Session ended. Book re-enabled.");
+    }
+
+    // ================================================================
+    // JOURNAL SAVE
+    // ================================================================
+
+    /// <summary>
+    /// Collects title + content from ScribbleManager and persists via JournalService.
+    /// Skipped silently if content is empty or ServiceManager is unavailable.
+    /// </summary>
+    private IEnumerator SaveJournalCoroutine()
+    {
+        var sm = ScribbleManager.Instance;
+        if (sm == null) yield break;
+
+        string title   = sm.GetTitleText().Trim();
+        string content = sm.GetContentText().Trim();
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            Debug.Log("[JournalSession] No content written — skipping save.");
+            yield break;
+        }
+
+        if (string.IsNullOrWhiteSpace(title))
+            title = DeriveTitleFromContent(content);
+
+        var userId = PlayerPrefs.GetString(playerPrefsUserIdKey, string.Empty);
+        if (string.IsNullOrEmpty(userId))
+        {
+            Debug.LogWarning("[JournalSession] No user ID in PlayerPrefs — journal not saved.");
+            yield break;
+        }
+
+        if (ServiceManager.Instance?.JournalService == null)
+        {
+            Debug.LogWarning("[JournalSession] ServiceManager unavailable — journal not saved to DB.");
+            yield break;
+        }
+
+        bool done = false;
+        yield return ServiceManager.Instance.JournalService.CreateJournal(
+            userId, title, content, _sessionCreatedAtIso,
+            onSuccess: _ =>
+            {
+                Debug.Log($"[JournalSession] Journal saved — title: \"{title}\"");
+                done = true;
+            },
+            onError: err =>
+            {
+                Debug.LogError($"[JournalSession] Journal save failed: {err}");
+                done = true;
+            }
+        );
+
+        yield return new WaitUntil(() => done);
+    }
+
+    private static readonly char[] s_wordSplitChars = new char[] { ' ' };
+
+    /// <summary>Derives a short title from the first N words of content.</summary>
+    private static string DeriveTitleFromContent(string content, int maxWords = 3, int maxChars = 60)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return "Untitled";
+        var words = content.Trim().Split(s_wordSplitChars, StringSplitOptions.RemoveEmptyEntries);
+        int take  = Mathf.Min(maxWords, words.Length);
+        var title = string.Join(" ", words, 0, take);
+        return title.Length > maxChars ? title[..maxChars] : title;
     }
 
     // ================================================================

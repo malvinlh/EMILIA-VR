@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 2048
     height: 1108.8
   m_ShowMode: 4
-  m_Title: Project
+  m_Title: Hierarchy
   m_RootView: {fileID: 2}
   m_MinSize: {x: 875, y: 300}
   m_MaxSize: {x: 10000, y: 10000}
@@ -237,7 +237,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 1
   m_Script: {fileID: 12006, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: ProjectBrowser
+  m_Name: ConsoleWindow
   m_EditorClassIdentifier: 
   m_Children: []
   m_Position:
@@ -246,16 +246,16 @@ MonoBehaviour:
     y: 633.6
     width: 1574.4
     height: 419.20007
-  m_MinSize: {x: 231, y: 276}
-  m_MaxSize: {x: 10001, y: 10026}
-  m_ActualView: {fileID: 19}
+  m_MinSize: {x: 101, y: 126}
+  m_MaxSize: {x: 4001, y: 4026}
+  m_ActualView: {fileID: 20}
   m_Panes:
   - {fileID: 17}
   - {fileID: 18}
   - {fileID: 19}
   - {fileID: 20}
-  m_Selected: 2
-  m_LastSelected: 3
+  m_Selected: 3
+  m_LastSelected: 2
 --- !u!114 &11
 MonoBehaviour:
   m_ObjectHideFlags: 52
@@ -1214,9 +1214,9 @@ MonoBehaviour:
   m_AudioPlay: 0
   m_DebugDrawModesUseInteractiveLightBakingData: 0
   m_Position:
-    m_Target: {x: -4.734862, y: 3.2545204, z: 6.723092}
+    m_Target: {x: -4.6895947, y: 3.0133667, z: 5.866077}
     speed: 2
-    m_Value: {x: -4.734862, y: 3.2545204, z: 6.723092}
+    m_Value: {x: -4.6895947, y: 3.0133667, z: 5.866077}
   m_RenderMode: 0
   m_CameraMode:
     drawMode: 0
@@ -1262,13 +1262,13 @@ MonoBehaviour:
     m_GridAxis: 1
     m_gridOpacity: 0.5
   m_Rotation:
-    m_Target: {x: 0.04871181, y: -0.20588276, z: 0.0102450615, w: 0.97736454}
+    m_Target: {x: 0.65908587, y: -0.19463737, z: 0.18242405, w: 0.70324653}
     speed: 2
-    m_Value: {x: -0.048711807, y: 0.20588276, z: -0.010245061, w: -0.97736454}
+    m_Value: {x: -0.6590858, y: 0.19463737, z: -0.18242405, w: -0.70324653}
   m_Size:
-    m_Target: 1.1199952
+    m_Target: 0.32728866
     speed: 2
-    m_Value: 1.1199952
+    m_Value: 0.32728866
   m_Ortho:
     m_Target: 0
     speed: 2
@@ -1347,15 +1347,42 @@ MonoBehaviour:
       m_LastClickedID:
         m_Data: 0
       m_ExpandedIDs:
-      - m_Data: -115554
-      - m_Data: -112284
-      - m_Data: -111920
-      - m_Data: -84754
-      - m_Data: -58412
-      - m_Data: -32730
-      - m_Data: -1300
-      - m_Data: 60628
-      - m_Data: 60872
+      - m_Data: -512112
+      - m_Data: -504062
+      - m_Data: -477518
+      - m_Data: -427036
+      - m_Data: -423766
+      - m_Data: -423402
+      - m_Data: -396216
+      - m_Data: -369958
+      - m_Data: -318704
+      - m_Data: -315434
+      - m_Data: -315070
+      - m_Data: -287910
+      - m_Data: -261826
+      - m_Data: -236194
+      - m_Data: -229440
+      - m_Data: -195844
+      - m_Data: -192574
+      - m_Data: -192210
+      - m_Data: -165036
+      - m_Data: -130398
+      - m_Data: -95544
+      - m_Data: -60060
+      - m_Data: -56790
+      - m_Data: -56426
+      - m_Data: -29256
+      - m_Data: -1320
+      - m_Data: 100626
+      - m_Data: 111630
+      - m_Data: 116076
+      - m_Data: 375908
+      - m_Data: 376038
+      - m_Data: 376204
+      - m_Data: 376286
+      - m_Data: 376448
+      - m_Data: 376458
+      - m_Data: 376588
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 
@@ -1507,7 +1534,7 @@ MonoBehaviour:
     m_HSlider: 0
     m_VSlider: 0
     m_IgnoreScrollWheelUntilClicked: 0
-    m_EnableMouseInput: 1
+    m_EnableMouseInput: 0
     m_EnableSliderZoomHorizontal: 0
     m_EnableSliderZoomVertical: 0
     m_UniformScale: 1
@@ -1612,15 +1639,18 @@ MonoBehaviour:
       m_Data: 92238
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 91764
-    - m_Data: 91766
-    - m_Data: 91768
-    - m_Data: 91770
-    - m_Data: 91772
-    - m_Data: 91774
-    - m_Data: 91776
-    - m_Data: 91778
-    - m_Data: 91780
+    - m_Data: 93382
+    - m_Data: 93384
+    - m_Data: 93386
+    - m_Data: 93388
+    - m_Data: 93390
+    - m_Data: 93392
+    - m_Data: 93394
+    - m_Data: 93396
+    - m_Data: 93398
+    - m_Data: 93400
+    - m_Data: 93402
+    - m_Data: 93404
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1653,15 +1683,18 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 91764
-    - m_Data: 91766
-    - m_Data: 91768
-    - m_Data: 91770
-    - m_Data: 91772
-    - m_Data: 91774
-    - m_Data: 91776
-    - m_Data: 91778
-    - m_Data: 91780
+    - m_Data: 93382
+    - m_Data: 93384
+    - m_Data: 93386
+    - m_Data: 93388
+    - m_Data: 93390
+    - m_Data: 93392
+    - m_Data: 93394
+    - m_Data: 93396
+    - m_Data: 93398
+    - m_Data: 93400
+    - m_Data: 93402
+    - m_Data: 93404
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1749,9 +1782,9 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 712
+    y: 712.8
     width: 1573.4
-    height: 394.00006
+    height: 393.20007
   m_SerializedDataModeController:
     m_DataMode: 0
     m_PreferredDataMode: 0
@@ -1776,7 +1809,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets
+    - Assets/Scripts/MixedReality
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1786,29 +1819,32 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets
+  - Assets/Scripts/MixedReality
   m_LastFoldersGridSize: -1
   m_LastProjectPath: C:\Users\Malvin Leonardo\Documents\UnityProjects\penting\Tugas_Akhir\EMILIA-VR
   m_LockTracker:
     m_IsLocked: 0
   m_LastLocalAssetsSearchArea: 1
   m_FolderTreeState:
-    scrollPos: {x: 0, y: 0}
+    scrollPos: {x: 0, y: 778.7999}
     m_SelectedIDs:
-    - m_Data: 92236
+    - m_Data: 92436
     m_LastClickedID:
-      m_Data: 92236
+      m_Data: 92436
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 91764
-    - m_Data: 91766
-    - m_Data: 91768
-    - m_Data: 91770
-    - m_Data: 91772
-    - m_Data: 91774
-    - m_Data: 91776
-    - m_Data: 91778
-    - m_Data: 91780
+    - m_Data: 93382
+    - m_Data: 93384
+    - m_Data: 93386
+    - m_Data: 93388
+    - m_Data: 93390
+    - m_Data: 93392
+    - m_Data: 93394
+    - m_Data: 93396
+    - m_Data: 93398
+    - m_Data: 93400
+    - m_Data: 93402
+    - m_Data: 93404
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1841,15 +1877,18 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 91764
-    - m_Data: 91766
-    - m_Data: 91768
-    - m_Data: 91770
-    - m_Data: 91772
-    - m_Data: 91774
-    - m_Data: 91776
-    - m_Data: 91778
-    - m_Data: 91780
+    - m_Data: 93382
+    - m_Data: 93384
+    - m_Data: 93386
+    - m_Data: 93388
+    - m_Data: 93390
+    - m_Data: 93392
+    - m_Data: 93394
+    - m_Data: 93396
+    - m_Data: 93398
+    - m_Data: 93400
+    - m_Data: 93402
+    - m_Data: 93404
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1876,9 +1915,8 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
   m_ListAreaState:
-    m_SelectedInstanceIDs:
-    - m_Data: 161448
-    m_LastClickedInstanceID: 161448
+    m_SelectedInstanceIDs: []
+    m_LastClickedInstanceID: 0
     m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs:
     - m_Data: 91164
@@ -1938,7 +1976,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 657.6
+    y: 712.8
     width: 1573.4
     height: 393.20007
   m_SerializedDataModeController:
@@ -1965,7 +2003,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Scenes
+    - Assets/Scripts/MixedReality
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1975,29 +2013,32 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets/Scenes
+  - Assets/Scripts/MixedReality
   m_LastFoldersGridSize: -1
   m_LastProjectPath: C:\Users\Malvin Leonardo\Documents\UnityProjects\penting\Tugas_Akhir\EMILIA-VR
   m_LockTracker:
     m_IsLocked: 0
   m_LastLocalAssetsSearchArea: 1
   m_FolderTreeState:
-    scrollPos: {x: 0, y: 570.7999}
+    scrollPos: {x: 0, y: 778.7999}
     m_SelectedIDs:
-    - m_Data: 93270
+    - m_Data: 92436
     m_LastClickedID:
-      m_Data: 93270
+      m_Data: 92436
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 91764
-    - m_Data: 91766
-    - m_Data: 91768
-    - m_Data: 91770
-    - m_Data: 91772
-    - m_Data: 91774
-    - m_Data: 91776
-    - m_Data: 91778
-    - m_Data: 91780
+    - m_Data: 93382
+    - m_Data: 93384
+    - m_Data: 93386
+    - m_Data: 93388
+    - m_Data: 93390
+    - m_Data: 93392
+    - m_Data: 93394
+    - m_Data: 93396
+    - m_Data: 93398
+    - m_Data: 93400
+    - m_Data: 93402
+    - m_Data: 93404
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2030,15 +2071,18 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 91764
-    - m_Data: 91766
-    - m_Data: 91768
-    - m_Data: 91770
-    - m_Data: 91772
-    - m_Data: 91774
-    - m_Data: 91776
-    - m_Data: 91778
-    - m_Data: 91780
+    - m_Data: 93382
+    - m_Data: 93384
+    - m_Data: 93386
+    - m_Data: 93388
+    - m_Data: 93390
+    - m_Data: 93392
+    - m_Data: 93394
+    - m_Data: 93396
+    - m_Data: 93398
+    - m_Data: 93400
+    - m_Data: 93402
+    - m_Data: 93404
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2065,9 +2109,8 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
   m_ListAreaState:
-    m_SelectedInstanceIDs:
-    - m_Data: 92884
-    m_LastClickedInstanceID: 92884
+    m_SelectedInstanceIDs: []
+    m_LastClickedInstanceID: 0
     m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs: []
     m_RenameOverlay:
@@ -2121,7 +2164,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 712.8
+    y: 657.6
     width: 1573.4
     height: 393.20007
   m_SerializedDataModeController:
