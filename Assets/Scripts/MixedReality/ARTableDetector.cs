@@ -456,20 +456,16 @@ public class ARTableDetector : MonoBehaviour
         Vector3 headPos = cam != null ? cam.transform.position : Vector3.zero;
         Vector3 headFwd = cam != null ? cam.transform.forward : Vector3.forward;
 
-        // Collect all joint positions for height averaging
-        List<Vector3> points = new List<Vector3>();
-        points.Add(leftPalmPos);
-        points.Add(rightPalmPos);
-        CollectFingertipPositions(leftHand, points);
-        CollectFingertipPositions(rightHand, points);
-
-        float avgY = 0f;
-        foreach (var p in points) avgY += p.y;
-        avgY /= points.Count;
+        // The XR palm joint is at the centre of the palm, ~12 mm above the
+        // physical table surface. Using fingertip average skews even higher.
+        // Subtract the palm-to-surface offset directly so the table Y matches
+        // the actual contact surface (consistent with BuildFromARPlane).
+        const float palmToSurface = 0.012f;
+        float tableY = (leftPalmPos.y + rightPalmPos.y) / 2f - palmToSurface;
 
         Vector3 center = new Vector3(
             (leftPalmPos.x + rightPalmPos.x) / 2f,
-            avgY,
+            tableY,
             (leftPalmPos.z + rightPalmPos.z) / 2f
         );
 

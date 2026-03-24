@@ -72,7 +72,7 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("Vertical bias applied to the detected table Y position (metres). " +
              "Negative values lower the whiteboard. Palm thickness sits ~2–3 cm above " +
              "the physical surface, so a small negative value corrects that overshoot.")]
-    public float tableHeightBias = -0.03f;
+    public float tableHeightBias = 0f;
 
     [Header("SeatPoint Calibration")]
     [Tooltip("The SeatPoint transform where the player will be teleported after calibration. " +

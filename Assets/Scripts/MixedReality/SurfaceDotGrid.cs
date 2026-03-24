@@ -80,7 +80,9 @@ public class SurfaceDotGrid : MonoBehaviour
             new Vector3(rightPalm.x, 0f, rightPalm.z));
 
         float gridWidth = palmDistance + gridPadding * 2f;
-        float tableY = (leftPalm.y + rightPalm.y) / 2f + 0.001f; // Slightly above surface
+        // Palm joint sits ~12 mm above the physical table surface.
+        // Subtract that offset so dots appear on the table, not on the dorsal hand.
+        float tableY = (leftPalm.y + rightPalm.y) / 2f - 0.012f;
 
         // Grid orientation: aligned with palm-to-palm axis (left-right)
         Vector3 palmAxis = rightPalm - leftPalm;
