@@ -50,6 +50,11 @@ public class JournalSessionManager : MonoBehaviour
     public WhiteboardUtils whiteboardUtils;
     public JournalStartButton startButton;
 
+    [Header("Post-Journal Review")]
+    [Tooltip("Optional review flow controller. When assigned, EndSession() runs the review " +
+             "before actually ending so the user can keep or release the journal.")]
+    public JournalReviewController reviewController;
+
     [Header("AR Managers")]
     [Tooltip("ARPlaneManager for table detection. Enabled only during detection.")]
     public ARPlaneManager arPlaneManager;
@@ -59,6 +64,10 @@ public class JournalSessionManager : MonoBehaviour
              "Quest 3 AR Surface Keyboard — instant dot grid feedback from palm positions. " +
              "Enable this for faster, lighter calibration without Scene Model dependency.")]
     public bool skipPlaneDetection;
+    [Tooltip("Editor / testing only. Skip all MR calibration and jump directly to the " +
+             "Journaling state on Start. Useful for testing the journal UI and review flow " +
+             "with XR Device Simulator without building to the headset.")]
+    public bool skipToJournalingOnStart;
 
     [Header("Scene Objects")]
     [Tooltip("The JournalChairTable parent that will be repositioned.")]
@@ -204,6 +213,17 @@ public class JournalSessionManager : MonoBehaviour
 
         // Whiteboard UI is only shown while journaling.
         SetWhiteboardUIActive(false);
+
+        if (skipToJournalingOnStart)
+            StartCoroutine(SkipToJournalingCoroutine());
+    }
+
+    private IEnumerator SkipToJournalingCoroutine()
+    {
+        // Wait one frame so all other Start() calls finish (UI layout, prefab init, etc.).
+        yield return null;
+        SetButtonVisible(false);
+        SpawnAtDefaultPosition();
     }
 
     private void Update()
@@ -824,13 +844,23 @@ public class JournalSessionManager : MonoBehaviour
         if (CurrentState != SessionState.Journaling) return;
 
         CurrentState = SessionState.Ending;
-        StartCoroutine(EndSessionCoroutine());
+
+        if (reviewController != null)
+        {
+            reviewController.BeginReview(
+                saveJournal => StartCoroutine(EndSessionCoroutine(saveJournal)),
+                originalXROriginY);
+            return;
+        }
+
+        StartCoroutine(EndSessionCoroutine(saveJournal: true));
     }
 
-    private IEnumerator EndSessionCoroutine()
+    private IEnumerator EndSessionCoroutine(bool saveJournal = true)
     {
         // Save before tearing down so ScribbleManager data is still intact.
-        yield return SaveJournalCoroutine();
+        if (saveJournal)
+            yield return SaveJournalCoroutine();
 
         SetWhiteboardUIActive(false);
 
