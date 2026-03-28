@@ -1,31 +1,5 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-3335879748548489386
-MonoBehaviour:
-  m_ObjectHideFlags: 11
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 639247ca83abc874e893eb93af2b5e44, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  version: 0
---- !u!114 &-2536893978736553219
-MonoBehaviour:
-  m_ObjectHideFlags: 11
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  version: 10
 --- !u!21 &2100000
 Material:
   serializedVersion: 8
@@ -33,11 +7,13 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Cork
+  m_Name: 01 - Default
   m_Shader: {fileID: 4800000, guid: 18e0032a4e875e5488cee334127ac8b4, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _ALPHAPREMULTIPLY_ON
+  - _SURFACE_TYPE_TRANSPARENT
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -46,12 +22,14 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
+  - DepthOnly
+  - SHADOWCASTER
   m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: 8288561fef1076b449aaaf8ec23121f1, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -78,16 +56,8 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _MainTexture:
-        m_Texture: {fileID: 2800000, guid: 35d336b0a71c41d4aafb25ff67172a12, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
     - _MetallicGlossMap:
         m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _NormalMap:
-        m_Texture: {fileID: 2800000, guid: a6ec744e53db02e4d966cddd94757628, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _OcclusionMap:
@@ -99,14 +69,6 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Texture2DAsset_46c74e5059524c9b9656d53d13cff555_Out_0:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Texture2DAsset_ced3e0f4340741a1b36c259c8f49d0c7_Out_0:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -124,23 +86,12 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
-    - _BUILTIN_AlphaClip: 0
-    - _BUILTIN_Blend: 0
-    - _BUILTIN_CullMode: 2
-    - _BUILTIN_DstBlend: 0
-    - _BUILTIN_QueueControl: 0
-    - _BUILTIN_QueueOffset: 0
-    - _BUILTIN_SrcBlend: 1
-    - _BUILTIN_Surface: 0
-    - _BUILTIN_ZTest: 4
-    - _BUILTIN_ZWrite: 1
-    - _BUILTIN_ZWriteControl: 0
     - _Blend: 0
-    - _BlendModePreserveSpecular: 0
+    - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
-    - _CastShadows: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 2
@@ -148,22 +99,21 @@ Material:
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DstBlend: 0
-    - _DstBlendAlpha: 0
+    - _DstBlendAlpha: 10
     - _EmissionToggle: 0
     - _EnvironmentReflections: 1
     - _GlassFresnelPower: 3
     - _GlassReflectivity: 0.4
     - _GlassSmoothness: 0.85
     - _GlassToggle: 0
-    - _GlossMapScale: 0
-    - _Glossiness: 0
-    - _GlossyReflections: 0
-    - _Metallic: 0.05
+    - _GlossMapScale: 1
+    - _Glossiness: 0.14142135
+    - _GlossyReflections: 1
+    - _Metallic: 0
+    - _Mode: 3
     - _NormalMapToggle: 0
-    - _NormalStrength: 0.75
     - _OcclusionStrength: 1
-    - _Parallax: 0.005
-    - _QueueControl: 0
+    - _Parallax: 0.02
     - _QueueOffset: 0
     - _ReceiveShadows: 1
     - _RimIntensity: 0.15
@@ -171,32 +121,40 @@ Material:
     - _RimPower: 4
     - _ShadowFeather: 0.1
     - _ShadowStep: 0.5
-    - _Smoothness: 0.2
+    - _Smoothness: 0.14142135
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
-    - _Surface: 0
+    - _Surface: 1
     - _TranslucencyPower: 4
     - _TranslucencyStrength: 0.3
     - _TranslucencyToggle: 0
+    - _UVSec: 0
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
-    - _ZTest: 4
     - _ZWrite: 1
-    - _ZWriteControl: 0
     m_Colors:
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BumpOffset: {r: 0, g: 0, b: 0, a: 0}
-    - _BumpTiling: {r: 4, g: 2, b: 0, a: 0}
-    - _Color: {r: 0.5686274, g: 0.78431374, b: 1, a: 1}
+    - _BaseColor: {r: 0.79073066, g: 0.79073066, b: 0.79073066, a: 1}
+    - _Color: {r: 0.79073066, g: 0.79073066, b: 0.79073066, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _GlassColor: {r: 0.85, g: 0.92, b: 1, a: 0.15}
-    - _NormalOffset: {r: 0, g: 0, b: 0, a: 0}
-    - _NormalTiling: {r: 4, g: 2, b: 0, a: 0}
-    - _RimColor: {r: 1, g: 1, b: 1, a: 0.09803922}
+    - _RimColor: {r: 1, g: 0.9, b: 0.85, a: 1}
     - _ShadowColor: {r: 0.85, g: 0.75, b: 0.72, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _TranslucencyColor: {r: 0.85, g: 0.95, b: 0.75, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+--- !u!114 &3903944762259257309
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
+  version: 10

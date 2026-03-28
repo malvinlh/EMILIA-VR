@@ -1044,6 +1044,12 @@ public class JournalSessionManager : MonoBehaviour
     }
 
     /// <summary>
+    /// Called by JournalReviewController mid-review to allow the player to walk
+    /// to the bottle rack or ocean edge after the Keep/Discard choice is made.
+    /// </summary>
+    public void AllowLocomotion() => UnlockLocomotion();
+
+    /// <summary>
     /// Re-enables all locomotion providers that were disabled by LockLocomotion().
     /// </summary>
     private void UnlockLocomotion()
