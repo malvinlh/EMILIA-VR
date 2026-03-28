@@ -4,6 +4,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.XR.Interaction.Toolkit.UI;
 
 /// <summary>
@@ -121,7 +122,14 @@ public class JournalReviewController : MonoBehaviour
         // 4. Fade back in — player now sees the avatar.
         yield return StartCoroutine(FadeScreen(0f, 0.5f));
 
-        // 5. Show AI comment via dialogue panel.
+        // 5. Re-enable the controller far-cast ray.
+        //    PokeGestureDetector (on the XR Origin Hands prefab) disables far-casting
+        //    while the index finger is in writing pose. If hand tracking stops or the
+        //    poke state isn't cleanly resolved during the journaling→review transition,
+        //    enableFarCasting is left false and the controller trigger can't hit UI.
+        RestoreControllerRay();
+
+        // 7. Show AI comment via dialogue panel.
         const string aiComment =
             "You've taken a meaningful step today by putting your thoughts into words. " +
             "Reflecting on what you've written can help you better understand your feelings " +
@@ -131,7 +139,7 @@ public class JournalReviewController : MonoBehaviour
 
         ShowDialogue(aiComment);
 
-        // 6. Wait for the typewriter to finish the last page.
+        // 8. Wait for the typewriter to finish the last page.
         bool commentDone = false;
         if (_dialoguePanel != null)
         {
@@ -486,6 +494,27 @@ public class JournalReviewController : MonoBehaviour
 
         go.SetActive(false);
         return go;
+    }
+
+    // ================================================================
+    // CONTROLLER RAY
+    // ================================================================
+
+    /// <summary>
+    /// Re-enables far-casting on every NearFarInteractor in the scene.
+    ///
+    /// During the journaling phase the user writes with hand tracking. The
+    /// PokeGestureDetector on the XR Origin Hands prefab calls
+    /// NearFarInteractor.set_enableFarCasting(false) while the index finger is
+    /// in poke pose. If hand tracking stops or the poke-end event is missed
+    /// (e.g. the user puts on controllers while still in writing pose), far
+    /// casting is left permanently disabled. Forcing it back here ensures the
+    /// controller ray reaches the review UI canvases.
+    /// </summary>
+    private static void RestoreControllerRay()
+    {
+        foreach (var interactor in FindObjectsByType<NearFarInteractor>(FindObjectsSortMode.None))
+            interactor.enableFarCasting = true;
     }
 
     // ================================================================

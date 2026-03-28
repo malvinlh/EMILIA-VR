@@ -16149,6 +16149,63 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &2086764617
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 5488353482449003525, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_Name
+      value: GameManager
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f52112a60040637458828db5d83ce007, type: 3}
 --- !u!1001 &2105726777
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -17512,8 +17569,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JournalReviewController
   avatarRoot: {fileID: 195504141}
-  standPoint: {fileID: 1263642082}
   dialoguePanelGO: {fileID: 6000000008}
+  standPoint: {fileID: 1263642082}
   journalChairTable: {fileID: 1456161760}
   bottleRoot: {fileID: 1446149846}
   wineRack: {fileID: 6000000012}
@@ -17549,3 +17606,4 @@ SceneRoots:
   - {fileID: 5000000009}
   - {fileID: 5000000012}
   - {fileID: 1910365443}
+  - {fileID: 2086764617}
