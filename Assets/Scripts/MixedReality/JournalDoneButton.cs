@@ -59,6 +59,18 @@ public class JournalDoneButton : MonoBehaviour
             doneButton.onClick.AddListener(OnDoneClicked);
     }
 
+    private void OnEnable()
+    {
+        // When the parent group re-activates for a new session, immediately sync
+        // the panel visibility to the current session state rather than waiting
+        // for the next Update() tick. Without this, DonePanel stays hidden if it
+        // was explicitly SetActive(false) at the end of the previous session.
+        var session = JournalSessionManager.Instance;
+        bool journaling = session != null &&
+                          session.CurrentState == JournalSessionManager.SessionState.Journaling;
+        ShowDonePanel(journaling);
+    }
+
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;

@@ -5,6 +5,7 @@ TagManager:
   serializedVersion: 3
   tags:
   - JournalCork
+  - JournalBottle
   layers:
   - Default
   - TransparentFX

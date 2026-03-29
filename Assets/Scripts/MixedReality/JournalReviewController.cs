@@ -63,6 +63,9 @@ public class JournalReviewController : MonoBehaviour
     public GameObject preNDuringJournalGroup;
     [Tooltip("PostJournal group — grab bottle + cork. Hidden during idle/journaling, active during post-journal.")]
     public GameObject postJournalGroup;
+    [Tooltip("Whiteboard UI GameObject (separate from preNDuringJournalGroup). " +
+             "Disabled when entering review/post-journal phases; re-enabled when session resets.")]
+    public GameObject whiteboardUIGroup;
 
     [Header("Cork")]
     [Tooltip("CorkSnapZone script on the PostJournal bottle neck child trigger collider.")]
@@ -84,6 +87,9 @@ public class JournalReviewController : MonoBehaviour
         Complete
     }
 
+    /// <summary>True while the player should carry the sealed bottle to the wine rack.</summary>
+    public bool IsWaitingForRack => _state == ReviewState.WaitingForRack;
+
     private ReviewState _state      = ReviewState.Inactive;
     private bool        _keepChosen;
     private Action<bool> _onComplete;   // true = save the journal
@@ -94,6 +100,13 @@ public class JournalReviewController : MonoBehaviour
     private GameObject _choicePanel;
     private GameObject _screenFadeOverlay;
     private Transform  _xrOriginTransform;
+
+    // Bottle's original local transform — captured once at scene start so it can be
+    // restored at the beginning of each new journaling session's cork phase.
+    private Transform  _bottleOriginalParent;
+    private Vector3    _bottleOriginalLocalPos;
+    private Quaternion _bottleOriginalLocalRot;
+    private bool       _bottleOriginalStored;
 
     // ================================================================
     // UNITY
@@ -113,6 +126,15 @@ public class JournalReviewController : MonoBehaviour
         // PostJournal group is inactive until Keep/Discard is chosen.
         if (postJournalGroup != null)
             postJournalGroup.SetActive(false);
+
+        // Store the bottle's original local transform so it can be reset each session.
+        if (bottleRoot != null)
+        {
+            _bottleOriginalParent   = bottleRoot.parent;
+            _bottleOriginalLocalPos = bottleRoot.localPosition;
+            _bottleOriginalLocalRot = bottleRoot.localRotation;
+            _bottleOriginalStored   = true;
+        }
     }
 
     // ================================================================
@@ -144,6 +166,11 @@ public class JournalReviewController : MonoBehaviour
     private IEnumerator ReviewCoroutine()
     {
         _state = ReviewState.ShowingComment;
+        Debug.Log("[JournalReview] ReviewCoroutine started. Hiding WhiteboardUI.");
+
+        // Hide the whiteboard UI immediately — it must not be visible during review or post-journal.
+        if (whiteboardUIGroup != null) whiteboardUIGroup.SetActive(false);
+        else Debug.LogWarning("[JournalReview] whiteboardUIGroup not assigned — whiteboard UI may remain visible during review.");
 
         // 1. Fade to black — avatar activation and camera snap happen invisibly.
         yield return StartCoroutine(FadeScreen(1f, 0.5f));
@@ -394,9 +421,34 @@ public class JournalReviewController : MonoBehaviour
 
     private void BeginCorkPhase()
     {
+        Debug.Log($"[JournalReview] BeginCorkPhase — keepChosen={_keepChosen}, bottleRoot={bottleRoot?.name ?? "NULL"}");
+
+        // Reset the cork back to its original state before revealing the group.
+        if (bottleNeckZone != null) bottleNeckZone.ResetForNewSession();
+
         // Switch scene groups: hide whiteboard area, reveal post-journal bottle + cork.
         if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(false);
+        if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(false);
         if (postJournalGroup       != null) postJournalGroup.SetActive(true);
+
+        // Re-enable the bottle (it was SetActive(false) at the end of the previous session)
+        // and restore its original local transform so it appears at the right position.
+        if (bottleRoot != null && _bottleOriginalStored)
+        {
+            bottleRoot.SetParent(_bottleOriginalParent, worldPositionStays: false);
+            bottleRoot.localPosition = _bottleOriginalLocalPos;
+            bottleRoot.localRotation = _bottleOriginalLocalRot;
+            bottleRoot.gameObject.SetActive(true);
+
+            var rb = bottleRoot.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic    = false;
+                rb.useGravity     = true;
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
+        }
 
         // Unlock locomotion so the player can move freely after the cork step.
         JournalSessionManager.Instance?.AllowLocomotion();
@@ -423,36 +475,15 @@ public class JournalReviewController : MonoBehaviour
         if (_keepChosen)
         {
             _state = ReviewState.WaitingForRack;
+            Debug.Log($"[JournalReview] Cork sealed — state → WaitingForRack. bottleRoot={bottleRoot?.name ?? "NULL"}");
 
             ShowDialogue(
-                "Carry the bottle to the bottle rack nearby to safely store your entry.");
-
-            // Wire the bottle rack socket at runtime.
-            // Wine Rack > Socket uses XRSocketInteractor — subscribe to its selectEntered
-            // so OnRackSelected() fires when the bottle snaps into the socket.
-            Transform rack = wineRack;
-            if (rack == null)
-            {
-                var rackGO = GameObject.Find("Wine Rack");
-                if (rackGO != null) rack = rackGO.transform;
-            }
-
-            if (rack != null)
-            {
-                var socket = rack.GetComponentInChildren<XRSocketInteractor>();
-                if (socket != null)
-                    socket.selectEntered.AddListener(_ => OnRackSelected());
-                else
-                    Debug.LogWarning("[JournalReview] No XRSocketInteractor found under Bottle Rack.");
-            }
-            else
-            {
-                Debug.LogWarning("[JournalReview] Bottle Rack not found — rack save path unavailable.");
-            }
+                "Carry the bottle to the bottle rack nearby — just bring it close and it will rest there.");
         }
         else
         {
             _state = ReviewState.WaitingForBottle;
+            Debug.Log($"[JournalReview] Cork sealed — state → WaitingForBottle. bottleRoot={bottleRoot?.name ?? "NULL"}");
 
             ShowDialogue(
                 "When you're ready, walk to the edge and toss the bottle into the ocean. " +
@@ -464,42 +495,115 @@ public class JournalReviewController : MonoBehaviour
     // UPDATE — BOTTLE OCEAN DETECTION
     // ================================================================
 
+    /// <summary>True while the player should throw the bottle into the sea.</summary>
+    public bool IsWaitingForBottle => _state == ReviewState.WaitingForBottle;
+
     private void Update()
     {
         if (_state != ReviewState.WaitingForBottle) return;
 
-        // If the bottle was destroyed by any other means, consider it released.
+        // Safety fallback: bottle was destroyed by means other than the sea collider.
         if (bottleRoot == null)
-        {
-            ResetSceneGroups();
             CompleteReview(saveJournal: false);
-            return;
-        }
-
-        // Ocean threshold: 3 metres below the table floor level.
-        float threshold = (journalChairTable != null)
-            ? journalChairTable.position.y - 3f
-            : -5f;
-
-        if (bottleRoot.position.y < threshold)
-        {
-            Destroy(bottleRoot.gameObject);
-            ResetSceneGroups();
-            CompleteReview(saveJournal: false);
-        }
     }
 
     // ================================================================
-    // RACK SELECTION
+    // SEA DETECTION (called by SeaBottleDetector)
     // ================================================================
 
-    private void OnRackSelected()
+    /// <summary>
+    /// Called by SeaBottleDetector when the thrown bottle contacts the Sea mesh collider.
+    /// Destroys the bottle, shows a short farewell dialogue, then ends the session.
+    /// </summary>
+    public void HandleBottleInSea()
     {
-        if (_state != ReviewState.WaitingForRack) return;
+        Debug.Log($"[JournalReview] HandleBottleInSea called — state={_state}, bottleRoot={bottleRoot?.name ?? "NULL (already destroyed)"}");
+        if (_state != ReviewState.WaitingForBottle)
+        {
+            Debug.LogWarning($"[JournalReview] HandleBottleInSea ignored — wrong state ({_state}).");
+            return;
+        }
         if (bottleRoot != null)
-            Destroy(bottleRoot.gameObject);
+        {
+            Debug.Log($"[JournalReview] Hiding bottle (sea) — name={bottleRoot.name}, instanceID={bottleRoot.gameObject.GetInstanceID()}");
+            bottleRoot.gameObject.SetActive(false);
+        }
+        Debug.Log("[JournalReview] Bottle destroyed (sea). Starting BottleDisposedCoroutine.");
+        StartCoroutine(BottleDisposedCoroutine(
+            "Letting go takes courage too.\nThe ocean will carry it — and so will you.",
+            saveJournal: false));
+    }
+
+    // ================================================================
+    // RACK SELECTION (called by WineRackProximity)
+    // ================================================================
+
+    /// <summary>
+    /// Called by WineRackProximity when the player brings the held bottle into the
+    /// wine rack's trigger zone. Destroys the bottle, shows a short dialogue, then ends the session.
+    /// </summary>
+    public void HandleBottleRacked()
+    {
+        Debug.Log($"[JournalReview] HandleBottleRacked called — state={_state}, bottleRoot={bottleRoot?.name ?? "NULL (already destroyed)"}");
+        if (_state != ReviewState.WaitingForRack)
+        {
+            Debug.LogWarning($"[JournalReview] HandleBottleRacked ignored — wrong state ({_state}).");
+            return;
+        }
+        if (bottleRoot != null)
+        {
+            Debug.Log($"[JournalReview] Hiding bottle (rack) — name={bottleRoot.name}, instanceID={bottleRoot.gameObject.GetInstanceID()}");
+            bottleRoot.gameObject.SetActive(false);
+        }
+        Debug.Log("[JournalReview] Bottle destroyed (rack). Starting BottleDisposedCoroutine.");
+        StartCoroutine(BottleDisposedCoroutine(
+            "Your words are safe now.\nRest easy — you showed up for yourself today.",
+            saveJournal: true));
+    }
+
+    // ================================================================
+    // BOTTLE DISPOSED DIALOGUE + COMPLETION
+    // ================================================================
+
+    private IEnumerator BottleDisposedCoroutine(string message, bool saveJournal)
+    {
+        // Lock state immediately so neither handler can fire again.
+        _state = ReviewState.Complete;
+        Debug.Log($"[JournalReview] BottleDisposedCoroutine — state locked to Complete. saveJournal={saveJournal}. dialoguePanel={(_dialoguePanel != null ? "OK" : "NULL")}");
+        HideChoicePanel();
+
+        // Avatar says something short and calming.
+        ShowDialogue(message);
+
+        // Wait for the typewriter to finish the message.
+        bool done = false;
+        if (_dialoguePanel != null)
+        {
+            void OnDone() { _dialoguePanel.OnContentFullyDisplayed -= OnDone; done = true; }
+            _dialoguePanel.OnContentFullyDisplayed += OnDone;
+        }
+        else
+        {
+            Debug.LogWarning("[JournalReview] dialoguePanel is null — skipping typewriter wait.");
+            done = true;
+        }
+
+        yield return new WaitUntil(() => done);
+        Debug.Log("[JournalReview] Typewriter done. Waiting 1s...");
+        yield return new WaitForSeconds(1f);
+
+        // Fade out dialogue and hide avatar.
+        _dialogueFader?.FadeOut();
+        if (avatarRoot != null)
+            avatarRoot.gameObject.SetActive(false);
+
+        // Re-enable the start button area, whiteboard UI, and hide the post-journal bottle.
         ResetSceneGroups();
-        CompleteReview(saveJournal: true);
+
+        Debug.Log($"[JournalReview] Invoking _onComplete (null={_onComplete == null}). About to reset state to Inactive.");
+        _onComplete?.Invoke(saveJournal);
+        _state = ReviewState.Inactive; // reset so BeginReview() works on the next session
+        Debug.Log("[JournalReview] BottleDisposedCoroutine complete — state = Inactive.");
     }
 
     // ================================================================
@@ -512,8 +616,19 @@ public class JournalReviewController : MonoBehaviour
     /// </summary>
     private void ResetSceneGroups()
     {
+        Debug.Log("[JournalReview] ResetSceneGroups — PostJournal OFF, PreNDuringJournal ON, WhiteboardUI ON.");
         if (postJournalGroup       != null) postJournalGroup.SetActive(false);
         if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(true);
+        if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(true);
+
+        // Re-enable bottleRoot explicitly. SetActive(false) was called on it during session
+        // end — Unity won't restore an explicitly-false child just by re-enabling its parent.
+        // Safe for BottlePost too: postJournalGroup just went false so its parent is inactive.
+        if (bottleRoot != null)
+        {
+            bottleRoot.gameObject.SetActive(true);
+            Debug.Log($"[JournalReview] ResetSceneGroups — bottleRoot '{bottleRoot.name}' re-enabled.");
+        }
     }
 
     // ================================================================
@@ -522,7 +637,8 @@ public class JournalReviewController : MonoBehaviour
 
     private void CompleteReview(bool saveJournal)
     {
-        if (_state == ReviewState.Complete) return;
+        Debug.Log($"[JournalReview] CompleteReview called — state={_state}, saveJournal={saveJournal}, _onComplete null={_onComplete == null}");
+        if (_state == ReviewState.Complete) { Debug.LogWarning("[JournalReview] CompleteReview skipped — already Complete."); return; }
         _state = ReviewState.Complete;
 
         _dialogueFader?.FadeOut();
@@ -531,7 +647,10 @@ public class JournalReviewController : MonoBehaviour
         if (avatarRoot != null)
             avatarRoot.gameObject.SetActive(false);
 
+        ResetSceneGroups();
         _onComplete?.Invoke(saveJournal);
+        _state = ReviewState.Inactive;
+        Debug.Log("[JournalReview] CompleteReview done — state = Inactive.");
     }
 
     // ================================================================

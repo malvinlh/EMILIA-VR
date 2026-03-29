@@ -29,14 +29,75 @@ public class CorkSnapZone : MonoBehaviour
     [Tooltip("If assigned, the cork is sealed to this transform (e.g., the shadow placeholder) instead of using socket attach math.")]
     [SerializeField] private Transform seatOverrideTarget;
 
+    [Header("Session Reset")]
+    [Tooltip("The Cork GameObject. Assign in Inspector so the original pose can be stored " +
+             "at scene start and restored when a new journaling session begins.")]
+    [SerializeField] private Transform _cork;
+
     private XRSocketInteractor _socket;
     private bool _sealed;
+
+    // Original cork state captured once at scene start (before any session runs).
+    private Transform  _corkOriginalParent;
+    private Vector3    _corkOriginalLocalPos;
+    private Quaternion _corkOriginalLocalRot;
 
     private void Awake()
     {
         _socket = GetComponent<XRSocketInteractor>();
         if (_socket == null)
             Debug.LogWarning("[CorkSnapZone] No XRSocketInteractor found on this GameObject.");
+
+        if (_cork != null)
+        {
+            _corkOriginalParent   = _cork.parent;
+            _corkOriginalLocalPos = _cork.localPosition;
+            _corkOriginalLocalRot = _cork.localRotation;
+        }
+        else
+        {
+            Debug.LogWarning("[CorkSnapZone] _cork not assigned — cork cannot be reset between sessions.");
+        }
+    }
+
+    /// <summary>
+    /// Restores the cork to its scene-start state so the next journaling session
+    /// can seal it again. Call from JournalReviewController.BeginCorkPhase().
+    /// </summary>
+    public void ResetForNewSession()
+    {
+        if (!_sealed || _cork == null) return;
+
+        // Restore Rigidbody to a grabbable, physics-active state.
+        var rb = _cork.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic          = false;
+            rb.useGravity           = true;
+            rb.detectCollisions     = true;
+            rb.interpolation        = RigidbodyInterpolation.None;
+            rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            rb.constraints          = RigidbodyConstraints.None;
+            rb.linearVelocity       = Vector3.zero;
+            rb.angularVelocity      = Vector3.zero;
+        }
+
+        // Re-enable grab so the player can pick the cork up again.
+        var grab = _cork.GetComponent<XRGrabInteractable>();
+        if (grab != null) grab.enabled = true;
+
+        // Return the cork to its original parent and local pose.
+        _cork.SetParent(_corkOriginalParent, worldPositionStays: false);
+        _cork.localPosition = _corkOriginalLocalPos;
+        _cork.localRotation = _corkOriginalLocalRot;
+
+        _sealed = false;
+        // OnEnable re-subscribes the socket listener automatically when the GO re-activates.
+        // If the socket GO is already active, subscribe now.
+        if (_socket != null && isActiveAndEnabled)
+            _socket.selectEntered.AddListener(OnSocketSelectEntered);
+
+        Debug.Log("[CorkSnapZone] Reset for new session — cork restored, _sealed = false.");
     }
 
     private void OnEnable()
