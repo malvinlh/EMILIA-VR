@@ -66,7 +66,7 @@ public class CorkSnapZone : MonoBehaviour
     /// </summary>
     public void ResetForNewSession()
     {
-        if (!_sealed || _cork == null) return;
+        if (_cork == null) return;
 
         // Restore Rigidbody to a grabbable, physics-active state.
         var rb = _cork.GetComponent<Rigidbody>();
@@ -90,6 +90,10 @@ public class CorkSnapZone : MonoBehaviour
         _cork.SetParent(_corkOriginalParent, worldPositionStays: false);
         _cork.localPosition = _corkOriginalLocalPos;
         _cork.localRotation = _corkOriginalLocalRot;
+
+        // Defensive: if any script disabled the cork GameObject, bring it back.
+        if (!_cork.gameObject.activeSelf)
+            _cork.gameObject.SetActive(true);
 
         _sealed = false;
         // OnEnable re-subscribes the socket listener automatically when the GO re-activates.

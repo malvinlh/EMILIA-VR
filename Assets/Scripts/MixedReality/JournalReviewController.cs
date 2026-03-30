@@ -70,6 +70,14 @@ public class JournalReviewController : MonoBehaviour
     [Header("Cork")]
     [Tooltip("CorkSnapZone script on the PostJournal bottle neck child trigger collider.")]
     public CorkSnapZone bottleNeckZone;
+    [Tooltip("Renderers that must stay disabled when EnableBottleComponents runs " +
+             "(e.g. the CorkPlaceholder mesh — a transform-only reference that should never be visible).")]
+    [SerializeField] private Renderer[] _placeholderRenderers;
+
+    [Header("Terminal Detectors")]
+    [Tooltip("Wine-rack proximity detector. Its trigger collider is disabled during the discard " +
+             "path and after KEEP completion, then re-enabled at each session start.")]
+    [SerializeField] private WineRackProximity _rackDetector;
 
     [Header("Audio")]
     [Tooltip("AudioSource that plays the cork-plug SFX. May be null — skipped silently if unassigned.")]
@@ -101,6 +109,14 @@ public class JournalReviewController : MonoBehaviour
     private GameObject _screenFadeOverlay;
     private Transform  _xrOriginTransform;
 
+    // PostJournal root's original local transform — captured once at scene start so
+    // repeated sessions can always restore the whole hierarchy to authored placement.
+    private Transform  _postJournalOriginalParent;
+    private Vector3    _postJournalOriginalLocalPos;
+    private Quaternion _postJournalOriginalLocalRot;
+    private Vector3    _postJournalOriginalLocalScale;
+    private bool       _postJournalOriginalStored;
+
     // Bottle's original local transform — captured once at scene start so it can be
     // restored at the beginning of each new journaling session's cork phase.
     private Transform  _bottleOriginalParent;
@@ -125,7 +141,15 @@ public class JournalReviewController : MonoBehaviour
 
         // PostJournal group is inactive until Keep/Discard is chosen.
         if (postJournalGroup != null)
+        {
             postJournalGroup.SetActive(false);
+
+            _postJournalOriginalParent     = postJournalGroup.transform.parent;
+            _postJournalOriginalLocalPos   = postJournalGroup.transform.localPosition;
+            _postJournalOriginalLocalRot   = postJournalGroup.transform.localRotation;
+            _postJournalOriginalLocalScale = postJournalGroup.transform.localScale;
+            _postJournalOriginalStored     = true;
+        }
 
         // Store the bottle's original local transform so it can be reset each session.
         if (bottleRoot != null)
@@ -423,6 +447,15 @@ public class JournalReviewController : MonoBehaviour
     {
         Debug.Log($"[JournalReview] BeginCorkPhase — keepChosen={_keepChosen}, bottleRoot={bottleRoot?.name ?? "NULL"}");
 
+        // Hard-restore the PostJournal root first in case any runtime script
+        // moved/disabled it between sessions.
+        RestorePostJournalRoot();
+        if (postJournalGroup != null)
+        {
+            postJournalGroup.SetActive(true);
+            ForceActivateHierarchy(postJournalGroup.transform);
+        }
+
         // Reset the cork back to its original state before revealing the group.
         if (bottleNeckZone != null) bottleNeckZone.ResetForNewSession();
 
@@ -439,11 +472,6 @@ public class JournalReviewController : MonoBehaviour
         // Hide the whiteboard UI groups.
         if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(false);
         if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(false);
-
-        // postJournalGroup is activated once on the first session and left active forever.
-        // Subsequent sessions just re-enable individual components via EnableBottleComponents.
-        if (postJournalGroup != null && !postJournalGroup.activeSelf)
-            postJournalGroup.SetActive(true);
 
         // Re-enable all bottle (and sealed cork) components so everything is visible/grabbable.
         EnableBottleComponents();
@@ -492,6 +520,21 @@ public class JournalReviewController : MonoBehaviour
         {
             _state = ReviewState.WaitingForBottle;
             Debug.Log($"[JournalReview] Cork sealed — state → WaitingForBottle. bottleRoot={bottleRoot?.name ?? "NULL"}");
+
+            // Disable auto-reset so the bottle can reach the sea without being
+            // blinked back to its origin mid-flight.
+            if (bottleRoot != null)
+            {
+                var autoReset = bottleRoot.GetComponent<ItemAutoReset>();
+                if (autoReset != null)
+                    autoReset.enabled = false; // suppress until next session
+            }
+
+            // Creative terminal guard: proactively kill the rack trigger so it cannot
+            // accidentally complete the KEEP path while the player carries the bottle to
+            // the sea. The sea collider stays active — it is the intended terminal here.
+            if (_rackDetector != null)
+                _rackDetector.GetComponent<Collider>().enabled = false;
 
             ShowDialogue(
                 "When you're ready, walk to the edge and toss the bottle into the ocean. " +
@@ -568,6 +611,13 @@ public class JournalReviewController : MonoBehaviour
             Debug.Log($"[JournalReview] Disposing bottle (rack) — name={bottleRoot.name}");
             DisableBottleComponents();
         }
+
+        // KEEP terminal cleanup: disable the rack collider so it cannot re-fire between
+        // now and when the session fully resets. The sea collider is untouched —
+        // state = Complete (set at the top of BottleDisposedCoroutine) is its guard.
+        if (_rackDetector != null)
+            _rackDetector.GetComponent<Collider>().enabled = false;
+
         Debug.Log("[JournalReview] Bottle disposed (rack). Starting BottleDisposedCoroutine.");
         StartCoroutine(BottleDisposedCoroutine(
             "Your words are safe now.\nRest easy — you showed up for yourself today.",
@@ -629,6 +679,8 @@ public class JournalReviewController : MonoBehaviour
     /// </summary>
     private void ResetSceneGroups()
     {
+        RestorePostJournalRoot();
+
         // PostJournal group is intentionally NOT deactivated here. Toggling a group's
         // SetActive between sessions causes Unity to silently refuse to re-show children
         // that were explicitly set inactive at any prior point in the hierarchy chain.
@@ -651,6 +703,32 @@ public class JournalReviewController : MonoBehaviour
             if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
             Debug.Log($"[JournalReview] ResetSceneGroups — bottleRoot '{bottleRoot.name}' repositioned for next session.");
         }
+    }
+
+    /// <summary>
+    /// Restores the PostJournal root to its authored hierarchy and local transform.
+    /// </summary>
+    private void RestorePostJournalRoot()
+    {
+        if (postJournalGroup == null || !_postJournalOriginalStored) return;
+
+        var tf = postJournalGroup.transform;
+        tf.SetParent(_postJournalOriginalParent, worldPositionStays: false);
+        tf.localPosition = _postJournalOriginalLocalPos;
+        tf.localRotation = _postJournalOriginalLocalRot;
+        tf.localScale    = _postJournalOriginalLocalScale;
+    }
+
+    /// <summary>
+    /// Ensures all descendants are active. This recovers from accidental SetActive(false)
+    /// calls on BottlePost/CorkPost that can persist across sessions.
+    /// </summary>
+    private static void ForceActivateHierarchy(Transform root)
+    {
+        if (root == null) return;
+        foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            if (!t.gameObject.activeSelf)
+                t.gameObject.SetActive(true);
     }
 
     // ================================================================
@@ -688,10 +766,16 @@ public class JournalReviewController : MonoBehaviour
     {
         // Re-enable across the whole post-journal group so the cork (restored to its
         // original parent by CorkSnapZone.ResetForNewSession) is also made visible.
+        // Skip any renderers listed in _placeholderRenderers (e.g. CorkPlaceholder)
+        // — those are transform-only references and must never be made visible.
         if (postJournalGroup != null)
         {
             foreach (var r in postJournalGroup.GetComponentsInChildren<Renderer>(true))
+            {
+                if (_placeholderRenderers != null && System.Array.IndexOf(_placeholderRenderers, r) >= 0)
+                    continue;
                 r.enabled = true;
+            }
             foreach (var c in postJournalGroup.GetComponentsInChildren<Collider>(true))
                 c.enabled = true;
         }
@@ -699,6 +783,17 @@ public class JournalReviewController : MonoBehaviour
         if (bottleRoot == null) return;
         var grab = bottleRoot.GetComponent<XRGrabInteractable>();
         if (grab != null) grab.enabled = true;
+
+        // Re-enable auto-reset for the new session (may have been suppressed by a
+        // previous discard path where WaitingForBottle disabled it).
+        var autoReset = bottleRoot.GetComponent<ItemAutoReset>();
+        if (autoReset != null)
+            autoReset.enabled = true;
+
+        // Restore the rack proximity trigger for the next session — it was disabled
+        // either at KEEP completion or at DISCARD path entry.
+        if (_rackDetector != null)
+            _rackDetector.GetComponent<Collider>().enabled = true;
     }
 
     // ================================================================

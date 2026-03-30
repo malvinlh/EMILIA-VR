@@ -9735,6 +9735,8 @@ MonoBehaviour:
   postJournalGroup: {fileID: 1790173462}
   whiteboardUIGroup: {fileID: 3000000021}
   bottleNeckZone: {fileID: 1286493200}
+  _placeholderRenderers:
+  - {fileID: 6574632737274784373}
   plugSfxSource: {fileID: 0}
 --- !u!4 &6000000012 stripped
 Transform:
@@ -26867,7 +26869,7 @@ GameObject:
   - component: {fileID: 7305090540728096378}
   - component: {fileID: 2252163610417999103}
   - component: {fileID: 7388969272661954646}
-  - component: {fileID: 7388969272661954645}
+  - component: {fileID: 7388969272661954647}
   m_Layer: 0
   m_Name: Plane.250_Plane.2737_Material.047
   m_TagString: Untagged
@@ -113457,8 +113459,22 @@ Transform:
   - {fileID: 4407210689864653827}
   m_Father: {fileID: 6941891827349428919}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!64 &7388969272661954645
-MeshCollider:
+--- !u!114 &7388969272661954646
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1139967314540327916}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 989ba0f1995f80a46bfbf4f695fef340, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SeaBottleDetector
+  reviewController: {fileID: 6000000011}
+  bottleTag: JournalBottle
+--- !u!65 &7388969272661954647
+BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -113475,24 +113491,9 @@ MeshCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 0
-  m_CookingOptions: 30
-  m_Mesh: {fileID: -3798746381904371419, guid: 81908a4c89ac8a04091b9ba1e28afec4, type: 3}
---- !u!114 &7388969272661954646
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1139967314540327916}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 989ba0f1995f80a46bfbf4f695fef340, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SeaBottleDetector
-  reviewController: {fileID: 6000000011}
-  bottleTag: JournalBottle
+  serializedVersion: 3
+  m_Size: {x: 53.52468, y: 53.522118, z: 14.606147}
+  m_Center: {x: 0.95432186, y: 0.6674975, z: 8.386815}
 --- !u!1 &7388971742386131912
 GameObject:
   m_ObjectHideFlags: 0
