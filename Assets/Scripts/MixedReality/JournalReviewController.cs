@@ -83,6 +83,10 @@ public class JournalReviewController : MonoBehaviour
     [Tooltip("AudioSource that plays the cork-plug SFX. May be null — skipped silently if unassigned.")]
     public AudioSource plugSfxSource;
 
+    [Header("Debug")]
+    [Tooltip("When enabled, emits detailed state snapshots with '[JRC][STATE]' prefix for logcat filtering.")]
+    [SerializeField] private bool _debugStateLogs = true;
+
     // ── State ─────────────────────────────────────────────────────────────
     private enum ReviewState
     {
@@ -122,6 +126,7 @@ public class JournalReviewController : MonoBehaviour
     private Transform  _bottleOriginalParent;
     private Vector3    _bottleOriginalLocalPos;
     private Quaternion _bottleOriginalLocalRot;
+    private Vector3    _bottleOriginalLocalScale;
     private bool       _bottleOriginalStored;
 
     // ================================================================
@@ -157,8 +162,11 @@ public class JournalReviewController : MonoBehaviour
             _bottleOriginalParent   = bottleRoot.parent;
             _bottleOriginalLocalPos = bottleRoot.localPosition;
             _bottleOriginalLocalRot = bottleRoot.localRotation;
+            _bottleOriginalLocalScale = bottleRoot.localScale;
             _bottleOriginalStored   = true;
         }
+
+        LogStateSnapshot("Awake.AfterInit");
     }
 
     // ================================================================
@@ -180,6 +188,7 @@ public class JournalReviewController : MonoBehaviour
         }
         _onComplete           = onComplete;
         _preJournalXROriginY  = preJournalXROriginY;
+        LogStateSnapshot("BeginReview.Start");
         StartCoroutine(ReviewCoroutine());
     }
 
@@ -446,6 +455,7 @@ public class JournalReviewController : MonoBehaviour
     private void BeginCorkPhase()
     {
         Debug.Log($"[JournalReview] BeginCorkPhase — keepChosen={_keepChosen}, bottleRoot={bottleRoot?.name ?? "NULL"}");
+        LogStateSnapshot("BeginCorkPhase.BeforeRestore");
 
         // Hard-restore the PostJournal root first in case any runtime script
         // moved/disabled it between sessions.
@@ -462,9 +472,13 @@ public class JournalReviewController : MonoBehaviour
         // Restore bottle transform first (kinematic so gravity doesn't fire before position is set).
         if (bottleRoot != null && _bottleOriginalStored)
         {
+            if (!bottleRoot.gameObject.activeSelf)
+                bottleRoot.gameObject.SetActive(true);
+
             bottleRoot.SetParent(_bottleOriginalParent, worldPositionStays: false);
             bottleRoot.localPosition = _bottleOriginalLocalPos;
             bottleRoot.localRotation = _bottleOriginalLocalRot;
+            bottleRoot.localScale    = _bottleOriginalLocalScale;
             var rb = bottleRoot.GetComponent<Rigidbody>();
             if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
         }
@@ -475,6 +489,7 @@ public class JournalReviewController : MonoBehaviour
 
         // Re-enable all bottle (and sealed cork) components so everything is visible/grabbable.
         EnableBottleComponents();
+        LogStateSnapshot("BeginCorkPhase.AfterEnableComponents");
 
         // Release physics now that the bottle is at the correct position and visible.
         if (bottleRoot != null)
@@ -498,10 +513,13 @@ public class JournalReviewController : MonoBehaviour
             Debug.LogWarning("[JournalReview] bottleNeckZone not assigned — cork step skipped.");
 
         _state = ReviewState.WaitingForCork;
+        LogStateSnapshot("BeginCorkPhase.WaitingForCork");
     }
 
     private void OnCorkSealed()
     {
+        LogStateSnapshot("OnCorkSealed.Entry");
+
         if (bottleNeckZone != null)
             bottleNeckZone.OnCorkSealed -= OnCorkSealed;
 
@@ -574,6 +592,7 @@ public class JournalReviewController : MonoBehaviour
     public void HandleBottleInSea()
     {
         Debug.Log($"[JournalReview] HandleBottleInSea called — state={_state}, bottleRoot={bottleRoot?.name ?? "NULL (already destroyed)"}");
+        LogStateSnapshot("HandleBottleInSea.Entry");
         if (_state != ReviewState.WaitingForBottle)
         {
             Debug.LogWarning($"[JournalReview] HandleBottleInSea ignored — wrong state ({_state}).");
@@ -583,6 +602,7 @@ public class JournalReviewController : MonoBehaviour
         {
             Debug.Log($"[JournalReview] Disposing bottle (sea) — name={bottleRoot.name}");
             DisableBottleComponents();
+            LogStateSnapshot("HandleBottleInSea.AfterDisableBottleComponents");
         }
         Debug.Log("[JournalReview] Bottle disposed (sea). Starting BottleDisposedCoroutine.");
         StartCoroutine(BottleDisposedCoroutine(
@@ -601,6 +621,7 @@ public class JournalReviewController : MonoBehaviour
     public void HandleBottleRacked()
     {
         Debug.Log($"[JournalReview] HandleBottleRacked called — state={_state}, bottleRoot={bottleRoot?.name ?? "NULL (already destroyed)"}");
+        LogStateSnapshot("HandleBottleRacked.Entry");
         if (_state != ReviewState.WaitingForRack)
         {
             Debug.LogWarning($"[JournalReview] HandleBottleRacked ignored — wrong state ({_state}).");
@@ -610,6 +631,7 @@ public class JournalReviewController : MonoBehaviour
         {
             Debug.Log($"[JournalReview] Disposing bottle (rack) — name={bottleRoot.name}");
             DisableBottleComponents();
+            LogStateSnapshot("HandleBottleRacked.AfterDisableBottleComponents");
         }
 
         // KEEP terminal cleanup: disable the rack collider so it cannot re-fire between
@@ -679,6 +701,8 @@ public class JournalReviewController : MonoBehaviour
     /// </summary>
     private void ResetSceneGroups()
     {
+        LogStateSnapshot("ResetSceneGroups.Before");
+
         RestorePostJournalRoot();
 
         // PostJournal group is intentionally NOT deactivated here. Toggling a group's
@@ -696,13 +720,19 @@ public class JournalReviewController : MonoBehaviour
         // EnableBottleComponents in BeginCorkPhase makes everything visible again.
         if (bottleRoot != null && _bottleOriginalStored)
         {
+            if (!bottleRoot.gameObject.activeSelf)
+                bottleRoot.gameObject.SetActive(true);
+
             bottleRoot.SetParent(_bottleOriginalParent, worldPositionStays: false);
             bottleRoot.localPosition = _bottleOriginalLocalPos;
             bottleRoot.localRotation = _bottleOriginalLocalRot;
+            bottleRoot.localScale    = _bottleOriginalLocalScale;
             var rb = bottleRoot.GetComponent<Rigidbody>();
             if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
             Debug.Log($"[JournalReview] ResetSceneGroups — bottleRoot '{bottleRoot.name}' repositioned for next session.");
         }
+
+        LogStateSnapshot("ResetSceneGroups.After");
     }
 
     /// <summary>
@@ -772,7 +802,7 @@ public class JournalReviewController : MonoBehaviour
         {
             foreach (var r in postJournalGroup.GetComponentsInChildren<Renderer>(true))
             {
-                if (_placeholderRenderers != null && System.Array.IndexOf(_placeholderRenderers, r) >= 0)
+                if (IsPlaceholderRenderer(r))
                     continue;
                 r.enabled = true;
             }
@@ -781,6 +811,24 @@ public class JournalReviewController : MonoBehaviour
         }
 
         if (bottleRoot == null) return;
+
+        // Fail-safe: if all non-placeholder bottle renderers are still disabled for any
+        // reason, force-enable them so the player can continue the session.
+        bool anyBottleRendererEnabled = false;
+        foreach (var r in bottleRoot.GetComponentsInChildren<Renderer>(true))
+        {
+            if (r == null || IsPlaceholderRenderer(r)) continue;
+            if (r.enabled) { anyBottleRendererEnabled = true; break; }
+        }
+        if (!anyBottleRendererEnabled)
+        {
+            foreach (var r in bottleRoot.GetComponentsInChildren<Renderer>(true))
+            {
+                if (r == null || IsPlaceholderRenderer(r)) continue;
+                r.enabled = true;
+            }
+        }
+
         var grab = bottleRoot.GetComponent<XRGrabInteractable>();
         if (grab != null) grab.enabled = true;
 
@@ -794,6 +842,71 @@ public class JournalReviewController : MonoBehaviour
         // either at KEEP completion or at DISCARD path entry.
         if (_rackDetector != null)
             _rackDetector.GetComponent<Collider>().enabled = true;
+    }
+
+    private bool IsPlaceholderRenderer(Renderer renderer)
+    {
+        return renderer != null
+               && _placeholderRenderers != null
+               && System.Array.IndexOf(_placeholderRenderers, renderer) >= 0;
+    }
+
+    private void LogStateSnapshot(string phase)
+    {
+        if (!_debugStateLogs) return;
+
+        Transform corkTf = bottleNeckZone != null ? bottleNeckZone.DebugCorkTransform : null;
+
+        int totalRenderers = 0;
+        int enabledRenderers = 0;
+        int totalColliders = 0;
+        int enabledColliders = 0;
+
+        if (postJournalGroup != null)
+        {
+            foreach (var r in postJournalGroup.GetComponentsInChildren<Renderer>(true))
+            {
+                totalRenderers++;
+                if (r != null && r.enabled) enabledRenderers++;
+            }
+
+            foreach (var c in postJournalGroup.GetComponentsInChildren<Collider>(true))
+            {
+                totalColliders++;
+                if (c != null && c.enabled) enabledColliders++;
+            }
+        }
+
+        var bottleGrab = bottleRoot != null ? bottleRoot.GetComponent<XRGrabInteractable>() : null;
+        var bottleRb = bottleRoot != null ? bottleRoot.GetComponent<Rigidbody>() : null;
+        var bottleAutoReset = bottleRoot != null ? bottleRoot.GetComponent<ItemAutoReset>() : null;
+        var rackCollider = _rackDetector != null ? _rackDetector.GetComponent<Collider>() : null;
+
+        Debug.Log(
+            $"[JRC][STATE] {phase} | " +
+            $"state={_state}, keepChosen={_keepChosen} | " +
+            $"post={DescribeGameObject(postJournalGroup)} | " +
+            $"bottle={DescribeTransform(bottleRoot)} | " +
+            $"cork={DescribeTransform(corkTf)} | " +
+            $"renderers={enabledRenderers}/{totalRenderers} | " +
+            $"colliders={enabledColliders}/{totalColliders} | " +
+            $"bottleGrab={(bottleGrab != null ? bottleGrab.enabled.ToString() : "NULL")} | " +
+            $"bottleAutoReset={(bottleAutoReset != null ? bottleAutoReset.enabled.ToString() : "NULL")} | " +
+            $"bottleRb={(bottleRb != null ? $"kin={bottleRb.isKinematic},grav={bottleRb.useGravity},detect={bottleRb.detectCollisions}" : "NULL")} | " +
+            $"rackCollider={(rackCollider != null ? rackCollider.enabled.ToString() : "NULL")}");
+    }
+
+    private static string DescribeGameObject(GameObject go)
+    {
+        if (go == null) return "NULL";
+        return $"{go.name}(activeSelf={go.activeSelf},activeInHierarchy={go.activeInHierarchy})";
+    }
+
+    private static string DescribeTransform(Transform tf)
+    {
+        if (tf == null) return "NULL";
+        string parentName = tf.parent != null ? tf.parent.name : "NULL";
+        return $"{tf.name}(activeSelf={tf.gameObject.activeSelf},activeInHierarchy={tf.gameObject.activeInHierarchy},parent={parentName},localPos={tf.localPosition},localScale={tf.localScale},worldPos={tf.position})";
     }
 
     // ================================================================

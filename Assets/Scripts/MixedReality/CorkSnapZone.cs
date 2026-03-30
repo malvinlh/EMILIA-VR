@@ -25,6 +25,9 @@ public class CorkSnapZone : MonoBehaviour
     /// <summary>Fired once after the Cork is permanently fixed to the Bottle.</summary>
     public event Action OnCorkSealed;
 
+    /// <summary>Debug-only access for state snapshots in JournalReviewController.</summary>
+    public Transform DebugCorkTransform => _cork;
+
     [Header("Optional Seat Override")]
     [Tooltip("If assigned, the cork is sealed to this transform (e.g., the shadow placeholder) instead of using socket attach math.")]
     [SerializeField] private Transform seatOverrideTarget;
@@ -41,6 +44,7 @@ public class CorkSnapZone : MonoBehaviour
     private Transform  _corkOriginalParent;
     private Vector3    _corkOriginalLocalPos;
     private Quaternion _corkOriginalLocalRot;
+    private Vector3    _corkOriginalLocalScale;
 
     private void Awake()
     {
@@ -53,6 +57,7 @@ public class CorkSnapZone : MonoBehaviour
             _corkOriginalParent   = _cork.parent;
             _corkOriginalLocalPos = _cork.localPosition;
             _corkOriginalLocalRot = _cork.localRotation;
+            _corkOriginalLocalScale = _cork.localScale;
         }
         else
         {
@@ -90,16 +95,27 @@ public class CorkSnapZone : MonoBehaviour
         _cork.SetParent(_corkOriginalParent, worldPositionStays: false);
         _cork.localPosition = _corkOriginalLocalPos;
         _cork.localRotation = _corkOriginalLocalRot;
+        _cork.localScale    = _corkOriginalLocalScale;
 
         // Defensive: if any script disabled the cork GameObject, bring it back.
         if (!_cork.gameObject.activeSelf)
             _cork.gameObject.SetActive(true);
 
+        // Ensure the cork is visible and collidable again even if previous disposal
+        // disabled child components while it was parented under the bottle.
+        foreach (var r in _cork.GetComponentsInChildren<Renderer>(true))
+            r.enabled = true;
+        foreach (var c in _cork.GetComponentsInChildren<Collider>(true))
+            c.enabled = true;
+
         _sealed = false;
         // OnEnable re-subscribes the socket listener automatically when the GO re-activates.
         // If the socket GO is already active, subscribe now.
         if (_socket != null && isActiveAndEnabled)
+        {
+            _socket.selectEntered.RemoveListener(OnSocketSelectEntered);
             _socket.selectEntered.AddListener(OnSocketSelectEntered);
+        }
 
         Debug.Log("[CorkSnapZone] Reset for new session — cork restored, _sealed = false.");
     }
