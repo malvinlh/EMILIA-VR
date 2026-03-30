@@ -426,28 +426,36 @@ public class JournalReviewController : MonoBehaviour
         // Reset the cork back to its original state before revealing the group.
         if (bottleNeckZone != null) bottleNeckZone.ResetForNewSession();
 
-        // Switch scene groups: hide whiteboard area, reveal post-journal bottle + cork.
-        if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(false);
-        if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(false);
-        if (postJournalGroup       != null) postJournalGroup.SetActive(true);
-
-        // Re-enable the bottle (it was SetActive(false) at the end of the previous session)
-        // and restore its original local transform so it appears at the right position.
+        // Restore bottle transform first (kinematic so gravity doesn't fire before position is set).
         if (bottleRoot != null && _bottleOriginalStored)
         {
             bottleRoot.SetParent(_bottleOriginalParent, worldPositionStays: false);
             bottleRoot.localPosition = _bottleOriginalLocalPos;
             bottleRoot.localRotation = _bottleOriginalLocalRot;
-            bottleRoot.gameObject.SetActive(true);
-
             var rb = bottleRoot.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.isKinematic    = false;
-                rb.useGravity     = true;
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-            }
+            if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+        }
+
+        // Hide the whiteboard UI groups.
+        if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(false);
+        if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(false);
+
+        // postJournalGroup is activated once on the first session and left active forever.
+        // Subsequent sessions just re-enable individual components via EnableBottleComponents.
+        if (postJournalGroup != null && !postJournalGroup.activeSelf)
+            postJournalGroup.SetActive(true);
+
+        // Re-enable all bottle (and sealed cork) components so everything is visible/grabbable.
+        EnableBottleComponents();
+
+        // Release physics now that the bottle is at the correct position and visible.
+        if (bottleRoot != null)
+        {
+            var rb = bottleRoot.GetComponent<Rigidbody>();
+            if (rb != null) { rb.isKinematic = false; rb.useGravity = true; }
+
+            // Refresh ItemAutoReset origin so blink-back uses the post-restore position.
+            bottleRoot.GetComponent<ItemAutoReset>()?.RefreshOrigin();
         }
 
         // Unlock locomotion so the player can move freely after the cork step.
@@ -502,8 +510,13 @@ public class JournalReviewController : MonoBehaviour
     {
         if (_state != ReviewState.WaitingForBottle) return;
 
-        // Safety fallback: bottle was destroyed by means other than the sea collider.
-        if (bottleRoot == null)
+        // Safety fallback: bottle components were disabled by external means (e.g. the
+        // XRGrabInteractable was turned off without going through HandleBottleInSea).
+        // Checking the grab interactable is more reliable than a null check now that we
+        // never call SetActive(false) or Destroy on bottleRoot.
+        if (bottleRoot == null) { CompleteReview(saveJournal: false); return; }
+        var grab = bottleRoot.GetComponent<XRGrabInteractable>();
+        if (grab != null && !grab.enabled)
             CompleteReview(saveJournal: false);
     }
 
@@ -525,10 +538,10 @@ public class JournalReviewController : MonoBehaviour
         }
         if (bottleRoot != null)
         {
-            Debug.Log($"[JournalReview] Hiding bottle (sea) — name={bottleRoot.name}, instanceID={bottleRoot.gameObject.GetInstanceID()}");
-            bottleRoot.gameObject.SetActive(false);
+            Debug.Log($"[JournalReview] Disposing bottle (sea) — name={bottleRoot.name}");
+            DisableBottleComponents();
         }
-        Debug.Log("[JournalReview] Bottle destroyed (sea). Starting BottleDisposedCoroutine.");
+        Debug.Log("[JournalReview] Bottle disposed (sea). Starting BottleDisposedCoroutine.");
         StartCoroutine(BottleDisposedCoroutine(
             "Letting go takes courage too.\nThe ocean will carry it — and so will you.",
             saveJournal: false));
@@ -552,10 +565,10 @@ public class JournalReviewController : MonoBehaviour
         }
         if (bottleRoot != null)
         {
-            Debug.Log($"[JournalReview] Hiding bottle (rack) — name={bottleRoot.name}, instanceID={bottleRoot.gameObject.GetInstanceID()}");
-            bottleRoot.gameObject.SetActive(false);
+            Debug.Log($"[JournalReview] Disposing bottle (rack) — name={bottleRoot.name}");
+            DisableBottleComponents();
         }
-        Debug.Log("[JournalReview] Bottle destroyed (rack). Starting BottleDisposedCoroutine.");
+        Debug.Log("[JournalReview] Bottle disposed (rack). Starting BottleDisposedCoroutine.");
         StartCoroutine(BottleDisposedCoroutine(
             "Your words are safe now.\nRest easy — you showed up for yourself today.",
             saveJournal: true));
@@ -616,19 +629,76 @@ public class JournalReviewController : MonoBehaviour
     /// </summary>
     private void ResetSceneGroups()
     {
-        Debug.Log("[JournalReview] ResetSceneGroups — PostJournal OFF, PreNDuringJournal ON, WhiteboardUI ON.");
-        if (postJournalGroup       != null) postJournalGroup.SetActive(false);
+        // PostJournal group is intentionally NOT deactivated here. Toggling a group's
+        // SetActive between sessions causes Unity to silently refuse to re-show children
+        // that were explicitly set inactive at any prior point in the hierarchy chain.
+        // Instead we keep the group active and manage individual item visibility via
+        // renderer/collider/interactable components (see DisableBottleComponents /
+        // EnableBottleComponents). Only the whiteboard UI groups change here.
+        Debug.Log("[JournalReview] ResetSceneGroups — PreNDuringJournal ON, WhiteboardUI ON.");
         if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(true);
         if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(true);
 
-        // Re-enable bottleRoot explicitly. SetActive(false) was called on it during session
-        // end — Unity won't restore an explicitly-false child just by re-enabling its parent.
-        // Safe for BottlePost too: postJournalGroup just went false so its parent is inactive.
-        if (bottleRoot != null)
+        // Reposition the bottle to its authored origin so it is ready for the next session.
+        // Components remain disabled (DisableBottleComponents was called at disposal);
+        // EnableBottleComponents in BeginCorkPhase makes everything visible again.
+        if (bottleRoot != null && _bottleOriginalStored)
         {
-            bottleRoot.gameObject.SetActive(true);
-            Debug.Log($"[JournalReview] ResetSceneGroups — bottleRoot '{bottleRoot.name}' re-enabled.");
+            bottleRoot.SetParent(_bottleOriginalParent, worldPositionStays: false);
+            bottleRoot.localPosition = _bottleOriginalLocalPos;
+            bottleRoot.localRotation = _bottleOriginalLocalRot;
+            var rb = bottleRoot.GetComponent<Rigidbody>();
+            if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+            Debug.Log($"[JournalReview] ResetSceneGroups — bottleRoot '{bottleRoot.name}' repositioned for next session.");
         }
+    }
+
+    // ================================================================
+    // BOTTLE COMPONENT HELPERS
+    // ================================================================
+
+    /// <summary>
+    /// Hides the bottle (and any sealed cork that is a child of it) without calling
+    /// SetActive so the GameObject stays alive and can be fully restored next session.
+    /// Also disables the XRGrabInteractable so ItemAutoReset's guard suppresses blink-back
+    /// while the bottle is in the "disposed" state.
+    /// </summary>
+    private void DisableBottleComponents()
+    {
+        if (bottleRoot == null) return;
+
+        var grab = bottleRoot.GetComponent<XRGrabInteractable>();
+        if (grab != null) grab.enabled = false;
+
+        var rb = bottleRoot.GetComponent<Rigidbody>();
+        if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+
+        foreach (var r in bottleRoot.GetComponentsInChildren<Renderer>(true))
+            r.enabled = false;
+        foreach (var c in bottleRoot.GetComponentsInChildren<Collider>(true))
+            c.enabled = false;
+    }
+
+    /// <summary>
+    /// Re-enables all renderers and colliders across the entire PostJournal group
+    /// (bottle and cork), then re-enables the bottle's XRGrabInteractable.
+    /// Called at the start of each cork phase so both items are interactable.
+    /// </summary>
+    private void EnableBottleComponents()
+    {
+        // Re-enable across the whole post-journal group so the cork (restored to its
+        // original parent by CorkSnapZone.ResetForNewSession) is also made visible.
+        if (postJournalGroup != null)
+        {
+            foreach (var r in postJournalGroup.GetComponentsInChildren<Renderer>(true))
+                r.enabled = true;
+            foreach (var c in postJournalGroup.GetComponentsInChildren<Collider>(true))
+                c.enabled = true;
+        }
+
+        if (bottleRoot == null) return;
+        var grab = bottleRoot.GetComponent<XRGrabInteractable>();
+        if (grab != null) grab.enabled = true;
     }
 
     // ================================================================
