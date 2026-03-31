@@ -1599,6 +1599,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!4 &334391415 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 2218496723442559053, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
+  m_PrefabInstance: {fileID: 3000000012}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &343477695
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6319,7 +6324,7 @@ MonoBehaviour:
   arTableDetector: {fileID: 5000000010}
   calibrationGuide: {fileID: 5000000013}
   alignmentAnchor: {fileID: 0}
-  whiteboardUtils: {fileID: 0}
+  whiteboardUtils: {fileID: 3000000008}
   startButton: {fileID: 4000000013}
   reviewController: {fileID: 6000000011}
   arPlaneManager: {fileID: 0}
@@ -6327,13 +6332,15 @@ MonoBehaviour:
   skipToJournalingOnStart: 0
   journalChairTable: {fileID: 1456161760}
   journalTable: {fileID: 251825959}
-  chair: {fileID: 0}
+  chair: {fileID: 1371020394}
   tableHeightBias: 0
   seatPoint: {fileID: 784500238}
-  xrOrigin: {fileID: 0}
-  mainIsland: {fileID: 0}
+  xrOrigin: {fileID: 334391415}
+  mainIsland: {fileID: 543450652472430531}
   heightAdjustmentRoot: {fileID: 1456161760}
   calibrateUserEyeHeight: 1
+  tableWritingSurface: {fileID: 2105726778}
+  calibrationHeightBias: 0
   realEyeAboveTableClamp: {x: 0.25, y: 0.85}
   applySceneHeightCorrection: 0
   maxHeightCorrection: 0.45

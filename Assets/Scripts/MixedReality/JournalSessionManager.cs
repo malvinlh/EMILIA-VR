@@ -103,6 +103,18 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("If enabled, adjusts XR Origin Y so the returned VR eye height matches the real eye-above-table relationship captured in passthrough.")]
     public bool calibrateUserEyeHeight = true;
 
+    [Tooltip("Optional: assign the WhiteboardPlaceholder transform (or any transform at the exact " +
+             "virtual writing surface height). If null, falls back to journalTable.position.y — " +
+             "which is only correct when the JournalTable pivot is at surface level.")]
+    public Transform tableWritingSurface;
+
+    [Tooltip("Fine-tune calibration after the session starts (metres). " +
+             "Negative = lower the player (virtual table appears higher). " +
+             "Positive = raise the player (virtual table appears lower). " +
+             "Start at 0 and adjust in small increments if the table still feels off.")]
+    [Range(-0.15f, 0.15f)]
+    public float calibrationHeightBias = 0f;
+
     [Tooltip("Expected real eye-above-table range in metres captured from passthrough. " +
              "Used to reject outlier hand/head samples.")]
     public Vector2 realEyeAboveTableClamp = new Vector2(0.25f, 0.85f);
@@ -662,11 +674,12 @@ public class JournalSessionManager : MonoBehaviour
                 Mathf.Min(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y),
                 Mathf.Max(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y));
 
-            targetEyeY = GetVirtualTableSurfaceY() + realEyeAboveTable;
+            float virtualTableY = GetVirtualTableSurfaceY();
+            targetEyeY = virtualTableY + realEyeAboveTable + calibrationHeightBias;
 
             Debug.Log($"[JournalSession] Eye-height calibrated: realEyeAboveTable=" +
                       $"{realEyeAboveTable:F3}m (eye={capturedRealEyeHeight:F3}, palmSurf={pendingTable.avgPalmSurfaceY:F3}), " +
-                      $"virtualTableY={GetVirtualTableSurfaceY():F3}m, targetEyeY={targetEyeY:F3}m");
+                      $"virtualTableY={virtualTableY:F3}m, bias={calibrationHeightBias:F3}m, targetEyeY={targetEyeY:F3}m");
         }
         else
         {
@@ -761,8 +774,46 @@ public class JournalSessionManager : MonoBehaviour
 
     private float GetVirtualTableSurfaceY()
     {
+        // Prefer an explicitly assigned writing-surface reference.
+        if (tableWritingSurface != null)
+        {
+            float y = tableWritingSurface.position.y;
+            Debug.Log($"[JournalSession] VirtualTableSurfaceY={y:F3}m from tableWritingSurface '{tableWritingSurface.name}'");
+            return y;
+        }
+
+        // Try WhiteboardPlaceholder first (explicit surface marker), then the
+        // Whiteboard itself (the static writing surface placed in scene).
+        string[] autoPaths = new[]
+        {
+            "JournalChairTable/JournalTable/WhiteboardPlaceholder",
+            "JournalChairTable/JournalTable/PreNDuringJournal/Whiteboard",
+        };
+
+        foreach (var path in autoPaths)
+        {
+            var found = GameObject.Find(path);
+            if (found != null)
+            {
+                tableWritingSurface = found.transform;
+                float y = tableWritingSurface.position.y;
+                Debug.Log($"[JournalSession] VirtualTableSurfaceY={y:F3}m from '{found.name}' (auto-found at '{path}'). " +
+                          $"JournalTable pivot Y for comparison: {(journalTable != null ? journalTable.position.y.ToString("F3") : "N/A")}m");
+                return y;
+            }
+        }
+
+        // Last resort: JournalTable pivot (only correct when pivot is at surface).
         if (journalTable != null)
-            return journalTable.position.y;
+        {
+            float y = journalTable.position.y;
+            Debug.LogWarning($"[JournalSession] VirtualTableSurfaceY={y:F3}m — FALLBACK to JournalTable pivot. " +
+                             "Neither WhiteboardPlaceholder nor Whiteboard found by path. " +
+                             "Calibration may be inaccurate. Assign tableWritingSurface in the inspector.");
+            return y;
+        }
+
+        Debug.LogError("[JournalSession] VirtualTableSurfaceY: no reference found — returning 0.");
         return 0f;
     }
 

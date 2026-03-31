@@ -128,10 +128,15 @@ public class ARTableDetector : MonoBehaviour
     private float holdMinY = float.MaxValue;
     private float holdMaxY = float.MinValue;
 
-    // Accumulators for eye/palm averaging during hold
+    // Accumulators for eye/surface averaging during hold
     private float holdEyeYAccum;
     private float holdPalmYAccum;
     private int holdSampleCount;
+    // Fingertip accumulator — all 10 fingertip joints averaged across hold frames.
+    // Fingertip joints sit ~3-5mm above the physical contact surface, much closer
+    // than the palm centre (~15-20mm), giving a more accurate table-surface estimate.
+    private float holdFingertipYAccum;
+    private int holdFingertipSampleCount;
 
     // Cached reference to the Camera Floor Offset Object — the transform that
     // converts session/tracking space to world space through the same chain as
@@ -247,6 +252,24 @@ public class ARTableDetector : MonoBehaviour
             holdPalmYAccum += (leftPalmPos.y + rightPalmPos.y) * 0.5f;
             holdSampleCount++;
 
+            // Accumulate all 10 fingertip world-space Y values.
+            // Fingertip joints are ~3-5mm above the physical surface, far closer than
+            // the palm centre (~15-20mm), so their average gives a more accurate
+            // table surface estimate with less bias.
+            foreach (var jointID in FingertipJoints)
+            {
+                if (leftHand.GetJoint(jointID).TryGetPose(out Pose lTip))
+                {
+                    holdFingertipYAccum += SessionToWorld(lTip.position).y;
+                    holdFingertipSampleCount++;
+                }
+                if (rightHand.GetJoint(jointID).TryGetPose(out Pose rTip))
+                {
+                    holdFingertipYAccum += SessionToWorld(rTip.position).y;
+                    holdFingertipSampleCount++;
+                }
+            }
+
             IsConfirming = true;
             OnConfirmationProgress?.Invoke(progress);
 
@@ -270,16 +293,24 @@ public class ARTableDetector : MonoBehaviour
                 else
                     result = BuildFromHands(leftHand, rightHand, leftPalmPos, rightPalmPos);
 
-                // Overwrite with averaged, palm-based values for accurate height calibration.
-                // avgPalmSurfaceY uses actual palm contact position rather than AR plane Y,
-                // eliminating spatial-mesh drift from the eye-above-table calculation.
+                // Use fingertip average for surface Y if we have samples (preferred).
+                // Fingertip joints sit ~3mm above the physical contact surface, giving
+                // a much smaller and more consistent offset than the palm centre (~15-20mm).
+                // Fall back to palm average if no fingertip data.
+                float avgFingertipY = holdFingertipSampleCount > 0
+                    ? holdFingertipYAccum / holdFingertipSampleCount
+                    : avgPalmY;
+                float surfaceY = holdFingertipSampleCount > 0
+                    ? avgFingertipY - 0.003f   // 3mm fingertip joint-to-skin offset
+                    : avgPalmY - 0.012f;       // fallback: palm centre offset
+
                 result.avgEyeY = avgEyeY;
-                result.avgPalmSurfaceY = avgPalmY - 0.012f;  // subtract palm joint thickness
+                result.avgPalmSurfaceY = surfaceY;
 
                 Debug.Log($"[ARTableDetector] Table confirmed at {result.position}, " +
                           $"size={result.size}, AR={matchedPlane != null}, " +
-                          $"avgEyeY={avgEyeY:F3}m, avgPalmSurfaceY={result.avgPalmSurfaceY:F3}m " +
-                          $"(samples={holdSampleCount})");
+                          $"avgEyeY={avgEyeY:F3}m, surfaceY={result.avgPalmSurfaceY:F3}m " +
+                          $"(frameSamples={holdSampleCount}, fingertipSamples={holdFingertipSampleCount})");
                 OnTableConfirmed?.Invoke(result);
             }
         }
@@ -626,6 +657,8 @@ public class ARTableDetector : MonoBehaviour
         holdEyeYAccum = 0f;
         holdPalmYAccum = 0f;
         holdSampleCount = 0;
+        holdFingertipYAccum = 0f;
+        holdFingertipSampleCount = 0;
         IsConfirming = false;
         matchedPlane = null;
     }
