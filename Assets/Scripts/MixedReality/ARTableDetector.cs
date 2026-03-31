@@ -90,6 +90,19 @@ public class ARTableDetector : MonoBehaviour
         public Vector3 userHeadPosition;
         public Vector3 userForward;
         public ARPlane sourcePlane;   // null if hand-only fallback
+
+        /// <summary>
+        /// Average camera/eye height (world Y) sampled across the entire hold period.
+        /// More accurate than a single-frame snapshot for calibration.
+        /// </summary>
+        public float avgEyeY;
+
+        /// <summary>
+        /// Average palm-surface Y (world Y) sampled across the hold period.
+        /// Palm midpoint Y minus palm thickness — used as the true table surface
+        /// reference, more accurate than the AR plane Y for height calibration.
+        /// </summary>
+        public float avgPalmSurfaceY;
     }
 
     public struct CandidatePlane
@@ -114,6 +127,11 @@ public class ARTableDetector : MonoBehaviour
     private List<CandidatePlane> candidates = new List<CandidatePlane>();
     private float holdMinY = float.MaxValue;
     private float holdMaxY = float.MinValue;
+
+    // Accumulators for eye/palm averaging during hold
+    private float holdEyeYAccum;
+    private float holdPalmYAccum;
+    private int holdSampleCount;
 
     // Cached reference to the Camera Floor Offset Object — the transform that
     // converts session/tracking space to world space through the same chain as
@@ -223,6 +241,12 @@ public class ARTableDetector : MonoBehaviour
             holdTimer += Time.deltaTime;
             float progress = Mathf.Clamp01(holdTimer / holdDuration);
 
+            // Accumulate eye and palm heights every frame for averaging
+            Camera camSample = Camera.main;
+            if (camSample != null) holdEyeYAccum += camSample.transform.position.y;
+            holdPalmYAccum += (leftPalmPos.y + rightPalmPos.y) * 0.5f;
+            holdSampleCount++;
+
             IsConfirming = true;
             OnConfirmationProgress?.Invoke(progress);
 
@@ -231,14 +255,31 @@ public class ARTableDetector : MonoBehaviour
                 HasConfirmed = true;
                 IsConfirming = false;
 
+                // Compute averages — more stable than single-frame snapshot
+                Camera cam = Camera.main;
+                float avgEyeY = holdSampleCount > 0
+                    ? holdEyeYAccum / holdSampleCount
+                    : (cam != null ? cam.transform.position.y : 0f);
+                float avgPalmY = holdSampleCount > 0
+                    ? holdPalmYAccum / holdSampleCount
+                    : (leftPalmPos.y + rightPalmPos.y) * 0.5f;
+
                 DetectedTable result;
                 if (matchedPlane != null)
                     result = BuildFromARPlane(matchedPlane, leftPalmPos, rightPalmPos);
                 else
                     result = BuildFromHands(leftHand, rightHand, leftPalmPos, rightPalmPos);
 
+                // Overwrite with averaged, palm-based values for accurate height calibration.
+                // avgPalmSurfaceY uses actual palm contact position rather than AR plane Y,
+                // eliminating spatial-mesh drift from the eye-above-table calculation.
+                result.avgEyeY = avgEyeY;
+                result.avgPalmSurfaceY = avgPalmY - 0.012f;  // subtract palm joint thickness
+
                 Debug.Log($"[ARTableDetector] Table confirmed at {result.position}, " +
-                          $"size={result.size}, AR={matchedPlane != null}");
+                          $"size={result.size}, AR={matchedPlane != null}, " +
+                          $"avgEyeY={avgEyeY:F3}m, avgPalmSurfaceY={result.avgPalmSurfaceY:F3}m " +
+                          $"(samples={holdSampleCount})");
                 OnTableConfirmed?.Invoke(result);
             }
         }
@@ -582,6 +623,9 @@ public class ARTableDetector : MonoBehaviour
         holdTimer = 0f;
         holdMinY = float.MaxValue;
         holdMaxY = float.MinValue;
+        holdEyeYAccum = 0f;
+        holdPalmYAccum = 0f;
+        holdSampleCount = 0;
         IsConfirming = false;
         matchedPlane = null;
     }

@@ -423,9 +423,10 @@ public class JournalSessionManager : MonoBehaviour
 
         CurrentState = SessionState.Preview;
 
-        // Capture player's real eye height at the moment of confirmation.
-        // This is used later so the VR camera matches the passthrough perspective.
-        capturedRealEyeHeight = table.userHeadPosition.y;
+        // Capture averaged eye height sampled across the entire hold period.
+        // This is more stable than a single-frame snapshot and is used later
+        // so the VR camera matches the passthrough perspective.
+        capturedRealEyeHeight = table.avgEyeY;
 
         Debug.Log($"[JournalSession] Table confirmed at {table.position}, " +
                   $"size={table.size}, AR={table.sourcePlane != null}. " +
@@ -474,7 +475,6 @@ public class JournalSessionManager : MonoBehaviour
                 CurrentState = SessionState.Journaling;
                 OnJournalingEntered();
                 SetWhiteboardUIActive(true);
-                LockLocomotion();
                 Debug.Log("[JournalSession] Journaling session started.");
             });
         }
@@ -498,6 +498,10 @@ public class JournalSessionManager : MonoBehaviour
         // fade-from-black coroutine, leaving the screen permanently black.
         try
         {
+            // Lock locomotion while the screen is still black so the player
+            // cannot move during the fade-in back to the VR world.
+            LockLocomotion();
+
             // Scene is fully static — only the player (XR Origin) is repositioned.
             TeleportToSeatPoint();
             MoveWhiteboardToVRLayer();
@@ -650,7 +654,9 @@ public class JournalSessionManager : MonoBehaviour
         float targetEyeY;
         if (calibrationDataValid)
         {
-            float realEyeAboveTable = capturedRealEyeHeight - pendingTable.position.y;
+            // Use palm-based surface Y rather than AR plane Y — eliminates spatial-mesh
+            // drift and uses the actual contact point the user measured from.
+            float realEyeAboveTable = capturedRealEyeHeight - pendingTable.avgPalmSurfaceY;
             realEyeAboveTable = Mathf.Clamp(
                 realEyeAboveTable,
                 Mathf.Min(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y),
@@ -659,8 +665,8 @@ public class JournalSessionManager : MonoBehaviour
             targetEyeY = GetVirtualTableSurfaceY() + realEyeAboveTable;
 
             Debug.Log($"[JournalSession] Eye-height calibrated: realEyeAboveTable=" +
-                      $"{realEyeAboveTable:F3}m, virtualTableY={GetVirtualTableSurfaceY():F3}m, " +
-                      $"targetEyeY={targetEyeY:F3}m");
+                      $"{realEyeAboveTable:F3}m (eye={capturedRealEyeHeight:F3}, palmSurf={pendingTable.avgPalmSurfaceY:F3}), " +
+                      $"virtualTableY={GetVirtualTableSurfaceY():F3}m, targetEyeY={targetEyeY:F3}m");
         }
         else
         {
