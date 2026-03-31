@@ -473,6 +473,13 @@ public class JournalReviewController : MonoBehaviour
         // Reset the cork back to its original state before revealing the group.
         if (bottleNeckZone != null) bottleNeckZone.ResetForNewSession();
 
+        // Ensure the bottle's original transform is captured before we try to restore it.
+        // This is a lazy fallback for the case where Awake() threw before reaching the
+        // capture block (e.g. VRDialogueFader.HideImmediate null-ref on Awake execution-order race).
+        // BeginCorkPhase for Session 1 is always called while the bottle is still at its
+        // authored position, so the lazy capture here is always correct.
+        EnsureBottleOriginalStored();
+
         // Restore bottle transform first (kinematic so gravity doesn't fire before position is set).
         if (bottleRoot != null && _bottleOriginalStored)
         {
@@ -849,6 +856,23 @@ public class JournalReviewController : MonoBehaviour
         // either at KEEP completion or at DISCARD path entry.
         if (_rackDetector != null)
             _rackDetector.GetComponent<Collider>().enabled = true;
+    }
+
+    /// <summary>
+    /// Captures the bottle's authored local transform on first call.
+    /// No-op after the first successful capture — safe to call every session.
+    /// Use this as a lazy fallback so Awake() crashes (e.g. script-execution-order
+    /// races) don't permanently break bottle repositioning.
+    /// </summary>
+    private void EnsureBottleOriginalStored()
+    {
+        if (_bottleOriginalStored || bottleRoot == null) return;
+        _bottleOriginalParent     = bottleRoot.parent;
+        _bottleOriginalLocalPos   = bottleRoot.localPosition;
+        _bottleOriginalLocalRot   = bottleRoot.localRotation;
+        _bottleOriginalLocalScale = bottleRoot.localScale;
+        _bottleOriginalStored     = true;
+        Debug.Log($"[JournalReview] Lazy-captured bottleRoot '{bottleRoot.name}' original transform (worldPos={bottleRoot.position}).");
     }
 
     private bool IsPlaceholderRenderer(Renderer renderer)

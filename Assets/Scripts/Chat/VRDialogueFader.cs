@@ -96,6 +96,11 @@ public class VRDialogueFader : MonoBehaviour
     /// <summary>Immediately sets alpha to 0 without animation.</summary>
     public void HideImmediate()
     {
+        // Guard: if called before our own Awake (e.g. from another script's Awake due to
+        // execution-order uncertainty), initialise _canvasGroup on the spot.
+        if (_canvasGroup == null) _canvasGroup = GetComponent<CanvasGroup>();
+        if (_canvasGroup == null) return;
+
         _canvasGroup.alpha          = 0f;
         _targetAlpha                = 0f;
         _autoHideActive             = false;

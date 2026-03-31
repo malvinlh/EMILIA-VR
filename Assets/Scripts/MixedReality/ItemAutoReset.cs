@@ -26,7 +26,6 @@ public class ItemAutoReset : MonoBehaviour
     private Transform  _originParent;
     private Vector3    _originLocalPos;
     private Quaternion _originLocalRot;
-
     private XRBaseInteractable _interactable;
     private float _outsideTimer;
     private bool  _blinking;
