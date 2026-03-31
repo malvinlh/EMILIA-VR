@@ -74,6 +74,10 @@ public class JournalReviewController : MonoBehaviour
              "(e.g. the CorkPlaceholder mesh — a transform-only reference that should never be visible).")]
     [SerializeField] private Renderer[] _placeholderRenderers;
 
+    [Tooltip("Colliders that must stay disabled when EnableBottleComponents runs " +
+             "(e.g. the CorkPlaceholder collider — should never participate in physics).")]
+    [SerializeField] private Collider[] _placeholderColliders;
+
     [Header("Terminal Detectors")]
     [Tooltip("Wine-rack proximity detector. Its trigger collider is disabled during the discard " +
              "path and after KEEP completion, then re-enabled at each session start.")]
@@ -807,7 +811,10 @@ public class JournalReviewController : MonoBehaviour
                 r.enabled = true;
             }
             foreach (var c in postJournalGroup.GetComponentsInChildren<Collider>(true))
+            {
+                if (IsPlaceholderCollider(c)) continue;
                 c.enabled = true;
+            }
         }
 
         if (bottleRoot == null) return;
@@ -849,6 +856,13 @@ public class JournalReviewController : MonoBehaviour
         return renderer != null
                && _placeholderRenderers != null
                && System.Array.IndexOf(_placeholderRenderers, renderer) >= 0;
+    }
+
+    private bool IsPlaceholderCollider(Collider collider)
+    {
+        return collider != null
+               && _placeholderColliders != null
+               && System.Array.IndexOf(_placeholderColliders, collider) >= 0;
     }
 
     private void LogStateSnapshot(string phase)

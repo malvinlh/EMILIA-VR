@@ -45,6 +45,8 @@ public class CorkSnapZone : MonoBehaviour
     private Vector3    _corkOriginalLocalPos;
     private Quaternion _corkOriginalLocalRot;
     private Vector3    _corkOriginalLocalScale;
+    private RigidbodyInterpolation _corkOriginalInterpolation;
+    private CollisionDetectionMode _corkOriginalCollisionDetection;
 
     private void Awake()
     {
@@ -58,6 +60,13 @@ public class CorkSnapZone : MonoBehaviour
             _corkOriginalLocalPos = _cork.localPosition;
             _corkOriginalLocalRot = _cork.localRotation;
             _corkOriginalLocalScale = _cork.localScale;
+
+            var rb = _cork.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                _corkOriginalInterpolation       = rb.interpolation;
+                _corkOriginalCollisionDetection  = rb.collisionDetectionMode;
+            }
         }
         else
         {
@@ -80,8 +89,8 @@ public class CorkSnapZone : MonoBehaviour
             rb.isKinematic          = false;
             rb.useGravity           = true;
             rb.detectCollisions     = true;
-            rb.interpolation        = RigidbodyInterpolation.None;
-            rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
+            rb.interpolation        = _corkOriginalInterpolation;
+            rb.collisionDetectionMode = _corkOriginalCollisionDetection;
             rb.constraints          = RigidbodyConstraints.None;
             rb.linearVelocity       = Vector3.zero;
             rb.angularVelocity      = Vector3.zero;
