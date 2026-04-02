@@ -10,6 +10,14 @@ using UnityEngine;
 /// </summary>
 public class RecognitionPipeline : MonoBehaviour
 {
+    [Header("Output Filtering")]
+    [Tooltip("Ignore short recognition results made only of punctuation/symbols.")]
+    public bool suppressLikelyNoiseTokens = true;
+
+    [Tooltip("Maximum length considered noise when no letters/digits are present.")]
+    [Range(1, 8)]
+    public int noiseOnlyMaxLength = 3;
+
     // ── Events ───────────────────────────────────────────────────────
 
     /// <summary>Fired with the final text selected from ML Kit candidates.</summary>
@@ -71,7 +79,7 @@ public class RecognitionPipeline : MonoBehaviour
     {
         processing = true;
 
-        string bestText = SelectBestCandidate(candidates);
+        string bestText = SanitizeRecognizedText(SelectBestCandidate(candidates));
 
         // ─────────────────────────────────────────────────────────────
         // Emit final result
@@ -130,5 +138,33 @@ public class RecognitionPipeline : MonoBehaviour
         }
 
         return best.text ?? string.Empty;
+    }
+
+    private string SanitizeRecognizedText(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+
+        string trimmed = text.Trim();
+
+        if (suppressLikelyNoiseTokens
+            && trimmed.Length <= noiseOnlyMaxLength
+            && !ContainsLetterOrDigit(trimmed))
+        {
+            return string.Empty;
+        }
+
+        return trimmed;
+    }
+
+    private static bool ContainsLetterOrDigit(string text)
+    {
+        foreach (char c in text)
+        {
+            if (char.IsLetterOrDigit(c))
+                return true;
+        }
+
+        return false;
     }
 }

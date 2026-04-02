@@ -47,6 +47,10 @@ public class WhiteboardPen : MonoBehaviour
     [Tooltip("Extra depth allowed after the finger has contacted the board.")]
     public float touchTolerance = 0.015f;
 
+    [Header("Stability Profile")]
+    [Tooltip("Apply recommended runtime minimums for contact continuity and recognition cadence.")]
+    public bool enforceRecommendedStabilityProfile = true;
+
     [Header("Contact Stability")]
     [Tooltip("Consecutive no-contact frames required before a stroke is considered lifted.")]
     [Range(1, 6)]
@@ -63,6 +67,36 @@ public class WhiteboardPen : MonoBehaviour
     [Tooltip("Minimum world-space distance (metres) before buffering a new stroke point.")]
     [Range(0f, 0.01f)]
     public float minBufferedPointDistance = 0.0008f;
+
+    [Header("Stroke Finalization")]
+    [Tooltip("Minimum points required for a standalone stroke segment.")]
+    [Range(1, 12)]
+    public int minPointsPerStroke = 3;
+
+    [Tooltip("Minimum stroke duration (seconds) required for a standalone segment.")]
+    [Range(0f, 0.5f)]
+    public float minStrokeDurationSeconds = 0.08f;
+
+    [Tooltip("Minimum stroke travel distance (metres) required for a standalone segment.")]
+    [Range(0f, 0.05f)]
+    public float minStrokeTravelDistance = 0.004f;
+
+    [Tooltip("If a tiny stroke occurs shortly after the previous stroke, merge it instead of splitting.")]
+    [Range(0f, 0.5f)]
+    public float microStrokeMergeGapSeconds = 0.2f;
+
+    [Tooltip("Maximum endpoint gap (metres) for merging a tiny stroke into the previous stroke.")]
+    [Range(0f, 0.05f)]
+    public float microStrokeMergeMaxDistance = 0.02f;
+
+    [Header("Recognition Gating")]
+    [Tooltip("Minimum total buffered points required before auto-recognition triggers.")]
+    [Range(1, 256)]
+    public int minBufferedPointsBeforeRecognize = 8;
+
+    [Tooltip("Minimum interval (seconds) between ML Kit recognition requests.")]
+    [Range(0f, 3f)]
+    public float minRecognizeIntervalSeconds = 0.7f;
 
     [Header("Clear Gesture Hysteresis")]
 
@@ -158,6 +192,10 @@ public class WhiteboardPen : MonoBehaviour
     private List<BufferedInkPoint> currentStrokeBuffer;
     private float lastStrokeBufferEndTime;
     private bool hasBufferedStrokes;
+    private float currentStrokeStartTime = -1f;
+    private float currentStrokeTravelDistance;
+    private int bufferedPointTotalCount;
+    private float lastRecognizeTime = -999f;
 
     // ── Scribble integration ────────────────────────────────────────
     /// <summary>Metadata about the strokes that were just flushed for recognition.</summary>
@@ -189,10 +227,34 @@ public class WhiteboardPen : MonoBehaviour
 
     private void Start()
     {
+        ApplyRecommendedStabilityProfileIfEnabled();
         CreateTouchParticles();
         inkBridge = DigitalInkBridge.Instance;
         ResolveCameraOffsetTransform();
         ResetDiagnosticsWindow();
+    }
+
+    private void ApplyRecommendedStabilityProfileIfEnabled()
+    {
+        if (!enforceRecommendedStabilityProfile)
+            return;
+
+        contactLossFramesToEndStroke = Mathf.Max(contactLossFramesToEndStroke, 4);
+        trackingLossGraceSeconds = Mathf.Max(trackingLossGraceSeconds, 0.12f);
+        touchTolerance = Mathf.Max(touchTolerance, 0.018f);
+        autoRecognizeDelay = Mathf.Max(autoRecognizeDelay, 1.3f);
+        minBufferedPointDistance = Mathf.Max(minBufferedPointDistance, 0.001f);
+
+        minPointsPerStroke = Mathf.Max(minPointsPerStroke, 3);
+        minStrokeDurationSeconds = Mathf.Max(minStrokeDurationSeconds, 0.08f);
+        minStrokeTravelDistance = Mathf.Max(minStrokeTravelDistance, 0.004f);
+        microStrokeMergeGapSeconds = Mathf.Max(microStrokeMergeGapSeconds, 0.2f);
+        microStrokeMergeMaxDistance = Mathf.Max(microStrokeMergeMaxDistance, 0.02f);
+
+        minBufferedPointsBeforeRecognize = Mathf.Max(minBufferedPointsBeforeRecognize, 8);
+        minRecognizeIntervalSeconds = Mathf.Max(minRecognizeIntervalSeconds, 0.7f);
+
+        Debug.Log("[WhiteboardPen] Recommended stability profile applied.");
     }
 
     private void LateUpdate()
@@ -285,16 +347,20 @@ public class WhiteboardPen : MonoBehaviour
         {
             currentStrokeBuffer = new List<BufferedInkPoint>();
             currentStrokeBuffer.Add(new BufferedInkPoint { worldPos = worldPoint, timestamp = timestamp });
+            currentStrokeStartTime = Time.time;
+            currentStrokeTravelDistance = 0f;
             if (enableStrokeDiagnostics) diagBufferedPointCount++;
             strokeActive = true;
             return;
         }
 
         Vector3 lastPoint = currentStrokeBuffer[currentStrokeBuffer.Count - 1].worldPos;
-        if (Vector3.Distance(lastPoint, worldPoint) < minBufferedPointDistance)
+        float stepDistance = Vector3.Distance(lastPoint, worldPoint);
+        if (stepDistance < minBufferedPointDistance)
             return;
 
         currentStrokeBuffer.Add(new BufferedInkPoint { worldPos = worldPoint, timestamp = timestamp });
+        currentStrokeTravelDistance += stepDistance;
         if (enableStrokeDiagnostics) diagBufferedPointCount++;
     }
 
@@ -304,13 +370,56 @@ public class WhiteboardPen : MonoBehaviour
 
         if (currentStrokeBuffer != null && currentStrokeBuffer.Count > 0)
         {
-            bufferedStrokes.Add(currentStrokeBuffer);
+            float strokeDuration = currentStrokeStartTime > 0f
+                ? Time.time - currentStrokeStartTime
+                : 0f;
+
+            bool tinyStroke = currentStrokeBuffer.Count < minPointsPerStroke
+                || strokeDuration < minStrokeDurationSeconds
+                || currentStrokeTravelDistance < minStrokeTravelDistance;
+
+            bool mergedIntoPrevious = false;
+            if (tinyStroke && bufferedStrokes.Count > 0)
+            {
+                var previousStroke = bufferedStrokes[bufferedStrokes.Count - 1];
+                if (previousStroke != null && previousStroke.Count > 0)
+                {
+                    BufferedInkPoint previousEnd = previousStroke[previousStroke.Count - 1];
+                    BufferedInkPoint currentStart = currentStrokeBuffer[0];
+
+                    float gapSeconds = (currentStart.timestamp - previousEnd.timestamp) / 1000f;
+                    float gapDistance = Vector3.Distance(previousEnd.worldPos, currentStart.worldPos);
+
+                    if (gapSeconds >= 0f
+                        && gapSeconds <= microStrokeMergeGapSeconds
+                        && gapDistance <= microStrokeMergeMaxDistance)
+                    {
+                        previousStroke.AddRange(currentStrokeBuffer);
+                        bufferedPointTotalCount += currentStrokeBuffer.Count;
+                        mergedIntoPrevious = true;
+                    }
+                }
+            }
+
+            if (!tinyStroke)
+            {
+                bufferedStrokes.Add(currentStrokeBuffer);
+                bufferedPointTotalCount += currentStrokeBuffer.Count;
+                hasBufferedStrokes = true;
+                lastStrokeBufferEndTime = Time.time;
+                if (enableStrokeDiagnostics) diagStrokeFinalizeCount++;
+            }
+            else if (mergedIntoPrevious)
+            {
+                hasBufferedStrokes = true;
+                lastStrokeBufferEndTime = Time.time;
+            }
+
             currentStrokeBuffer = null;
-            hasBufferedStrokes = true;
-            lastStrokeBufferEndTime = Time.time;
-            if (enableStrokeDiagnostics) diagStrokeFinalizeCount++;
         }
 
+        currentStrokeStartTime = -1f;
+        currentStrokeTravelDistance = 0f;
         strokeActive = false;
     }
 
@@ -331,7 +440,9 @@ public class WhiteboardPen : MonoBehaviour
             hasSmoothedPosition = false;
 
         if (hasBufferedStrokes && !strokeActive &&
-            Time.time - lastStrokeBufferEndTime >= autoRecognizeDelay)
+            bufferedPointTotalCount >= minBufferedPointsBeforeRecognize &&
+            Time.time - lastStrokeBufferEndTime >= autoRecognizeDelay &&
+            Time.time - lastRecognizeTime >= minRecognizeIntervalSeconds)
         {
             FlushAndRecognize();
         }
@@ -401,6 +512,9 @@ public class WhiteboardPen : MonoBehaviour
         currentStrokeBuffer = null;
         hasBufferedStrokes = false;
         strokeActive = false;
+        bufferedPointTotalCount = 0;
+        currentStrokeStartTime = -1f;
+        currentStrokeTravelDistance = 0f;
 
         hasMadeContact = false;
         hasLastContactWorldPoint = false;
@@ -810,6 +924,7 @@ public class WhiteboardPen : MonoBehaviour
         {
             bufferedStrokes.Clear();
             hasBufferedStrokes = false;
+            bufferedPointTotalCount = 0;
             return;
         }
 
@@ -826,6 +941,7 @@ public class WhiteboardPen : MonoBehaviour
         {
             bufferedStrokes.Clear();
             hasBufferedStrokes = false;
+            bufferedPointTotalCount = 0;
             return;
         }
 
@@ -862,6 +978,7 @@ public class WhiteboardPen : MonoBehaviour
         }
 
         inkBridge.Recognize();
+        lastRecognizeTime = Time.time;
         if (enableStrokeDiagnostics) diagRecognizeCount++;
 
         // Notify ScribbleManager with stroke metadata before clearing
@@ -881,6 +998,7 @@ public class WhiteboardPen : MonoBehaviour
 
         bufferedStrokes.Clear();
         hasBufferedStrokes = false;
+        bufferedPointTotalCount = 0;
     }
 
     /// <summary>
@@ -946,6 +1064,9 @@ public class WhiteboardPen : MonoBehaviour
         currentStrokeBuffer = null;
         hasBufferedStrokes = false;
         strokeActive = false;
+        bufferedPointTotalCount = 0;
+        currentStrokeStartTime = -1f;
+        currentStrokeTravelDistance = 0f;
         if (inkBridge != null) inkBridge.ClearInk();
     }
 
