@@ -7,6 +7,7 @@ using UnityEngine.XR.Hands;
 /// Touch tolerance is ONLY applied after real contact has occurred
 /// (i.e. when the finger has begun to pass through the board).
 /// </summary>
+[DefaultExecutionOrder(-20)]
 public class WhiteboardPen : MonoBehaviour
 {
     public JournalSessionManager journalSessionManager;
@@ -30,14 +31,52 @@ public class WhiteboardPen : MonoBehaviour
 
     // ── Constants ─────────────────────────────────────────────────────
     private const int WHITEBOARD_LAYER = 10;
-    private const float PINCH_THRESHOLD = 0.02f;
 
     // ── Pinky-pinch clear (edge detection) ────────────────────────────
     private bool pinkyPinchActive;
+    private float pinkyPinchHoldTimer;
+    private bool pinkyClearTriggeredThisHold;
+
+    private int consecutiveNoContactFrames;
+    private float lastTrackedTime;
+    private float lastTouchTime = -999f;
+    private Vector3 lastContactWorldPoint;
+    private bool hasLastContactWorldPoint;
 
     // Extra depth allowed AFTER contact (meters)
     [Tooltip("Extra depth allowed after the finger has contacted the board.")]
     public float touchTolerance = 0.015f;
+
+    [Header("Contact Stability")]
+    [Tooltip("Consecutive no-contact frames required before a stroke is considered lifted.")]
+    [Range(1, 6)]
+    public int contactLossFramesToEndStroke = 2;
+
+    [Tooltip("Grace window (seconds) to keep contact alive when hand tracking drops briefly.")]
+    [Range(0f, 0.2f)]
+    public float trackingLossGraceSeconds = 0.08f;
+
+    [Tooltip("Idle time (seconds) before smoothing filters are reinitialized.")]
+    [Range(0.05f, 1f)]
+    public float smoothingIdleResetSeconds = 0.25f;
+
+    [Tooltip("Minimum world-space distance (metres) before buffering a new stroke point.")]
+    [Range(0f, 0.01f)]
+    public float minBufferedPointDistance = 0.0008f;
+
+    [Header("Clear Gesture Hysteresis")]
+
+    [Tooltip("Thumb-pinky distance to engage clear gesture (metres).")]
+    [Range(0.005f, 0.05f)]
+    public float pinkyPinchCloseThreshold = 0.018f;
+
+    [Tooltip("Thumb-pinky distance to release clear gesture (metres).")]
+    [Range(0.005f, 0.06f)]
+    public float pinkyPinchOpenThreshold = 0.026f;
+
+    [Tooltip("Hold time (seconds) required for pinky clear to trigger.")]
+    [Range(0.1f, 1.5f)]
+    public float pinkyPinchHoldSeconds = 0.45f;
 
     // ── Position smoothing (One Euro Filter) ────────────────────
     [Tooltip("Min cutoff frequency (Hz). Lower = more smoothing when slow. " +
@@ -81,6 +120,29 @@ public class WhiteboardPen : MonoBehaviour
     [Tooltip("Seconds of idle time after the last stroke before auto-recognition fires.")]
     public float autoRecognizeDelay = 1.0f;
 
+    [Header("Diagnostics")]
+    [Tooltip("Enable periodic stroke/contact diagnostics logs for on-device tuning.")]
+    public bool enableStrokeDiagnostics;
+
+    [Tooltip("Seconds between diagnostics log entries while journaling.")]
+    [Range(1f, 60f)]
+    public float diagnosticsLogIntervalSeconds = 8f;
+
+    [Tooltip("Warn when stroke-finalize rate exceeds this value (splits per minute).")]
+    [Range(1f, 180f)]
+    public float strokeSplitWarnPerMinute = 24f;
+
+    private float diagnosticsWindowStartTime;
+    private float nextDiagnosticsLogTime;
+    private int diagTouchStartCount;
+    private int diagTouchEndCount;
+    private int diagDropoutHoldFrames;
+    private int diagTrackingGraceFrames;
+    private int diagStrokeFinalizeCount;
+    private int diagRecognizeCount;
+    private int diagBufferedPointCount;
+    private int diagClearGestureCount;
+
     // ── Buffered strokes for PCA-based rotation ─────────────────────
     // Strokes are buffered in world-space instead of being sent to ML Kit
     // in real-time.  When recognition triggers (idle timer), PCA determines
@@ -118,7 +180,7 @@ public class WhiteboardPen : MonoBehaviour
 
     // Cached Camera Floor Offset Object — needed to convert XRHandJoint
     // session-space positions to world space. The XR Origin uses Device
-    // tracking mode with CameraYOffset=2, so joint positions must go through
+    // tracking mode with a camera Y offset, so joint positions must go through
     // the same transform chain as the camera (not the XR Origin root).
     private Transform cameraOffsetTransform;
 
@@ -130,6 +192,52 @@ public class WhiteboardPen : MonoBehaviour
         CreateTouchParticles();
         inkBridge = DigitalInkBridge.Instance;
         ResolveCameraOffsetTransform();
+        ResetDiagnosticsWindow();
+    }
+
+    private void LateUpdate()
+    {
+        MaybeLogDiagnostics();
+    }
+
+    private void ResetDiagnosticsWindow()
+    {
+        diagnosticsWindowStartTime = Time.time;
+        nextDiagnosticsLogTime = diagnosticsWindowStartTime + Mathf.Max(0.1f, diagnosticsLogIntervalSeconds);
+        diagTouchStartCount = 0;
+        diagTouchEndCount = 0;
+        diagDropoutHoldFrames = 0;
+        diagTrackingGraceFrames = 0;
+        diagStrokeFinalizeCount = 0;
+        diagRecognizeCount = 0;
+        diagBufferedPointCount = 0;
+        diagClearGestureCount = 0;
+    }
+
+    private void MaybeLogDiagnostics(bool force = false)
+    {
+        if (!enableStrokeDiagnostics)
+            return;
+
+        if (!force && Time.time < nextDiagnosticsLogTime)
+            return;
+
+        float duration = Mathf.Max(0.001f, Time.time - diagnosticsWindowStartTime);
+        float touchStartsPerMin = (diagTouchStartCount * 60f) / duration;
+        float splitsPerMin = (diagStrokeFinalizeCount * 60f) / duration;
+
+        Debug.Log($"[WhiteboardPen][Diag] dur={duration:F1}s touchStart={diagTouchStartCount} touchEnd={diagTouchEndCount} " +
+                  $"dropoutHoldFrames={diagDropoutHoldFrames} trackingGraceFrames={diagTrackingGraceFrames} " +
+                  $"strokeFinalize={diagStrokeFinalizeCount} recognize={diagRecognizeCount} bufferedPts={diagBufferedPointCount} " +
+                  $"clear={diagClearGestureCount} starts/min={touchStartsPerMin:F1} splits/min={splitsPerMin:F1}");
+
+        if (splitsPerMin > strokeSplitWarnPerMinute)
+        {
+            Debug.LogWarning($"[WhiteboardPen][Diag] High stroke split rate: {splitsPerMin:F1}/min " +
+                             $"(warn>{strokeSplitWarnPerMinute:F1}). Increase hysteresis/grace or reduce jitter.");
+        }
+
+        ResetDiagnosticsWindow();
     }
 
     private void ResolveCameraOffsetTransform()
@@ -150,14 +258,190 @@ public class WhiteboardPen : MonoBehaviour
     /// <summary>
     /// Converts an XRHandJoint pose position from session/tracking space to
     /// world space via the Camera Floor Offset Object. This is required because
-    /// the scene uses Device tracking mode with CameraYOffset=2 — raw joint
-    /// positions are 2m below where they should appear in world space.
+    /// Device tracking mode applies a camera Y offset — raw joint positions must
+    /// follow the same transform chain as the camera to align with world space.
     /// </summary>
     private Vector3 JointToWorld(Vector3 sessionPos)
     {
         if (cameraOffsetTransform != null)
             return cameraOffsetTransform.TransformPoint(sessionPos);
         return sessionPos;
+    }
+
+    private static bool UpdatePinchState(ref bool pinchActive,
+                                         float distance,
+                                         float closeThreshold,
+                                         float openThreshold)
+    {
+        float engageThreshold = Mathf.Min(closeThreshold, openThreshold);
+        float releaseThreshold = Mathf.Max(closeThreshold, openThreshold);
+        pinchActive = pinchActive ? distance < releaseThreshold : distance < engageThreshold;
+        return pinchActive;
+    }
+
+    private void AppendBufferedPoint(Vector3 worldPoint, long timestamp)
+    {
+        if (!strokeActive || currentStrokeBuffer == null)
+        {
+            currentStrokeBuffer = new List<BufferedInkPoint>();
+            currentStrokeBuffer.Add(new BufferedInkPoint { worldPos = worldPoint, timestamp = timestamp });
+            if (enableStrokeDiagnostics) diagBufferedPointCount++;
+            strokeActive = true;
+            return;
+        }
+
+        Vector3 lastPoint = currentStrokeBuffer[currentStrokeBuffer.Count - 1].worldPos;
+        if (Vector3.Distance(lastPoint, worldPoint) < minBufferedPointDistance)
+            return;
+
+        currentStrokeBuffer.Add(new BufferedInkPoint { worldPos = worldPoint, timestamp = timestamp });
+        if (enableStrokeDiagnostics) diagBufferedPointCount++;
+    }
+
+    private void FinalizeActiveStrokeIfNeeded()
+    {
+        if (!strokeActive) return;
+
+        if (currentStrokeBuffer != null && currentStrokeBuffer.Count > 0)
+        {
+            bufferedStrokes.Add(currentStrokeBuffer);
+            currentStrokeBuffer = null;
+            hasBufferedStrokes = true;
+            lastStrokeBufferEndTime = Time.time;
+            if (enableStrokeDiagnostics) diagStrokeFinalizeCount++;
+        }
+
+        strokeActive = false;
+    }
+
+    private void ConfirmTouchLoss(Vector3 tip, Vector3 direction, bool allowHover)
+    {
+        if (whiteboard != null)
+            whiteboard.ToggleTouch(false);
+
+        CurrentTouchWorldPoint = null;
+        FinalizeActiveStrokeIfNeeded();
+
+        HideTouchParticles();
+        hasMadeContact = false;
+        hasLastContactWorldPoint = false;
+        consecutiveNoContactFrames = 0;
+
+        if (Time.time - lastTouchTime >= smoothingIdleResetSeconds)
+            hasSmoothedPosition = false;
+
+        if (hasBufferedStrokes && !strokeActive &&
+            Time.time - lastStrokeBufferEndTime >= autoRecognizeDelay)
+        {
+            FlushAndRecognize();
+        }
+
+        if (allowHover)
+        {
+            DetectHover(tip, direction);
+        }
+        else if (hoverWhiteboard != null)
+        {
+            hoverWhiteboard.ToggleHover(false);
+            hoverWhiteboard = null;
+        }
+    }
+
+    private void HandleTrackingLoss()
+    {
+        bool inGraceWindow = wasTouchingLastFrame
+            && hasSmoothedPosition
+            && Time.time - lastTrackedTime <= trackingLossGraceSeconds;
+
+        if (inGraceWindow)
+        {
+            if (enableStrokeDiagnostics) diagTrackingGraceFrames++;
+
+            if (whiteboard != null)
+            {
+                whiteboard.SetTouchPosition(smoothedX, smoothedY);
+                whiteboard.ToggleTouch(true);
+            }
+
+            if (hasLastContactWorldPoint)
+            {
+                CurrentTouchWorldPoint = lastContactWorldPoint;
+                ShowTouchParticles(lastContactWorldPoint, boardNormal);
+            }
+
+            return;
+        }
+
+        pinkyPinchActive = false;
+        pinkyPinchHoldTimer = 0f;
+        pinkyClearTriggeredThisHold = false;
+
+        ConfirmTouchLoss(Vector3.zero, Vector3.forward, allowHover: false);
+        wasTouchingLastFrame = false;
+    }
+
+    private void TriggerBoardClear()
+    {
+        if (whiteboard == null) return;
+
+        if (enableStrokeDiagnostics) diagClearGestureCount++;
+
+        var session = journalSessionManager != null
+            ? journalSessionManager
+            : JournalSessionManager.Instance;
+        session?.EndSession();
+
+        if (inkBridge != null)
+        {
+            inkBridge.ClearInk();
+            inkBridge.ClearPreContext();
+        }
+
+        bufferedStrokes.Clear();
+        currentStrokeBuffer = null;
+        hasBufferedStrokes = false;
+        strokeActive = false;
+
+        hasMadeContact = false;
+        hasLastContactWorldPoint = false;
+        consecutiveNoContactFrames = 0;
+        CurrentTouchWorldPoint = null;
+        wasTouchingLastFrame = false;
+
+        OnBoardCleared?.Invoke();
+    }
+
+    private void UpdatePinkyClearGesture(Vector3 thumbWorld, bool hasLittleTipPose, Pose littleTipPose)
+    {
+        if (!hasLittleTipPose)
+        {
+            pinkyPinchActive = false;
+            pinkyPinchHoldTimer = 0f;
+            pinkyClearTriggeredThisHold = false;
+            return;
+        }
+
+        Vector3 littleWorld = JointToWorld(littleTipPose.position);
+        bool pinkyPinching = UpdatePinchState(
+            ref pinkyPinchActive,
+            Vector3.Distance(thumbWorld, littleWorld),
+            pinkyPinchCloseThreshold,
+            pinkyPinchOpenThreshold);
+
+        if (pinkyPinching)
+        {
+            pinkyPinchHoldTimer += Time.deltaTime;
+            if (!pinkyClearTriggeredThisHold && pinkyPinchHoldTimer >= pinkyPinchHoldSeconds)
+            {
+                pinkyClearTriggeredThisHold = true;
+                TriggerBoardClear();
+            }
+        }
+        else
+        {
+            pinkyPinchHoldTimer = 0f;
+            pinkyClearTriggeredThisHold = false;
+        }
     }
 
     private void Update()
@@ -171,6 +455,10 @@ public class WhiteboardPen : MonoBehaviour
             if (hoverWhiteboard != null) { hoverWhiteboard.ToggleHover(false); hoverWhiteboard = null; }
             wasTouchingLastFrame = false;
             hasMadeContact = false;
+            pinkyPinchActive = false;
+            pinkyPinchHoldTimer = 0f;
+            pinkyClearTriggeredThisHold = false;
+            consecutiveNoContactFrames = 0;
             CurrentTouchWorldPoint = null;
             return;
         }
@@ -189,7 +477,12 @@ public class WhiteboardPen : MonoBehaviour
             ? handSubsystem.leftHand
             : handSubsystem.rightHand;
 
-        if (!hand.isTracked) return;
+        if (!hand.isTracked)
+        {
+            HandleTrackingLoss();
+            return;
+        }
+        lastTrackedTime = Time.time;
 
         // Required joints
         XRHandJoint indexTipJoint = hand.GetJoint(XRHandJointID.IndexTip);
@@ -198,9 +491,10 @@ public class WhiteboardPen : MonoBehaviour
         XRHandJoint thumbTipJoint = hand.GetJoint(XRHandJointID.ThumbTip);
         XRHandJoint littleTipJoint = hand.GetJoint(XRHandJointID.LittleTip);
 
-        if (!indexTipJoint.TryGetPose(out Pose indexTipPose)) return;
-        if (!indexDistalJoint.TryGetPose(out Pose indexDistalPose)) return;
-        if (!thumbTipJoint.TryGetPose(out Pose thumbTipPose)) return;
+        if (!indexTipJoint.TryGetPose(out Pose indexTipPose)) { HandleTrackingLoss(); return; }
+        if (!indexDistalJoint.TryGetPose(out Pose indexDistalPose)) { HandleTrackingLoss(); return; }
+        if (!thumbTipJoint.TryGetPose(out Pose thumbTipPose)) { HandleTrackingLoss(); return; }
+        bool hasLittleTipPose = littleTipJoint.TryGetPose(out Pose littleTipPose);
 
         // Convert joint positions from session/tracking space to world space.
         // Raw XRHandJoint poses are in session space; the camera is offset by
@@ -210,6 +504,7 @@ public class WhiteboardPen : MonoBehaviour
         Vector3 tip    = JointToWorld(indexTipPose.position);
         Vector3 direction = Vector3.Normalize(tip - origin);
         float fingerLength = Vector3.Distance(origin, tip);
+        Vector3 thumbWorld = JointToWorld(thumbTipPose.position);
 
         bool hitBoard = false;
 
@@ -266,30 +561,6 @@ public class WhiteboardPen : MonoBehaviour
         }
 
         // ===============================================================
-        // THUMB + INDEX PINCH-TO-DRAW
-        // Alternative input: close thumb and index fingertips above the
-        // whiteboard. The pinch midpoint is projected straight down onto
-        // the board surface, producing a draw point without physical contact.
-        // ===============================================================
-        if (!hitBoard)
-        {
-            Vector3 thumbWorld = JointToWorld(thumbTipPose.position);
-            if (IsPinching(thumbWorld, tip))
-            {
-                Vector3 pinchMid = (thumbWorld + tip) * 0.5f;
-                // Cast from 10 cm above the midpoint straight down onto the whiteboard layer
-                if (Physics.Raycast(pinchMid + Vector3.up * 0.1f, Vector3.down,
-                                    out touch, 0.3f, 1 << WHITEBOARD_LAYER))
-                {
-                    hitBoard       = true;
-                    hasMadeContact = true;
-                    boardNormal    = touch.normal;
-                    boardPoint     = touch.point;
-                }
-            }
-        }
-
-        // ===============================================================
         // HANDWRITING AREA BOUNDS CHECK
         // Reject touches that land on the whiteboard but outside the
         // HandwritingArea RectTransform (e.g. header, footer, margins).
@@ -300,8 +571,12 @@ public class WhiteboardPen : MonoBehaviour
         // ===============================================================
         // APPLY RESULT
         // ===============================================================
+        bool keepTouchThisFrame = false;
+        bool previousTouching = wasTouchingLastFrame;
+
         if (hitBoard)
         {
+            consecutiveNoContactFrames = 0;
             whiteboard = touch.collider.GetComponent<Whiteboard>();
             if (whiteboard != null)
             {
@@ -316,44 +591,33 @@ public class WhiteboardPen : MonoBehaviour
                 float rawY = touch.textureCoord.y;
 
                 // Smoothing via One Euro Filter
-                if (!hasSmoothedPosition)
+                bool shouldReinitializeFilter = !hasSmoothedPosition
+                    || Time.time - lastTouchTime > smoothingIdleResetSeconds;
+
+                if (shouldReinitializeFilter)
                 {
                     filterX = new OneEuroFilter(filterMinCutoff, filterBeta, filterDCutoff);
                     filterY = new OneEuroFilter(filterMinCutoff, filterBeta, filterDCutoff);
                     hasSmoothedPosition = true;
+                }
 
-                    // Pre-seed filters with initial position
-                    float t = Time.time;
-                    smoothedX = filterX.Filter(rawX, t);
-                    smoothedY = filterY.Filter(rawY, t);
-                }
-                else
-                {
-                    float t = Time.time;
-                    smoothedX = filterX.Filter(rawX, t);
-                    smoothedY = filterY.Filter(rawY, t);
-                }
+                float t = Time.time;
+                smoothedX = filterX.Filter(rawX, t);
+                smoothedY = filterY.Filter(rawY, t);
+                lastTouchTime = t;
 
                 whiteboard.SetTouchPosition(smoothedX, smoothedY);
                 whiteboard.ToggleTouch(true);
 
                 CurrentTouchWorldPoint = touch.point;
+                lastContactWorldPoint = touch.point;
+                hasLastContactWorldPoint = true;
 
                 // ── Buffer stroke for deferred PCA-based recognition ─────
                 {
                     Vector3 worldPoint = touch.point;
                     long ts = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-
-                    if (!wasTouchingLastFrame)
-                    {
-                        currentStrokeBuffer = new List<BufferedInkPoint>();
-                        currentStrokeBuffer.Add(new BufferedInkPoint { worldPos = worldPoint, timestamp = ts });
-                        strokeActive = true;
-                    }
-                    else if (currentStrokeBuffer != null)
-                    {
-                        currentStrokeBuffer.Add(new BufferedInkPoint { worldPos = worldPoint, timestamp = ts });
-                    }
+                    AppendBufferedPoint(worldPoint, ts);
                 }
             }
 
@@ -361,80 +625,43 @@ public class WhiteboardPen : MonoBehaviour
         }
         else
         {
-            if (whiteboard != null)
+            consecutiveNoContactFrames++;
+
+            if (wasTouchingLastFrame && consecutiveNoContactFrames < contactLossFramesToEndStroke)
             {
-                whiteboard.ToggleTouch(false);
-            }
-
-            CurrentTouchWorldPoint = null;
-
-            // End active stroke — finalize in buffer
-            if (strokeActive)
-            {
-                if (currentStrokeBuffer != null && currentStrokeBuffer.Count > 0)
-                {
-                    bufferedStrokes.Add(currentStrokeBuffer);
-                    currentStrokeBuffer = null;
-                    hasBufferedStrokes = true;
-                    lastStrokeBufferEndTime = Time.time;
-                }
-                strokeActive = false;
-            }
-
-            HideTouchParticles();
-            hasMadeContact = false; // reset contact state
-            hasSmoothedPosition = false; // reset smoothing for next stroke
-
-            // Auto-recognize after idle delay
-            if (hasBufferedStrokes && !strokeActive &&
-                Time.time - lastStrokeBufferEndTime >= autoRecognizeDelay)
-            {
-                FlushAndRecognize();
-            }
-
-            // ── Hover detection (pointer cursor, right hand only) ──────
-            DetectHover(tip, direction);
-        }
-
-        wasTouchingLastFrame = hitBoard;
-
-        // Pinky pinch → clear board (edge-detected: fires once per pinch)
-        if (littleTipJoint.TryGetPose(out Pose littleTipPose))
-        {
-            bool pinkyPinching = IsPinching(thumbTipPose.position, littleTipPose.position);
-
-            if (pinkyPinching && !pinkyPinchActive)
-            {
-                pinkyPinchActive = true;
+                keepTouchThisFrame = true;
+                if (enableStrokeDiagnostics) diagDropoutHoldFrames++;
 
                 if (whiteboard != null)
                 {
-                    // whiteboard.Initialize();
-                    journalSessionManager?.EndSession();
+                    whiteboard.SetTouchPosition(smoothedX, smoothedY);
+                    whiteboard.ToggleTouch(true);
+                }
 
-                    // Also clear accumulated ink, recognised text, and pre-context
-                    if (inkBridge != null)
-                    {
-                        inkBridge.ClearInk();
-                        inkBridge.ClearPreContext();
-                    }
-
-                    bufferedStrokes.Clear();
-                    currentStrokeBuffer = null;
-                    hasBufferedStrokes = false;
-                    strokeActive = false;
-
-                    OnBoardCleared?.Invoke();
-
-                    // var textDisplay = whiteboard.GetComponent<RecognizedTextDisplay>();
-                    // if (textDisplay != null) textDisplay.ClearText();
+                if (hasLastContactWorldPoint)
+                {
+                    CurrentTouchWorldPoint = lastContactWorldPoint;
+                    ShowTouchParticles(lastContactWorldPoint, boardNormal);
                 }
             }
-            else if (!pinkyPinching)
+            else
             {
-                pinkyPinchActive = false;
+                ConfirmTouchLoss(tip, direction, allowHover: true);
             }
         }
+
+        bool effectiveTouching = hitBoard || keepTouchThisFrame;
+
+        if (enableStrokeDiagnostics)
+        {
+            if (!previousTouching && effectiveTouching) diagTouchStartCount++;
+            if (previousTouching && !effectiveTouching) diagTouchEndCount++;
+        }
+
+        wasTouchingLastFrame = effectiveTouching;
+
+        // Pinky pinch-hold → clear board (debounced + hysteresis)
+        UpdatePinkyClearGesture(thumbWorld, hasLittleTipPose, littleTipPose);
     }
 
     // ==================================================================
@@ -635,6 +862,7 @@ public class WhiteboardPen : MonoBehaviour
         }
 
         inkBridge.Recognize();
+        if (enableStrokeDiagnostics) diagRecognizeCount++;
 
         // Notify ScribbleManager with stroke metadata before clearing
         if (OnStrokesFlushed != null)
@@ -740,11 +968,6 @@ public class WhiteboardPen : MonoBehaviour
         Rect r = ha.rect;
         return local.x >= r.xMin && local.x <= r.xMax
             && local.y >= r.yMin && local.y <= r.yMax;
-    }
-
-    public static bool IsPinching(Vector3 a, Vector3 b)
-    {
-        return Vector3.Distance(a, b) < PINCH_THRESHOLD;
     }
 
     public static XRHandSubsystem GetHandSubsystem()

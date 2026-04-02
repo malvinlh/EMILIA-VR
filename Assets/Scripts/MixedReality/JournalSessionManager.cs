@@ -132,6 +132,18 @@ public class JournalSessionManager : MonoBehaviour
              "Typical seated range is around 0.55m to 0.90m.")]
     public Vector2 eyeAboveTableClamp = new Vector2(0.50f, 1.05f);
 
+    [Header("Calibration Diagnostics")]
+    [Tooltip("Enable post-teleport calibration residual logs for on-device validation.")]
+    public bool enableCalibrationDiagnostics;
+
+    [Tooltip("Warn if final camera eye-Y differs from targetEyeY by more than this value (metres).")]
+    [Range(0.001f, 0.2f)]
+    public float eyeHeightResidualWarnThreshold = 0.015f;
+
+    [Tooltip("Warn if final camera XZ differs from SeatPoint XZ by more than this value (metres).")]
+    [Range(0.001f, 0.2f)]
+    public float seatXZResidualWarnThreshold = 0.02f;
+
     [Header("UI")]
     [Tooltip("World-space TextMeshPro for instruction prompts (fallback if CalibrationGuide is null). Created at runtime if null.")]
     public TextMeshPro instructionText;
@@ -664,6 +676,8 @@ public class JournalSessionManager : MonoBehaviour
         //    distance so the virtual whiteboard feels at the same height as the real table.
         //    Otherwise: use SeatPoint's authored eye height as-is.
         float targetEyeY;
+        bool hasExpectedEyeAboveTable = false;
+        float expectedEyeAboveTable = 0f;
         if (calibrationDataValid)
         {
             // Use palm-based surface Y rather than AR plane Y — eliminates spatial-mesh
@@ -673,6 +687,9 @@ public class JournalSessionManager : MonoBehaviour
                 realEyeAboveTable,
                 Mathf.Min(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y),
                 Mathf.Max(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y));
+
+            expectedEyeAboveTable = realEyeAboveTable;
+            hasExpectedEyeAboveTable = true;
 
             float virtualTableY = GetVirtualTableSurfaceY();
             targetEyeY = virtualTableY + realEyeAboveTable + calibrationHeightBias;
@@ -696,6 +713,58 @@ public class JournalSessionManager : MonoBehaviour
         Debug.Log($"[JournalSession] Teleported to SeatPoint. " +
                   $"XR Origin → {xrOrigin.position}, yaw delta={yawDelta:F1}°, " +
                   $"camera Y → {cam.transform.position.y:F2}");
+
+        LogCalibrationResiduals(cam, targetEyeY, hasExpectedEyeAboveTable, expectedEyeAboveTable);
+    }
+
+    private void LogCalibrationResiduals(Camera cam,
+                                         float targetEyeY,
+                                         bool hasExpectedEyeAboveTable,
+                                         float expectedEyeAboveTable)
+    {
+        if (!enableCalibrationDiagnostics || cam == null || seatPoint == null)
+            return;
+
+        float eyeResidual = cam.transform.position.y - targetEyeY;
+
+        Vector2 camXZ = new Vector2(cam.transform.position.x, cam.transform.position.z);
+        Vector2 seatXZ = new Vector2(seatPoint.position.x, seatPoint.position.z);
+        float seatResidual = Vector2.Distance(camXZ, seatXZ);
+
+        string eyeAboveMessage = string.Empty;
+        float eyeAboveResidual = 0f;
+        bool hasEyeAboveResidual = false;
+
+        if (hasExpectedEyeAboveTable)
+        {
+            float virtualTableY = GetVirtualTableSurfaceY();
+            float actualEyeAboveVirtual = cam.transform.position.y - virtualTableY;
+            eyeAboveResidual = actualEyeAboveVirtual - expectedEyeAboveTable;
+            hasEyeAboveResidual = true;
+            eyeAboveMessage = $", eyeAboveVirtual={actualEyeAboveVirtual:F3}m " +
+                              $"(target={expectedEyeAboveTable:F3}m, residual={eyeAboveResidual:+0.000;-0.000;0.000}m)";
+        }
+
+        Debug.Log($"[JournalSession][Diag] Teleport residuals: eyeY={eyeResidual:+0.000;-0.000;0.000}m, " +
+                  $"seatXZ={seatResidual:F3}m{eyeAboveMessage}");
+
+        if (Mathf.Abs(eyeResidual) > eyeHeightResidualWarnThreshold)
+        {
+            Debug.LogWarning($"[JournalSession][Diag] Eye-height residual {eyeResidual:+0.000;-0.000;0.000}m " +
+                             $"exceeds warn threshold {eyeHeightResidualWarnThreshold:F3}m.");
+        }
+
+        if (seatResidual > seatXZResidualWarnThreshold)
+        {
+            Debug.LogWarning($"[JournalSession][Diag] Seat XZ residual {seatResidual:F3}m " +
+                             $"exceeds warn threshold {seatXZResidualWarnThreshold:F3}m.");
+        }
+
+        if (hasEyeAboveResidual && Mathf.Abs(eyeAboveResidual) > eyeHeightResidualWarnThreshold)
+        {
+            Debug.LogWarning($"[JournalSession][Diag] Eye-above-table residual {eyeAboveResidual:+0.000;-0.000;0.000}m " +
+                             $"exceeds warn threshold {eyeHeightResidualWarnThreshold:F3}m.");
+        }
     }
 
     /// <summary>

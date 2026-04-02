@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 
+[DefaultExecutionOrder(-10)]
 public class Whiteboard : MonoBehaviour
 {
     private int texturesSizeHorizontal;
@@ -13,6 +15,8 @@ public class Whiteboard : MonoBehaviour
     public int penSize = 2;
 
     private Texture2D texture;
+    private Color32[] canvasPixels;
+    private Color32[] clearPixels;
     public Color color;
 
     [Tooltip("Background colour of the whiteboard texture. Use warm cream for journal mode.")]
@@ -36,10 +40,22 @@ public class Whiteboard : MonoBehaviour
 
     private float cursorLastX = -1f, cursorLastY = -1f;
     // Snapshot of pixels under the cursor so it can be erased cleanly.
-    private Color[] cursorBackup;
+    private Color32[] cursorBackup;
     private int cursorBackupMinU, cursorBackupMinV;
     private int cursorBackupW, cursorBackupH;
     private bool hasCursorBackup;
+
+    // ── Dirty region tracking ────────────────────────────────────────
+    private bool hasDirtyRegion;
+    private int dirtyMinU, dirtyMinV;
+    private int dirtyMaxU, dirtyMaxV;
+
+    [Header("Rendering Performance")]
+    [Tooltip("Maximum texture uploads per second while interacting. Set 0 to upload every frame.")]
+    [Range(0, 120)]
+    public int maxTextureUploadsPerSecond = 90;
+
+    private float nextUploadTime;
 
     // ── Hover state (pointer without drawing) ─────────────────────────
     private bool hovering, hoveringLast;
@@ -90,15 +106,21 @@ public class Whiteboard : MonoBehaviour
 
         //Create a new texture and set it as the default texture of this whiteboard
         Renderer renderer = GetComponent<Renderer>();
-        texture = new Texture2D(texturesSizeHorizontal, texturesSizeVertical);
+        texture = new Texture2D(texturesSizeHorizontal, texturesSizeVertical, TextureFormat.RGBA32, false);
         texture.filterMode = FilterMode.Bilinear;   // smooth scaling / angled viewing
 
-        // Fill with background colour
-        Color[] fill = new Color[texturesSizeHorizontal * texturesSizeVertical];
-        for (int i = 0; i < fill.Length; i++)
-            fill[i] = backgroundColor;
-        texture.SetPixels(fill);
-        texture.Apply();
+        // Keep a CPU-side pixel buffer to avoid per-stamp GetPixels/SetPixels allocations.
+        int pixelCount = texturesSizeHorizontal * texturesSizeVertical;
+        canvasPixels = new Color32[pixelCount];
+        clearPixels = new Color32[pixelCount];
+
+        Color32 bg = backgroundColor;
+        for (int i = 0; i < pixelCount; i++)
+            clearPixels[i] = bg;
+
+        Array.Copy(clearPixels, canvasPixels, pixelCount);
+        texture.SetPixels32(canvasPixels);
+        texture.Apply(false, false);
 
         renderer.material.mainTexture = texture;
 
@@ -106,6 +128,9 @@ public class Whiteboard : MonoBehaviour
         color = Color.black;
 
         isActive = true;
+        hasDirtyRegion = false;
+        hasCursorBackup = false;
+        nextUploadTime = 0f;
     }
 
     // Update is called once per frame
@@ -116,6 +141,7 @@ public class Whiteboard : MonoBehaviour
         // Float coordinates – DrawCircle already centres, no offset needed.
         float x = posX * texturesSizeHorizontal;
         float y = posY * texturesSizeVertical;
+        Color32 drawColor = color;
 
         // ── Erase previous cursor before any drawing ──────────────
         EraseCursor();
@@ -153,7 +179,9 @@ public class Whiteboard : MonoBehaviour
                     float t     = (float)i / steps;
                     float lerpX = Mathf.Lerp(lastX, x, t);
                     float lerpY = Mathf.Lerp(lastY, y, t);
-                    texture.DrawCircle(color, lerpX, lerpY, penSize);
+                    canvasPixels.DrawCircle(texturesSizeHorizontal, texturesSizeVertical,
+                                            drawColor, lerpX, lerpY, penSize);
+                    MarkCircleDirty(lerpX, lerpY, penSize);
                 }
 
                 this.lastX = x;
@@ -180,11 +208,9 @@ public class Whiteboard : MonoBehaviour
             DrawCursor(hx, hy, hoverCursorColor, hoverCursorRadius);
         }
 
-        // Batch-apply all texture changes once per frame.
-        if (touching || touchingLast || hovering || hoveringLast)
-        {
-            texture.Apply();
-        }
+        // Upload changed pixels to the GPU at a controlled cadence.
+        bool stateChanged = (touching != touchingLast) || (hovering != hoveringLast);
+        UploadIfNeeded(stateChanged);
 
         this.touchingLast  = this.touching;
         this.hoveringLast  = this.hovering;
@@ -209,15 +235,26 @@ public class Whiteboard : MonoBehaviour
 
         if (cursorBackupW <= 0 || cursorBackupH <= 0) return;
 
-        cursorBackup = texture.GetPixels(cursorBackupMinU, cursorBackupMinV,
-                                         cursorBackupW, cursorBackupH);
+        int backupLength = cursorBackupW * cursorBackupH;
+        if (cursorBackup == null || cursorBackup.Length < backupLength)
+            cursorBackup = new Color32[backupLength];
+
+        for (int row = 0; row < cursorBackupH; row++)
+        {
+            int srcIndex = (cursorBackupMinV + row) * texturesSizeHorizontal + cursorBackupMinU;
+            int dstIndex = row * cursorBackupW;
+            Array.Copy(canvasPixels, srcIndex, cursorBackup, dstIndex, cursorBackupW);
+        }
+
         hasCursorBackup = true;
 
         cursorLastX = cx;
         cursorLastY = cy;
 
         // Draw cursor as a soft circle.
-        texture.DrawCircle(col, cx, cy, rad);
+        canvasPixels.DrawCircle(texturesSizeHorizontal, texturesSizeVertical,
+                                (Color32)col, cx, cy, rad);
+        MarkCircleDirty(cx, cy, rad);
     }
 
     /// <summary>
@@ -227,9 +264,74 @@ public class Whiteboard : MonoBehaviour
     {
         if (!hasCursorBackup) return;
 
-        texture.SetPixels(cursorBackupMinU, cursorBackupMinV,
-                          cursorBackupW, cursorBackupH, cursorBackup);
+        for (int row = 0; row < cursorBackupH; row++)
+        {
+            int dstIndex = (cursorBackupMinV + row) * texturesSizeHorizontal + cursorBackupMinU;
+            int srcIndex = row * cursorBackupW;
+            Array.Copy(cursorBackup, srcIndex, canvasPixels, dstIndex, cursorBackupW);
+        }
+
+        MarkDirtyRect(cursorBackupMinU,
+                      cursorBackupMinV,
+                      cursorBackupMinU + cursorBackupW - 1,
+                      cursorBackupMinV + cursorBackupH - 1);
         hasCursorBackup = false;
+    }
+
+    private void MarkCircleDirty(float cx, float cy, int radius)
+    {
+        int r = radius + 2; // include anti-alias fringe
+        MarkDirtyRect(Mathf.FloorToInt(cx - r),
+                      Mathf.FloorToInt(cy - r),
+                      Mathf.CeilToInt(cx + r),
+                      Mathf.CeilToInt(cy + r));
+    }
+
+    private void MarkDirtyRect(int minU, int minV, int maxU, int maxV)
+    {
+        if (texturesSizeHorizontal <= 0 || texturesSizeVertical <= 0)
+            return;
+
+        minU = Mathf.Clamp(minU, 0, texturesSizeHorizontal - 1);
+        minV = Mathf.Clamp(minV, 0, texturesSizeVertical - 1);
+        maxU = Mathf.Clamp(maxU, 0, texturesSizeHorizontal - 1);
+        maxV = Mathf.Clamp(maxV, 0, texturesSizeVertical - 1);
+
+        if (maxU < minU || maxV < minV)
+            return;
+
+        if (!hasDirtyRegion)
+        {
+            dirtyMinU = minU;
+            dirtyMinV = minV;
+            dirtyMaxU = maxU;
+            dirtyMaxV = maxV;
+            hasDirtyRegion = true;
+            return;
+        }
+
+        dirtyMinU = Mathf.Min(dirtyMinU, minU);
+        dirtyMinV = Mathf.Min(dirtyMinV, minV);
+        dirtyMaxU = Mathf.Max(dirtyMaxU, maxU);
+        dirtyMaxV = Mathf.Max(dirtyMaxV, maxV);
+    }
+
+    private void UploadIfNeeded(bool force)
+    {
+        if (!hasDirtyRegion || texture == null || canvasPixels == null)
+            return;
+
+        if (!force && maxTextureUploadsPerSecond > 0)
+        {
+            if (Time.unscaledTime < nextUploadTime)
+                return;
+
+            nextUploadTime = Time.unscaledTime + (1f / maxTextureUploadsPerSecond);
+        }
+
+        texture.SetPixels32(canvasPixels);
+        texture.Apply(false, false);
+        hasDirtyRegion = false;
     }
 
     //ToggleTouch allows the WhiteboardPen.cs script to tell
@@ -270,16 +372,16 @@ public class Whiteboard : MonoBehaviour
     /// </summary>
     public void ClearToBackground()
     {
-        if (texture == null) return;
-        Color[] fill = new Color[texturesSizeHorizontal * texturesSizeVertical];
-        for (int i = 0; i < fill.Length; i++)
-            fill[i] = backgroundColor;
-        texture.SetPixels(fill);
-        texture.Apply();
+        if (texture == null || canvasPixels == null || clearPixels == null) return;
+
+        Array.Copy(clearPixels, canvasPixels, clearPixels.Length);
+        hasCursorBackup = false;
+        MarkDirtyRect(0, 0, texturesSizeHorizontal - 1, texturesSizeVertical - 1);
+        UploadIfNeeded(force: true);
     }
 
     /// <summary>
-    /// Returns the current whiteboard texture (for VLM image capture).
+    /// Returns the current whiteboard texture.
     /// </summary>
     public Texture2D GetTexture() => texture;
 }
