@@ -11,6 +11,9 @@ using UnityEngine.XR.Hands;
 public class WhiteboardPen : MonoBehaviour
 {
     public JournalSessionManager journalSessionManager;
+
+    [Tooltip("Allows this pen to run when no JournalSessionManager exists (for non-journal scenes such as login).")]
+    public bool allowWithoutJournalSession;
     
     [Tooltip("Which hand drives this pen.")]
     public Handedness handedness = Handedness.Right;
@@ -560,10 +563,17 @@ public class WhiteboardPen : MonoBehaviour
 
     private void Update()
     {
-        // Only active during a journaling session — blocks drawing, hover,
-        // pinky-pinch clear, and accidental content wipes outside of session.
-        if (JournalSessionManager.Instance == null ||
-            JournalSessionManager.Instance.CurrentState != JournalSessionManager.SessionState.Journaling)
+        // Journal scenes stay locked to the Journaling state. Non-journal scenes
+        // can opt in via allowWithoutJournalSession.
+        var session = journalSessionManager != null
+            ? journalSessionManager
+            : JournalSessionManager.Instance;
+
+        bool sessionBlocksInput = session != null &&
+            session.CurrentState != JournalSessionManager.SessionState.Journaling;
+        bool missingSessionBlocksInput = session == null && !allowWithoutJournalSession;
+
+        if (sessionBlocksInput || missingSessionBlocksInput)
         {
             if (whiteboard != null) whiteboard.ToggleTouch(false);
             if (hoverWhiteboard != null) { hoverWhiteboard.ToggleHover(false); hoverWhiteboard = null; }

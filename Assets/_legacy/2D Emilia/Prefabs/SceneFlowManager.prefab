@@ -57,4 +57,10 @@ MonoBehaviour:
     sceneName: Journal
   - sceneKey: Settings
     sceneName: Settings
+  - sceneKey: 3D_Login
+    sceneName: 3D_LoginArea
+  - sceneKey: 3D_Chat
+    sceneName: 3D_Chat_playground
+  - sceneKey: 3D_Journal
+    sceneName: 3D_Journal_CURRENT_IMPROVE
   _currentSceneKey: 

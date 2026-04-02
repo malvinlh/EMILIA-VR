@@ -11,7 +11,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/3D_StartArea.unity
     guid: 7b667000356914844b21eb34fb0ee087
-  - enabled: 0
+  - enabled: 1
     path: Assets/Scenes/3D_LoginArea.unity
     guid: 2bec35f045363b4429ec5eca414de024
   - enabled: 0
@@ -35,6 +35,9 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/3D_Journal_full_extended.unity
     guid: 8c0d49f8e66c1fc4e867741e3c078e2c
+  - enabled: 1
+    path: Assets/Scenes/3D_Chat_playground.unity
+    guid: 594615e139b2ae84295b8cb7ea1fce00
   - enabled: 1
     path: Assets/Scenes/3D_Journal_CURRENT_IMPROVE.unity
     guid: e3df2cd3fd0ec2943868737db8f14c45

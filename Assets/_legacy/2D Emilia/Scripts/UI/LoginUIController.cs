@@ -36,6 +36,10 @@ public class LoginUIController : MonoBehaviour
     [Tooltip("Handler responsible for loading the next scene after login.")]
     [SerializeField] private SceneButtonHandler sceneButtonHandler;
 
+    [Header("3D Handwriting Integration")]
+    [Tooltip("Auto-adds VR handwriting login support when whiteboard handwriting components are present in the scene.")]
+    [SerializeField] private bool autoAttachVrHandwritingBridge = true;
+
     #endregion
 
     #region Constants
@@ -57,6 +61,8 @@ public class LoginUIController : MonoBehaviour
         // Clear specific errors when user starts typing
         nicknameInput.onValueChanged.AddListener(_ => ClearNicknameError());
         fullNameInput.onValueChanged.AddListener(_ => ClearFullNameError());
+
+        TryAttachVrHandwritingBridgeIfAvailable();
     }
 
     #endregion
@@ -159,6 +165,24 @@ public class LoginUIController : MonoBehaviour
     {
         ClearNicknameError();
         ClearFullNameError();
+    }
+
+    private void TryAttachVrHandwritingBridgeIfAvailable()
+    {
+        if (!autoAttachVrHandwritingBridge)
+            return;
+
+        if (GetComponent<VRLoginHandwritingBridge>() != null)
+            return;
+
+        // 2D login scene has no whiteboard handwriting stack, so this remains inactive there.
+        if (FindAnyObjectByType<WhiteboardPen>() == null)
+            return;
+        if (FindAnyObjectByType<RecognitionPipeline>() == null)
+            return;
+
+        var bridge = gameObject.AddComponent<VRLoginHandwritingBridge>();
+        bridge.Configure(fullNameInput, nicknameInput);
     }
 
     #endregion

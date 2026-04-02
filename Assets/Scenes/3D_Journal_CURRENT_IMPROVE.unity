@@ -8399,63 +8399,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1001 &2086764617
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 5488353482449003525, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_Name
-      value: GameManager
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7891093752313431065, guid: f52112a60040637458828db5d83ce007, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: f52112a60040637458828db5d83ce007, type: 3}
 --- !u!1001 &2105726777
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -8663,11 +8606,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f5c019d4912b374b89004a952d733a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  alwaysRefineLLM: 0
-  llmConfidenceThreshold: 0.6
-  enableVLMFallback: 0
-  vlmConfidenceThreshold: 0.2
-  activeWhiteboard: {fileID: 0}
+  suppressLikelyNoiseTokens: 1
+  noiseOnlyMaxLength: 3
 --- !u!1 &3000000006
 GameObject:
   m_ObjectHideFlags: 0
@@ -8788,6 +8728,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: XR Origin (XR Rig)
       objectReference: {fileID: 0}
+    - target: {fileID: 6873022368256633593, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8227192243087186103, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_FarAttachMode
       value: 0
@@ -8826,14 +8770,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   journalSessionManager: {fileID: 1456161761}
+  allowWithoutJournalSession: 0
   handedness: 2
   touchTolerance: 0.015
+  enforceRecommendedStabilityProfile: 1
   contactLossFramesToEndStroke: 2
   trackingLossGraceSeconds: 0.08
   smoothingIdleResetSeconds: 0.25
   minBufferedPointDistance: 0.0008
-  drawPinchCloseThreshold: 0.018
-  drawPinchOpenThreshold: 0.025
+  minPointsPerStroke: 3
+  minStrokeDurationSeconds: 0.08
+  minStrokeTravelDistance: 0.004
+  microStrokeMergeGapSeconds: 0.2
+  microStrokeMergeMaxDistance: 0.02
+  minBufferedPointsBeforeRecognize: 8
+  minRecognizeIntervalSeconds: 0.7
   pinkyPinchCloseThreshold: 0.018
   pinkyPinchOpenThreshold: 0.026
   pinkyPinchHoldSeconds: 0.45
@@ -8859,14 +8810,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   journalSessionManager: {fileID: 1456161761}
+  allowWithoutJournalSession: 0
   handedness: 1
   touchTolerance: 0.015
+  enforceRecommendedStabilityProfile: 1
   contactLossFramesToEndStroke: 2
   trackingLossGraceSeconds: 0.08
   smoothingIdleResetSeconds: 0.25
   minBufferedPointDistance: 0.0008
-  drawPinchCloseThreshold: 0.018
-  drawPinchOpenThreshold: 0.025
+  minPointsPerStroke: 3
+  minStrokeDurationSeconds: 0.08
+  minStrokeTravelDistance: 0.004
+  microStrokeMergeGapSeconds: 0.2
+  microStrokeMergeMaxDistance: 0.02
+  minBufferedPointsBeforeRecognize: 8
+  minRecognizeIntervalSeconds: 0.7
   pinkyPinchCloseThreshold: 0.018
   pinkyPinchOpenThreshold: 0.026
   pinkyPinchHoldSeconds: 0.45
@@ -140308,6 +140266,5 @@ SceneRoots:
   - {fileID: 5000000009}
   - {fileID: 5000000012}
   - {fileID: 1910365443}
-  - {fileID: 2086764617}
   - {fileID: 561882570}
   - {fileID: 1790173463}
