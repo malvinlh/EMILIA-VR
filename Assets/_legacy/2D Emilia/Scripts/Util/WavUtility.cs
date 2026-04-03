@@ -21,24 +21,49 @@ public static class WavUtility
     /// </summary>
     /// <param name="filePath">Destination path (with or without ".wav" extension).</param>
     /// <param name="clip">The Unity <see cref="AudioClip"/> to save.</param>
-    public static void Save(string filePath, AudioClip clip)
+    /// <returns>True when saved successfully; otherwise false.</returns>
+    public static bool Save(string filePath, AudioClip clip)
     {
         if (clip == null)
         {
             Debug.LogError("[WavUtility] Cannot save null AudioClip.");
-            return;
+            return false;
         }
 
-        if (!filePath.ToLower().EndsWith(".wav"))
-            filePath += ".wav";
-
-        // Ensure target directory exists
-        Directory.CreateDirectory(Path.GetDirectoryName(filePath));
-
-        using (FileStream fileStream = CreateEmpty(filePath))
+        if (string.IsNullOrWhiteSpace(filePath))
         {
-            ConvertAndWrite(fileStream, clip);
-            WriteHeader(fileStream, clip);
+            Debug.LogError("[WavUtility] Cannot save with an empty file path.");
+            return false;
+        }
+
+        string targetPath = filePath.Trim();
+        if (!targetPath.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+            targetPath += ".wav";
+
+        string directory = Path.GetDirectoryName(targetPath);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            directory = Application.persistentDataPath;
+            targetPath = Path.Combine(directory, Path.GetFileName(targetPath));
+        }
+
+        try
+        {
+            // Ensure target directory exists
+            Directory.CreateDirectory(directory);
+
+            using (FileStream fileStream = CreateEmpty(targetPath))
+            {
+                ConvertAndWrite(fileStream, clip);
+                WriteHeader(fileStream, clip);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[WavUtility] Failed to save WAV to '{targetPath}': {ex.Message}");
+            return false;
         }
     }
 

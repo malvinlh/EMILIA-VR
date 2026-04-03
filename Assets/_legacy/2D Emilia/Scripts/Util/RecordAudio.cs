@@ -75,6 +75,7 @@ public class RecordAudio : MonoBehaviour
 
     private string _directoryPath;
     private string _filePath;
+    private string _activeMicDevice;
     private AudioClip _recordedClip;
     private float _startTime;
     private Coroutine _blinkCo;
@@ -85,13 +86,7 @@ public class RecordAudio : MonoBehaviour
 
     private void Awake()
     {
-        // Ensure recording folder exists
-        string targetFolder = @"D:\Emilia\AI\Recordings"; // Hardcoded path
-        if (!Directory.Exists(targetFolder))
-            Directory.CreateDirectory(targetFolder);
-
-        _directoryPath = targetFolder;
-        _filePath = Path.Combine(_directoryPath, outputFileName);
+        EnsureOutputPathInitialized();
 
         if (micButton != null) 
             micButton.onClick.AddListener(OnMicClicked);
@@ -170,6 +165,7 @@ public class RecordAudio : MonoBehaviour
     public void StartRecording()
     {
         if (IsRecording) return;
+        EnsureOutputPathInitialized();
 
         if (Microphone.devices.Length == 0)
         {
@@ -177,8 +173,15 @@ public class RecordAudio : MonoBehaviour
             return;
         }
 
-        string device = string.IsNullOrEmpty(micDevice) ? Microphone.devices[0] : micDevice;
+        string device = ResolveMicDevice();
         _recordedClip = Microphone.Start(device, loop: false, lengthSec: maxLengthSec, frequency: sampleRate);
+        if (_recordedClip == null)
+        {
+            Debug.LogError($"[RecordAudio] Failed to start recording on device '{device}'.");
+            return;
+        }
+
+        _activeMicDevice = device;
         _startTime = Time.realtimeSinceStartup;
         IsRecording = true;
 
@@ -198,33 +201,59 @@ public class RecordAudio : MonoBehaviour
     {
         if (!IsRecording) return;
 
-        try { Microphone.End(null); }
-        catch { /* ignored */ }
+        EndMicrophoneCapture();
 
         IsRecording = false;
 
         float recordedSeconds = Mathf.Max(0f, Time.realtimeSinceStartup - _startTime);
+        string savedPath = null;
 
-        if (_recordedClip != null && recordedSeconds > 0.01f)
+        try
         {
-            var trimmed = TrimClip(_recordedClip, recordedSeconds);
-            WavUtility.Save(_filePath, trimmed);
-            Debug.Log($"[RecordAudio] Recording saved to: {_filePath}");
+            if (_recordedClip != null && recordedSeconds > 0.01f)
+            {
+                var trimmed = TrimClip(_recordedClip, recordedSeconds);
+                if (trimmed != null && trimmed.samples > 0)
+                {
+                    string targetPath = EnsureWavExtension(_filePath);
+                    if (WavUtility.Save(targetPath, trimmed))
+                    {
+                        savedPath = targetPath;
+                        Debug.Log($"[RecordAudio] Recording saved to: {savedPath}");
+                    }
+                    else
+                    {
+                        Debug.LogError("[RecordAudio] WAV save failed.");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning("[RecordAudio] Trimmed clip is empty, skipping save.");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[RecordAudio] No valid audio recorded, skipping save.");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Debug.LogWarning("[RecordAudio] No valid audio recorded, skipping save.");
+            Debug.LogError($"[RecordAudio] Stop/save failed: {ex.Message}");
         }
+        finally
+        {
+            _recordedClip = null;
+            _activeMicDevice = null;
 
-        _recordedClip = null;
+            OnMicStateChanged?.Invoke(false);
 
-        OnMicStateChanged?.Invoke(false);
+            ApplyBlink(false);
+            SetCanvasAlpha(1f);
 
-        ApplyBlink(false);
-        SetCanvasAlpha(1f);
-
-        // Notify listeners (e.g., ChatManager) that a recording is ready
-        OnSaved?.Invoke(_filePath);
+            // Notify listeners only when a valid file was produced.
+            if (!string.IsNullOrEmpty(savedPath))
+                OnSaved?.Invoke(savedPath);
+        }
     }
 
     /// <summary>
@@ -245,6 +274,75 @@ public class RecordAudio : MonoBehaviour
         var newClip = AudioClip.Create(clip.name, samples, clip.channels, clip.frequency, false);
         newClip.SetData(data, 0);
         return newClip;
+    }
+
+    private void EnsureOutputPathInitialized()
+    {
+        if (!string.IsNullOrWhiteSpace(_filePath) && !string.IsNullOrWhiteSpace(_directoryPath))
+            return;
+
+        string safeFolderName = string.IsNullOrWhiteSpace(folderName) ? "Recordings" : folderName.Trim();
+        string persistentRoot = Application.persistentDataPath;
+        string targetFolder = Path.Combine(persistentRoot, safeFolderName);
+
+        try
+        {
+            Directory.CreateDirectory(targetFolder);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[RecordAudio] Cannot create folder '{targetFolder}': {ex.Message}. Falling back to '{persistentRoot}'.");
+            targetFolder = persistentRoot;
+            Directory.CreateDirectory(targetFolder);
+        }
+
+        string safeFileName = string.IsNullOrWhiteSpace(outputFileName) ? "recording.wav" : outputFileName.Trim();
+        _directoryPath = targetFolder;
+        _filePath = Path.Combine(_directoryPath, safeFileName);
+    }
+
+    private string ResolveMicDevice()
+    {
+        if (!string.IsNullOrWhiteSpace(micDevice))
+        {
+            for (int i = 0; i < Microphone.devices.Length; i++)
+            {
+                if (string.Equals(Microphone.devices[i], micDevice, StringComparison.Ordinal))
+                    return Microphone.devices[i];
+            }
+
+            Debug.LogWarning($"[RecordAudio] Preferred mic '{micDevice}' not found. Using '{Microphone.devices[0]}'.");
+        }
+
+        return Microphone.devices[0];
+    }
+
+    private void EndMicrophoneCapture()
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_activeMicDevice))
+                Microphone.End(_activeMicDevice);
+            else
+                Microphone.End(null);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[RecordAudio] Microphone.End on active device failed: {ex.Message}. Trying fallback.");
+
+            try { Microphone.End(null); }
+            catch { /* ignored */ }
+        }
+    }
+
+    private static string EnsureWavExtension(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return path;
+
+        return path.EndsWith(".wav", StringComparison.OrdinalIgnoreCase)
+            ? path
+            : path + ".wav";
     }
 
     #endregion
