@@ -191,20 +191,20 @@ public class JournalMicController : MonoBehaviour
         _micState = MicState.Transcribing;
         UpdateMicVisual();
 
-        var gemini = GeminiService.Instance;
-        if (gemini == null || !gemini.IsConfigured)
+        var api = ServiceManager.Instance?.TranscribeApi;
+        if (api == null)
         {
-            Debug.LogWarning($"{TAG} GeminiService not available — transcription skipped.");
+            Debug.LogWarning($"{TAG} TranscribeApi not available — transcription skipped.");
             _micState = MicState.Idle;
             UpdateMicVisual();
             yield break;
         }
 
-        byte[] wavBytes  = File.ReadAllBytes(filePath);
         string transcribed = null;
-        bool   done        = false;
-        gemini.TranscribeAudio(wavBytes, text => { transcribed = text; done = true; });
-        yield return new WaitUntil(() => done);
+        yield return api.TranscribeFile(
+            filePath,
+            onSuccess: text => transcribed = text,
+            onError:   err  => Debug.LogWarning($"{TAG} Transcription error: {err}"));
 
         _micState = MicState.Idle;
         UpdateMicVisual();

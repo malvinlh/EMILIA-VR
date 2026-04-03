@@ -10,52 +10,66 @@ using EMILIA.Data;
 /// <summary>
 /// Attach to the Wine Rack GameObject (or a dedicated child interactable zone).
 ///
-/// When the player points their controller at the Wine Rack and presses the trigger
-/// while OUTSIDE an active journaling session (SessionState.Idle), this controller
-/// toggles the JournalListCanvas visible. The canvas shows a read-only list of the
-/// user's journals — edit and delete are intentionally absent.
+/// Controller trigger while OUTSIDE an active journaling session (SessionState.Idle)
+/// toggles the JournalListCanvas. Inside the canvas the user navigates via two panels:
 ///
-/// Session guard:
-///   - Shows canvas only when JournalSessionManager.CurrentState == Idle.
-///   - Blocks interaction during any active MR calibration or journaling state.
+///   HomeCanvas   — scrollable list of journals (one JournalEntry prefab per entry).
+///   JournalCanvas — read-only detail view of a selected journal.
 ///
-/// Setup requirements in the Inspector / scene:
-///   1. Add an XRSimpleInteractable component to this GameObject (or let RequireComponent
-///      add it). Make sure the XRI Ray Interactor on the controller can reach it.
-///   2. Add a non-trigger BoxCollider so the controller ray can hit this object.
-///      (The existing trigger Collider on WineRackProximity is for bottle detection;
-///       add a second, non-trigger BoxCollider for XRI ray picking.)
-///   3. Wire the Inspector fields described below.
+/// Clicking the BackButton on a JournalEntry opens JournalCanvas and hides HomeCanvas.
+/// PreviousButton inside JournalCanvas returns to HomeCanvas.
 ///
-/// Inspector fields:
-///   journalListCanvas   — World Space canvas parented under WineRack (inactive at start).
-///   listContentParent   — ScrollRect → Viewport → Content transform.
-///   journalEntryPrefab  — A prefab containing TitleText, ContentText, and
-///                         TimestampBG/TimestampText children (TextMeshProUGUI).
-///                         Any EditButton / DeleteButton children are automatically
-///                         deactivated at runtime so this remains read-only.
-///   bgNoJournals        — GameObject shown when there are no journal entries.
-///   closeButton         — Optional "X" button inside the canvas to dismiss the list.
+/// Inspector setup:
+///   journalListCanvas  — top-level World Space canvas (inactive at start).
+///   homeCanvas         — child panel that hosts the journal list.
+///   journalCanvas      — child panel that shows a selected journal's detail.
+///   detailTitleField   — TMP_InputField for the journal title (forced read-only at runtime).
+///   detailContentText  — TextMeshProUGUI that displays the journal content.
+///   previousButton     — Button in JournalCanvas that navigates back to the list.
+///   listContentParent  — Content Transform inside HomeCanvas's ScrollRect.
+///   journalEntryPrefab — Prefab with TitleText, ContentText, TimestampBG/TimestampText,
+///                        and a BackButton that triggers the detail view.
+///   bgNoJournals       — Shown when there are no saved journals.
+///   closeButton        — Optional X button on JournalListCanvas to dismiss everything.
 /// </summary>
 [RequireComponent(typeof(XRSimpleInteractable))]
 public class WineRackJournalListController : MonoBehaviour
 {
     [Header("Journal List Canvas")]
-    [Tooltip("World Space canvas under WineRack. Starts inactive; toggled by controller trigger.")]
+    [Tooltip("Top-level World Space canvas. Starts inactive; toggled by controller trigger.")]
     public GameObject journalListCanvas;
 
+    [Header("Home (List) Canvas")]
+    [Tooltip("Child panel that shows the scrollable journal list.")]
+    public GameObject homeCanvas;
+
+    [Header("Detail (Journal) Canvas")]
+    [Tooltip("Child panel that shows a single journal read-only.")]
+    public GameObject journalCanvas;
+
+    [Tooltip("TMP_InputField inside JournalCanvas for the title (TitleInputField).")]
+    public TMP_InputField detailTitleField;
+
+    [Tooltip("TMP_InputField inside JournalCanvas/MainCanvas for the content (ContentInputField (TMP)). "
+           + "Both fields are forced non-interactable at runtime so the Quest keyboard never pops up.")]
+    public TMP_InputField detailContentField;
+
+    [Tooltip("PreviousButton inside JournalCanvas — returns to the list.")]
+    public Button previousButton;
+
     [Header("List Content")]
-    [Tooltip("Content Transform inside ScrollRect → Viewport (journal entries are spawned here).")]
+    [Tooltip("Content Transform inside HomeCanvas's ScrollRect → Viewport.")]
     public Transform listContentParent;
 
-    [Tooltip("Read-only journal entry prefab. Any EditButton / DeleteButton children are disabled at runtime.")]
+    [Tooltip("JournalEntry prefab. Must have TitleText, ContentText, TimestampBG/TimestampText "
+           + "and a BackButton that opens the detail view.")]
     public GameObject journalEntryPrefab;
 
     [Tooltip("Shown when the user has no saved journals.")]
     public GameObject bgNoJournals;
 
     [Header("Close Button (Optional)")]
-    [Tooltip("Button inside the canvas that hides the list. Leave null to rely on trigger-toggle only.")]
+    [Tooltip("Button that dismisses the entire JournalListCanvas.")]
     public Button closeButton;
 
     // ── Private State ────────────────────────────────────────────────
@@ -73,21 +87,38 @@ public class WineRackJournalListController : MonoBehaviour
 
     private void Start()
     {
-        // Canvas starts hidden.
         if (journalListCanvas != null)
         {
             journalListCanvas.SetActive(false);
             EnsureTrackedRaycaster(journalListCanvas);
         }
 
+        // Ensure each child canvas can be hit by the XRI controller ray.
+        if (homeCanvas != null && homeCanvas.GetComponent<Canvas>() != null)
+            EnsureTrackedRaycaster(homeCanvas);
+
+        if (journalCanvas != null)
+        {
+            journalCanvas.SetActive(false);
+            if (journalCanvas.GetComponent<Canvas>() != null)
+                EnsureTrackedRaycaster(journalCanvas);
+        }
+
+        // Force both display fields permanently non-interactable so the Quest
+        // keyboard never opens when the user accidentally touches them.
+        if (detailTitleField != null)   detailTitleField.interactable  = false;
+        if (detailContentField != null) detailContentField.interactable = false;
+
+        if (previousButton != null)
+            previousButton.onClick.AddListener(HideDetail);
+
         if (closeButton != null)
             closeButton.onClick.AddListener(HideCanvas);
     }
 
     /// <summary>
-    /// Swaps the standard GraphicRaycaster (copied from the 2D scene) for
-    /// TrackedDeviceGraphicRaycaster so the XRI controller ray can hit canvas buttons
-    /// and scroll rects — mirrors the pattern used by WhiteboardPageManager.
+    /// Replaces a standard GraphicRaycaster with TrackedDeviceGraphicRaycaster so
+    /// XRI controller rays can reach buttons and scroll rects on this canvas.
     /// </summary>
     private static void EnsureTrackedRaycaster(GameObject canvasRoot)
     {
@@ -102,8 +133,7 @@ public class WineRackJournalListController : MonoBehaviour
 
     private void Update()
     {
-        // Safety: auto-close the canvas the moment a journaling session begins,
-        // even if the user forgot to close it before pressing the start button.
+        // Auto-close the moment a journaling session begins.
         if (!_isVisible) return;
         var mgr = JournalSessionManager.Instance;
         if (mgr != null && mgr.CurrentState != JournalSessionManager.SessionState.Idle)
@@ -121,17 +151,15 @@ public class WineRackJournalListController : MonoBehaviour
         if (_interactable != null)
             _interactable.selectEntered.RemoveListener(OnControllerSelect);
 
-        // Ensure canvas is hidden if this object is disabled mid-session.
         HideCanvas();
     }
 
     // ================================================================
-    // CONTROLLER INPUT (XRI trigger / select)
+    // CONTROLLER INPUT
     // ================================================================
 
     private void OnControllerSelect(SelectEnterEventArgs args)
     {
-        // Block interaction during any active MR calibration or journaling phase.
         var mgr = JournalSessionManager.Instance;
         if (mgr != null && mgr.CurrentState != JournalSessionManager.SessionState.Idle)
         {
@@ -140,7 +168,6 @@ public class WineRackJournalListController : MonoBehaviour
             return;
         }
 
-        // Toggle the canvas.
         if (_isVisible)
             HideCanvas();
         else
@@ -157,15 +184,40 @@ public class WineRackJournalListController : MonoBehaviour
         if (journalListCanvas != null)
             journalListCanvas.SetActive(true);
 
+        // Always open on the list view.
+        if (homeCanvas != null)    homeCanvas.SetActive(true);
+        if (journalCanvas != null) journalCanvas.SetActive(false);
+
         FetchAndPopulate();
     }
 
-    /// <summary>Called by the optional close button or on toggle-off.</summary>
     public void HideCanvas()
     {
         _isVisible = false;
         if (journalListCanvas != null)
             journalListCanvas.SetActive(false);
+    }
+
+    // ================================================================
+    // DETAIL VIEW
+    // ================================================================
+
+    private void ShowDetail(Journal journal)
+    {
+        if (detailTitleField != null)
+            detailTitleField.text = journal.Title;
+
+        if (detailContentField != null)
+            detailContentField.text = journal.Content;
+
+        if (homeCanvas != null)    homeCanvas.SetActive(false);
+        if (journalCanvas != null) journalCanvas.SetActive(true);
+    }
+
+    private void HideDetail()
+    {
+        if (journalCanvas != null) journalCanvas.SetActive(false);
+        if (homeCanvas != null)    homeCanvas.SetActive(true);
     }
 
     // ================================================================
@@ -198,7 +250,7 @@ public class WineRackJournalListController : MonoBehaviour
     }
 
     // ================================================================
-    // LIST POPULATION (read-only)
+    // LIST POPULATION
     // ================================================================
 
     private void OnJournalsReceived(Journal[] journals)
@@ -221,15 +273,23 @@ public class WineRackJournalListController : MonoBehaviour
             var go = Instantiate(journalEntryPrefab, listContentParent);
             go.name = $"Journal_{j.Id}";
 
-            // Populate text fields (paths must match your prefab hierarchy).
-            SetTMP(go, "TitleText",                 j.Title);
-            SetTMP(go, "ContentText",               j.Content);
+            SetTMP(go, "TitleText",   j.Title);
+            SetTMP(go, "ContentText", j.Content);
             SetTMP(go, "TimestampBG/TimestampText",
                 j.CreatedAt.ToString("dd/MM/yyyy hh:mm tt", CultureInfo.InvariantCulture));
 
-            // Remove edit/delete interactivity — this is a read-only view.
-            DisableButtonChild(go, "EditButton");
-            DisableButtonChild(go, "DeleteButton");
+            // Wire BackButton on the entry to open the detail view.
+            var viewBtn = go.GetComponentInChildren<Button>(includeInactive: true);
+            if (viewBtn != null)
+            {
+                var captured = j;
+                viewBtn.onClick.AddListener(() => ShowDetail(captured));
+            }
+            else
+            {
+                Debug.LogWarning($"[WineRackJournalList] No Button found on entry '{j.Title}' — " +
+                                 "check that JournalEntry prefab has a BackButton.");
+            }
         }
     }
 
@@ -241,13 +301,5 @@ public class WineRackJournalListController : MonoBehaviour
     {
         var t = parent.transform.Find(path)?.GetComponent<TextMeshProUGUI>();
         if (t != null) t.text = value;
-    }
-
-    /// <summary>Deactivates a named child button so it is invisible and non-interactive.</summary>
-    private static void DisableButtonChild(GameObject parent, string childName)
-    {
-        var child = parent.transform.Find(childName);
-        if (child != null)
-            child.gameObject.SetActive(false);
     }
 }
