@@ -423,7 +423,7 @@ Transform:
   m_GameObject: {fileID: 93829824}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.01, z: 0}
+  m_LocalPosition: {x: 2.369, y: 0.109, z: 5.214}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -455,6 +455,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
+  - {fileID: 0}
   - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
@@ -518,7 +519,7 @@ ParticleSystem:
   m_GameObject: {fileID: 93829824}
   serializedVersion: 8
   lengthInSec: 2.4
-  simulationSpeed: 1
+  simulationSpeed: 0.85
   stopAction: 0
   cullingMode: 0
   ringBufferMode: 0
@@ -815,7 +816,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startSizeY:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 3
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -868,7 +869,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startSizeZ:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 3
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -2192,7 +2193,7 @@ ParticleSystem:
     orbitalY:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.0685
+      scalar: 0.16
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -5578,7 +5579,7 @@ Transform:
   m_GameObject: {fileID: 230040796}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.01, z: 0}
+  m_LocalPosition: {x: 2.369, y: 0.109, z: 5.214}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -5610,6 +5611,7 @@ ParticleSystemRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
+  - {fileID: 0}
   - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
@@ -5970,7 +5972,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startSizeY:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 3
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -6023,7 +6025,7 @@ ParticleSystem:
         m_RotationOrder: 4
     startSizeZ:
       serializedVersion: 2
-      minMaxState: 0
+      minMaxState: 3
       scalar: 1
       minScalar: 1
       maxCurve:
@@ -10675,6 +10677,44 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4f17a1b36fcb274449d030ef08f66941, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!21 &687553549
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!64 &724524168
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -11207,7 +11247,8 @@ MonoBehaviour:
   autoCreateMissingReferences: 1
   autoCreateComfortFadeCanvas: 1
   targetScene: Assets/Scenes/3D_Journal_CURRENT_JOURNAL_LIST.unity
-  loadDelay: 1.2
+  loadDelay: 2.8
+  enterSpinDuration: 2.8
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:
@@ -11220,9 +11261,20 @@ MonoBehaviour:
   portalAnimator: {fileID: 0}
   enterAnimatorTrigger: Enter
   portalAudioSource: {fileID: 1176094224}
-  enterSfx: {fileID: 0}
+  enterSfx: {fileID: 8300000, guid: b750b9d606a0bb94e9254ff823a2766a, type: 3}
   enterSfxVolume: 0.7
-  stopIdleLoopOnEnter: 1
+  stopIdleLoopOnEnter: 0
+  playEnterBurstVfx: 0
+  portalRingVfx: {fileID: 1176094230}
+  synchronizeParticlesWithRing: 1
+  idleParticleSpinSpeed: 0.16
+  enterParticleSpinSpeed: 1.45
+  idleParticleSimulationSpeed: 0.85
+  enterParticleSimulationSpeed: 1.8
+  particleSpinResponse: 8
+  autoAssignParticleMaterials: 1
+  particleTint: {r: 0.72, g: 0.66, b: 0.94, a: 0.78}
+  particleBrightness: 1.1
   applyCalmComfortProfile: 1
   vfxAnchor: {fileID: 1176094220}
   calmTint: {r: 0.52, g: 0.86, b: 0.92, a: 1}
@@ -11354,6 +11406,39 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.60905284, y: 0.91432106, z: 0.60905284}
   m_Center: {x: 2.3665936, y: 0.55504256, z: 5.2156415}
+--- !u!114 &1176094230
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1176094221}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 603eb01cf045f644798fe03cee55a935, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PortalCalmRingVfx
+  autoCreateRenderer: 1
+  ringObjectName: PortalCalmRing_Auto
+  ringAnchor: {fileID: 1176094220}
+  ringRenderer: {fileID: 1634097692}
+  baseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  accentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+  worldRadius: 0.30452645
+  ringThickness: 0.22
+  arcCount: 10
+  sparkleStrength: 0.3
+  softNoise: 0.5
+  preserveManualRingTransform: 1
+  defaultLocalPosition: {x: 0, y: 0.01, z: 0}
+  defaultLocalEuler: {x: 90, y: 0, z: 0}
+  useUnscaledTime: 1
+  idleSpinSpeed: 0.9
+  enterSpinSpeed: 4.5
+  idleIntensity: 0.62
+  enterIntensity: 1.15
+  spinResponse: 7
+  intensityResponse: 6
 --- !u!1001 &1183078201
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -12081,10 +12166,13 @@ PrefabInstance:
       addedObject: {fileID: 1336054324}
     - targetCorrespondingSourceObject: {fileID: -8101429033976757700, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
       insertIndex: -1
+      addedObject: {fileID: 230040797}
+    - targetCorrespondingSourceObject: {fileID: -8101429033976757700, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 93829825}
     - targetCorrespondingSourceObject: {fileID: -8101429033976757700, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 230040797}
+      addedObject: {fileID: 1634097691}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 6479137908180158667, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
       insertIndex: -1
@@ -12179,6 +12267,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -2910231805023529543, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1176094229}
+    - targetCorrespondingSourceObject: {fileID: -2910231805023529543, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1176094230}
     - targetCorrespondingSourceObject: {fileID: -4611310490918076743, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
       insertIndex: -1
       addedObject: {fileID: 455652486}
@@ -12939,15 +13030,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalScale.x
-      value: 0.275
+      value: 0.24
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalScale.y
-      value: 0.275
+      value: 0.24
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.275
+      value: 0.24
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalPosition.x
@@ -12955,7 +13046,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.0000033918768
+      value: 0.01
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalPosition.z
@@ -15023,6 +15114,119 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -5104956052390161353, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
+--- !u!1 &1634097690
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1634097691}
+  - component: {fileID: 1634097694}
+  - component: {fileID: 1634097693}
+  - component: {fileID: 1634097692}
+  m_Layer: 0
+  m_Name: PortalCalmRing_Auto
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1634097691
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1634097690}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 2.369, y: 0.109, z: 5.214}
+  m_LocalScale: {x: 0.6090529, y: 0.6090529, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1176094220}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1634097692
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1634097690}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 2
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 687553549}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 1
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!64 &1634097693
+MeshCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1634097690}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 5
+  m_Convex: 0
+  m_CookingOptions: 30
+  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!33 &1634097694
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1634097690}
+  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!1001 &1721514624
 PrefabInstance:
   m_ObjectHideFlags: 0

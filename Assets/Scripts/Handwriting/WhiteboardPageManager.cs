@@ -459,22 +459,27 @@ public class WhiteboardPageManager : MonoBehaviour
     /// Called by ScribbleManager whenever words change or the page turns.
     /// Page 0 is always the title page; pages 1+ are content pages.
     /// </summary>
-    public void UpdateUI(string pageText, int pageIndex, int totalPages)
+    public void UpdateUI(string pageText, int pageIndex, int totalPages, int titlePageCount = 1)
     {
         if (resultText != null)
             resultText.text = pageText;
 
-        bool isTitlePage = pageIndex == 0;
+        bool isTitlePage = pageIndex < titlePageCount;
 
-        // Page number: "Title" on title page, "N / M" on content pages.
+        // Page number label.
         if (pageNumberText != null)
         {
             if (isTitlePage)
-                pageNumberText.text = "Title";
+            {
+                // Show "Title" for a single title page; "Title 1/2" when multi-page.
+                pageNumberText.text = titlePageCount > 1
+                    ? $"Title {pageIndex + 1}/{titlePageCount}"
+                    : "Title";
+            }
             else
             {
-                int contentIndex = pageIndex;           // 1-based content page index
-                int totalContent = totalPages - 1;      // subtract title page
+                int contentIndex = pageIndex - titlePageCount + 1;  // 1-based
+                int totalContent = totalPages - titlePageCount;
                 pageNumberText.text = $"{contentIndex} / {totalContent}";
             }
         }
@@ -486,7 +491,7 @@ public class WhiteboardPageManager : MonoBehaviour
             createdAtLabel.gameObject.SetActive(isTitlePage);
 
         bool hasWords = !string.IsNullOrEmpty(pageText);
-        // Next is always available on title page so user can always proceed to content.
+        // Next is always available on any title page so user can proceed to content.
         bool hasNext = isTitlePage || pageIndex < totalPages - 1;
         SetButtonStates(hasPrev:  pageIndex > 0,
                         hasNext:  hasNext,

@@ -48,6 +48,7 @@ public class JournalMicController : MonoBehaviour
     private enum MicState { Idle, Recording, Transcribing }
     private MicState  _micState = MicState.Idle;
     private Coroutine _pulseCo;
+    private Coroutine _transcribeCo;
     private float     _recordingStartTime;
 
     // Minimum seconds that must elapse before a Stop is accepted.
@@ -112,10 +113,20 @@ public class JournalMicController : MonoBehaviour
 
         ShowMicPanel(journaling);
 
-        // If a session ended mid-recording, stop cleanly.
-        if (!journaling && _micState == MicState.Recording)
+        // Session ended while mic was active — reset to Idle so the button
+        // is not stuck non-interactable on the next session.
+        if (!journaling && _micState != MicState.Idle)
         {
-            recorder?.StopRecording();
+            if (_micState == MicState.Recording)
+                recorder?.StopRecording();
+
+            if (_transcribeCo != null)
+            {
+                StopCoroutine(_transcribeCo);
+                _transcribeCo = null;
+            }
+            _micState = MicState.Idle;
+            UpdateMicVisual();
         }
     }
 
@@ -164,7 +175,15 @@ public class JournalMicController : MonoBehaviour
     {
         Debug.Log($"{TAG} OnMicClicked state={_micState}");
         if (recorder == null) return;
-        if (_micState == MicState.Transcribing) return; // busy
+        if (_micState == MicState.Transcribing)
+        {
+            // Cancel the in-flight transcription so the user can record again.
+            if (_transcribeCo != null) { StopCoroutine(_transcribeCo); _transcribeCo = null; }
+            _micState = MicState.Idle;
+            UpdateMicVisual();
+            Debug.Log($"{TAG} Transcription cancelled by user.");
+            return;
+        }
 
         if (_micState == MicState.Recording)
         {
@@ -230,7 +249,7 @@ public class JournalMicController : MonoBehaviour
             return;
         }
 
-        StartCoroutine(CoTranscribe(filePath));
+        _transcribeCo = StartCoroutine(CoTranscribe(filePath));
     }
 
     // ==================================================================
@@ -257,6 +276,7 @@ public class JournalMicController : MonoBehaviour
             onSuccess: text => transcribed = text,
             onError:   err  => Debug.LogWarning($"{TAG} Transcription error: {err}"));
 
+        _transcribeCo = null;
         _micState = MicState.Idle;
         UpdateMicVisual();
 
@@ -295,7 +315,7 @@ public class JournalMicController : MonoBehaviour
             case MicState.Transcribing:
                 label        = "⌛ ...";
                 color        = transcribingColor;
-                interactable = false;
+                interactable = true;   // interactable so poke can cancel it
                 shouldPulse  = false;
                 break;
             default:

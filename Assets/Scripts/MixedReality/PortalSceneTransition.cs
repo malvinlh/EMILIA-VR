@@ -37,7 +37,10 @@ public class PortalSceneTransition : MonoBehaviour
     [SerializeField] private string targetScene = "Assets/Scenes/3D_Journal_CURRENT_IMPROVE.unity";
 
     [Tooltip("Delay before loading scene, so enter VFX can play first.")]
-    [SerializeField] [Range(0f, 10f)] private float loadDelay = 1.2f;
+    [SerializeField] [Range(0f, 10f)] private float loadDelay = 2.8f;
+
+    [Tooltip("How long the ring should spin up before transition load starts.")]
+    [SerializeField] [Range(0f, 10f)] private float enterSpinDuration = 2.8f;
 
     [Header("Who Can Trigger")]
     [Tooltip("Primary tag used to detect the player collider or camera.")]
@@ -63,7 +66,37 @@ public class PortalSceneTransition : MonoBehaviour
     [SerializeField] private AudioSource portalAudioSource;
     [SerializeField] private AudioClip enterSfx;
     [SerializeField] [Range(0f, 1f)] private float enterSfxVolume = 1f;
-    [SerializeField] private bool stopIdleLoopOnEnter = true;
+    [SerializeField] private bool stopIdleLoopOnEnter = false;
+    [SerializeField] private bool playEnterBurstVfx = false;
+    [SerializeField] private PortalCalmRingVfx portalRingVfx;
+
+    [Header("Synced Spin Particles")]
+    [Tooltip("Keep idle particles spinning with the portal ring and accelerate on enter.")]
+    [SerializeField] private bool synchronizeParticlesWithRing = true;
+
+    [Tooltip("Idle orbital spin speed for particle loops.")]
+    [SerializeField] [Range(0f, 4f)] private float idleParticleSpinSpeed = 0.16f;
+
+    [Tooltip("Enter orbital spin speed for particle loops.")]
+    [SerializeField] [Range(0f, 8f)] private float enterParticleSpinSpeed = 1.45f;
+
+    [Tooltip("Simulation speed while portal is idle.")]
+    [SerializeField] [Range(0.1f, 4f)] private float idleParticleSimulationSpeed = 0.85f;
+
+    [Tooltip("Simulation speed while portal is spinning up.")]
+    [SerializeField] [Range(0.1f, 8f)] private float enterParticleSimulationSpeed = 1.8f;
+
+    [Tooltip("How quickly particles react to ring speed changes.")]
+    [SerializeField] [Range(1f, 20f)] private float particleSpinResponse = 8f;
+
+    [Tooltip("Automatically assign a URP-compatible particle material to avoid magenta shaders.")]
+    [SerializeField] private bool autoAssignParticleMaterials = true;
+
+    [Tooltip("Primary tint for the portal particles.")]
+    [SerializeField] [ColorUsage(true, true)] private Color particleTint = new Color(0.72f, 0.66f, 0.94f, 0.78f);
+
+    [Tooltip("Brightness multiplier for particle material color.")]
+    [SerializeField] [Range(0.2f, 3f)] private float particleBrightness = 1.1f;
 
     [Header("Comfort Profile")]
     [Tooltip("Apply a low-stimulus visual profile suitable for calm room VR use.")]
@@ -100,10 +133,15 @@ public class PortalSceneTransition : MonoBehaviour
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId = Shader.PropertyToID("_Color");
     private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
+    private static readonly int SurfaceId = Shader.PropertyToID("_Surface");
+    private static readonly int BlendId = Shader.PropertyToID("_Blend");
+    private static readonly int ZWriteId = Shader.PropertyToID("_ZWrite");
 
     private Collider triggerCollider;
     private bool isTransitioning;
     private MaterialPropertyBlock propertyBlock;
+    private Material particleRuntimeMaterial;
+    private float currentParticleSpin01;
 
     private void Reset()
     {
@@ -133,6 +171,13 @@ public class PortalSceneTransition : MonoBehaviour
 
         if (enterBurstVfx != null && enterBurstVfx.isPlaying)
             enterBurstVfx.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        if (portalRingVfx != null)
+            portalRingVfx.SetIdleState(immediate: true);
+
+        EnsureParticleMaterials();
+        currentParticleSpin01 = 0f;
+        ApplySynchronizedParticleSpin(currentParticleSpin01);
     }
 
     private void OnValidate()
@@ -144,6 +189,25 @@ public class PortalSceneTransition : MonoBehaviour
 
         if (portalForwardReference == null)
             portalForwardReference = FindPortalRoot(transform) ?? transform;
+
+        if (!Application.isPlaying)
+            EnsureParticleMaterials();
+    }
+
+    private void Update()
+    {
+        if (!synchronizeParticlesWithRing || idleLoopVfx == null)
+            return;
+
+        float dt = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+        if (dt <= 0f)
+            return;
+
+        float targetSpin01 = GetTargetParticleSpin01();
+        float lerp = 1f - Mathf.Exp(-particleSpinResponse * dt);
+        currentParticleSpin01 = Mathf.Lerp(currentParticleSpin01, targetSpin01, lerp);
+
+        ApplySynchronizedParticleSpin(currentParticleSpin01);
     }
 
     [ContextMenu("Auto Wire Portal Now")]
@@ -262,6 +326,28 @@ public class PortalSceneTransition : MonoBehaviour
 
         if (triggeringLayers.value == 0 && Camera.main != null)
             triggeringLayers = 1 << Camera.main.gameObject.layer;
+
+        if (portalRingVfx == null)
+            portalRingVfx = portalRoot.GetComponentInChildren<PortalCalmRingVfx>(includeInactive);
+
+        if (portalRingVfx == null && autoCreateMissingReferences)
+        {
+            portalRingVfx = GetComponent<PortalCalmRingVfx>();
+            if (portalRingVfx == null)
+                portalRingVfx = gameObject.AddComponent<PortalCalmRingVfx>();
+        }
+
+        if (portalRingVfx != null)
+        {
+            float estimatedRadius = EstimatePortalRadius();
+            Transform ringAnchor = vfxAnchor != null ? vfxAnchor : transform;
+            portalRingVfx.AutoConfigure(portalRoot, ringAnchor, estimatedRadius);
+            portalRingVfx.SetIdleState(immediate: true);
+        }
+
+        EnsureParticleMaterials();
+        currentParticleSpin01 = 0f;
+        ApplySynchronizedParticleSpin(currentParticleSpin01);
 
         if (applyCalmComfortProfile)
             ApplyCalmComfortProfile(portalRoot);
@@ -393,8 +479,15 @@ public class PortalSceneTransition : MonoBehaviour
 
     private void EnsureComfortTiming()
     {
-        loadDelay = Mathf.Max(loadDelay, minimumComfortLoadDelay);
+        enterSpinDuration = Mathf.Max(enterSpinDuration, minimumComfortLoadDelay);
+        loadDelay = Mathf.Max(loadDelay, minimumComfortLoadDelay, enterSpinDuration);
         enterSfxVolume = Mathf.Min(enterSfxVolume, 0.7f);
+
+        idleParticleSpinSpeed = Mathf.Clamp(idleParticleSpinSpeed, 0.05f, 0.35f);
+        enterParticleSpinSpeed = Mathf.Max(enterParticleSpinSpeed, idleParticleSpinSpeed + 0.45f);
+        idleParticleSimulationSpeed = Mathf.Clamp(idleParticleSimulationSpeed, 0.7f, 1.25f);
+        enterParticleSimulationSpeed = Mathf.Max(enterParticleSimulationSpeed, idleParticleSimulationSpeed + 0.4f);
+        particleBrightness = Mathf.Clamp(particleBrightness, 0.6f, 1.5f);
 
         if (fadeCanvas != null)
             fadeDuration = Mathf.Max(0.25f, fadeDuration);
@@ -402,6 +495,7 @@ public class PortalSceneTransition : MonoBehaviour
 
     private void ConfigureIdleLoopVfx(ParticleSystem system)
     {
+        bool wasPlaying = StopParticleForReconfigure(system);
         float radius = EstimatePortalRadius();
 
         var main = system.main;
@@ -409,6 +503,7 @@ public class PortalSceneTransition : MonoBehaviour
         main.duration = 2.4f;
         main.playOnAwake = true;
         main.simulationSpace = ParticleSystemSimulationSpace.Local;
+        main.simulationSpeed = idleParticleSimulationSpeed;
         main.maxParticles = 130;
         main.gravityModifier = 0f;
         main.startLifetime = new ParticleSystem.MinMaxCurve(1.2f, 2f);
@@ -429,7 +524,7 @@ public class PortalSceneTransition : MonoBehaviour
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
         velocity.radial = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0.01f, 0.05f, motionIntensity));
-        velocity.orbitalY = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0.03f, 0.14f, motionIntensity));
+        velocity.orbitalY = new ParticleSystem.MinMaxCurve(idleParticleSpinSpeed);
 
         var noise = system.noise;
         noise.enabled = true;
@@ -452,10 +547,14 @@ public class PortalSceneTransition : MonoBehaviour
                 new Keyframe(1f, 0.7f)));
 
         ConfigureRenderer(system);
+
+        if (wasPlaying && !(isTransitioning && stopIdleLoopOnEnter))
+            system.Play(true);
     }
 
     private void ConfigureEnterBurstVfx(ParticleSystem system)
     {
+        StopParticleForReconfigure(system);
         float radius = EstimatePortalRadius();
 
         var main = system.main;
@@ -502,6 +601,18 @@ public class PortalSceneTransition : MonoBehaviour
         ConfigureRenderer(system);
     }
 
+    private static bool StopParticleForReconfigure(ParticleSystem system)
+    {
+        if (system == null)
+            return false;
+
+        bool wasActive = system.isPlaying || system.isEmitting || system.isPaused;
+        if (wasActive)
+            system.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+
+        return wasActive;
+    }
+
     private void ConfigureRenderer(ParticleSystem system)
     {
         ParticleSystemRenderer renderer = system.GetComponent<ParticleSystemRenderer>();
@@ -511,6 +622,129 @@ public class PortalSceneTransition : MonoBehaviour
         renderer.renderMode = ParticleSystemRenderMode.Billboard;
         renderer.alignment = ParticleSystemRenderSpace.View;
         renderer.sortMode = ParticleSystemSortMode.Distance;
+    }
+
+    private float GetTargetParticleSpin01()
+    {
+        if (portalRingVfx != null)
+            return portalRingVfx.CurrentSpin01;
+
+        return isTransitioning ? 1f : 0f;
+    }
+
+    private void ApplySynchronizedParticleSpin(float normalizedSpin)
+    {
+        if (!synchronizeParticlesWithRing || idleLoopVfx == null)
+            return;
+
+        float spin01 = Mathf.Clamp01(normalizedSpin);
+
+        var main = idleLoopVfx.main;
+        main.simulationSpeed = Mathf.Lerp(idleParticleSimulationSpeed, enterParticleSimulationSpeed, spin01);
+
+        var velocity = idleLoopVfx.velocityOverLifetime;
+        velocity.enabled = true;
+        velocity.space = ParticleSystemSimulationSpace.Local;
+        velocity.orbitalY = new ParticleSystem.MinMaxCurve(Mathf.Lerp(idleParticleSpinSpeed, enterParticleSpinSpeed, spin01));
+
+        var noise = idleLoopVfx.noise;
+        noise.enabled = true;
+        noise.scrollSpeed = Mathf.Lerp(0.03f, 0.28f, spin01);
+        noise.strength = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0.01f, 0.09f, spin01));
+
+        if (!idleLoopVfx.isPlaying && !(isTransitioning && stopIdleLoopOnEnter))
+            idleLoopVfx.Play(true);
+    }
+
+    private void EnsureParticleMaterials()
+    {
+        if (!autoAssignParticleMaterials)
+            return;
+
+        if (idleLoopVfx == null && enterBurstVfx == null)
+            return;
+
+        Shader particleShader = ResolveParticleShader();
+        if (particleShader == null)
+            return;
+
+        if (particleRuntimeMaterial == null || particleRuntimeMaterial.shader != particleShader)
+        {
+            DestroyParticleRuntimeMaterial();
+            particleRuntimeMaterial = new Material(particleShader)
+            {
+                name = "PortalParticles_AutoRuntime",
+                hideFlags = HideFlags.HideAndDontSave,
+                renderQueue = 3000
+            };
+        }
+
+        Color tint = ClampComfortColor(Color.Lerp(calmTint, particleTint, 0.65f)) * particleBrightness;
+        tint.a = Mathf.Clamp01(particleTint.a);
+
+        if (particleRuntimeMaterial.HasProperty(BaseColorId))
+            particleRuntimeMaterial.SetColor(BaseColorId, tint);
+
+        if (particleRuntimeMaterial.HasProperty(ColorId))
+            particleRuntimeMaterial.SetColor(ColorId, tint);
+
+        if (particleRuntimeMaterial.HasProperty(SurfaceId))
+            particleRuntimeMaterial.SetFloat(SurfaceId, 1f);
+
+        if (particleRuntimeMaterial.HasProperty(BlendId))
+            particleRuntimeMaterial.SetFloat(BlendId, 2f);
+
+        if (particleRuntimeMaterial.HasProperty(ZWriteId))
+            particleRuntimeMaterial.SetFloat(ZWriteId, 0f);
+
+        AssignParticleMaterial(idleLoopVfx);
+        AssignParticleMaterial(enterBurstVfx);
+    }
+
+    private static Shader ResolveParticleShader()
+    {
+        string[] candidates =
+        {
+            "Universal Render Pipeline/Particles/Unlit",
+            "Particles/Standard Unlit",
+            "Universal Render Pipeline/Unlit",
+            "Unlit/Color"
+        };
+
+        foreach (string candidate in candidates)
+        {
+            Shader shader = Shader.Find(candidate);
+            if (shader != null)
+                return shader;
+        }
+
+        return null;
+    }
+
+    private void AssignParticleMaterial(ParticleSystem system)
+    {
+        if (system == null || particleRuntimeMaterial == null)
+            return;
+
+        ParticleSystemRenderer renderer = system.GetComponent<ParticleSystemRenderer>();
+        if (renderer == null)
+            renderer = system.gameObject.AddComponent<ParticleSystemRenderer>();
+
+        renderer.sharedMaterial = particleRuntimeMaterial;
+        renderer.trailMaterial = particleRuntimeMaterial;
+    }
+
+    private void DestroyParticleRuntimeMaterial()
+    {
+        if (particleRuntimeMaterial == null)
+            return;
+
+        if (Application.isPlaying)
+            Destroy(particleRuntimeMaterial);
+        else
+            DestroyImmediate(particleRuntimeMaterial);
+
+        particleRuntimeMaterial = null;
     }
 
     private Gradient BuildIdleGradient()
@@ -662,7 +896,7 @@ public class PortalSceneTransition : MonoBehaviour
         if (stopIdleLoopOnEnter && idleLoopVfx != null)
             idleLoopVfx.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 
-        if (enterBurstVfx != null)
+        if (playEnterBurstVfx && enterBurstVfx != null)
             enterBurstVfx.Play(true);
 
         if (portalAnimator != null && !string.IsNullOrEmpty(enterAnimatorTrigger))
@@ -671,11 +905,23 @@ public class PortalSceneTransition : MonoBehaviour
         if (portalAudioSource != null && enterSfx != null)
             portalAudioSource.PlayOneShot(enterSfx, enterSfxVolume);
 
-        if (fadeCanvas != null && fadeDuration > 0f)
-            yield return FadeCanvas(0f, 1f, fadeDuration);
+        if (portalRingVfx != null)
+            portalRingVfx.TriggerEnterSpin(enterSpinDuration);
 
-        if (loadDelay > 0f)
-            yield return WaitSeconds(loadDelay);
+        float transitionDelay = Mathf.Max(loadDelay, enterSpinDuration);
+
+        if (fadeCanvas != null && fadeDuration > 0f)
+        {
+            float preFadeWait = Mathf.Max(0f, transitionDelay - fadeDuration);
+            if (preFadeWait > 0f)
+                yield return WaitSeconds(preFadeWait);
+
+            yield return FadeCanvas(0f, 1f, fadeDuration);
+        }
+        else if (transitionDelay > 0f)
+        {
+            yield return WaitSeconds(transitionDelay);
+        }
 
         yield return LoadTargetScene();
     }
@@ -745,5 +991,10 @@ public class PortalSceneTransition : MonoBehaviour
 
         while (!loadOperation.isDone)
             yield return null;
+    }
+
+    private void OnDestroy()
+    {
+        DestroyParticleRuntimeMaterial();
     }
 }

@@ -80,9 +80,12 @@ public class ScribbleManager : MonoBehaviour
     }
 
     // ── State ────────────────────────────────────────────────────────────
-    // Page 0 is always the title page; pages 1+ are journal content pages.
+    // Page 0 is always the first title page.  _titlePageCount tracks how many
+    // leading pages are title pages (grows when the title overflows a page).
+    // Content pages begin at index _titlePageCount.
     private readonly List<PageData> pages = new List<PageData> { new PageData(), new PageData() };
     private int currentPageIndex;
+    private int _titlePageCount = 1;
     private PageData CurrentPage => pages[currentPageIndex];
 
     private readonly Queue<WhiteboardPen.StrokeMetadata> pendingMeta =
@@ -497,13 +500,24 @@ public class ScribbleManager : MonoBehaviour
         RefreshUI();
 
         // ── Board-full: silently create next page so Next button appears ─
-        // Guard: never auto-create from title page (index 0); the title is always short.
-        if (currentPageIndex >= 1 && IsBoardFull() && currentPageIndex == pages.Count - 1)
+        if (IsBoardFull() && currentPageIndex == pages.Count - 1)
         {
-            pages.Add(new PageData());
-            Debug.Log($"{TAG} Board full — created page {pages.Count}. " +
-                      "Press Next to continue on the new page.");
-            RefreshUI(); // re-run so Next button becomes visible
+            if (currentPageIndex < _titlePageCount)
+            {
+                // Title page overflow: insert a new title page immediately after
+                // the last title page so content pages (if any) stay in place.
+                pages.Insert(_titlePageCount, new PageData());
+                _titlePageCount++;
+                Debug.Log($"{TAG} Title full — created title page {_titlePageCount}. " +
+                          "Press Next to continue title.");
+            }
+            else
+            {
+                pages.Add(new PageData());
+                Debug.Log($"{TAG} Board full — created content page {pages.Count - _titlePageCount}. " +
+                          "Press Next to continue.");
+            }
+            RefreshUI(); // so Next button becomes visible
         }
     }
 
@@ -690,7 +704,8 @@ public class ScribbleManager : MonoBehaviour
         pages.Add(new PageData()); // page 0 = title
         pages.Add(new PageData()); // page 1 = first content page
         currentPageIndex = 0;
-        _insertCursor = -1;
+        _titlePageCount  = 1;
+        _insertCursor    = -1;
 
         pendingMeta.Clear();
 
@@ -798,6 +813,10 @@ public class ScribbleManager : MonoBehaviour
     /// JournalInlineCursor watches this to dismiss selection/cursor on page turn.</summary>
     public int CurrentPageIndex => currentPageIndex;
 
+    /// <summary>Number of leading pages that are title pages (page 0 .. TitlePageCount-1).
+    /// Content starts at index TitlePageCount.</summary>
+    public int TitlePageCount => _titlePageCount;
+
     /// <summary>
     /// Injects voice-transcribed text into the current page.
     /// Does NOT clear whiteboard ink — active strokes remain until the recognition timer fires.
@@ -814,7 +833,14 @@ public class ScribbleManager : MonoBehaviour
             new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 
         foreach (string word in parts)
+        {
+            // If the current page is full, navigate to the next one before placing
+            // the word so it appears on screen rather than being truncated.
+            if (IsBoardFull() && currentPageIndex < pages.Count - 1)
+                GoToPage(currentPageIndex + 1);
+
             PlaceWord(word);
+        }
 
         RefreshUI();
         FireTextChanged();
@@ -835,14 +861,31 @@ public class ScribbleManager : MonoBehaviour
         return sb.ToString();
     }
 
-    /// <summary>Returns the text written on the title page (page 0).</summary>
-    public string GetTitleText() => pages.Count > 0 ? pages[0].GetFullText() : string.Empty;
+    /// <summary>
+    /// Returns the text written across all title pages (pages 0 .. TitlePageCount-1),
+    /// joined with a space. Title can span multiple pages if the user wrote a long title.
+    /// </summary>
+    public string GetTitleText()
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < _titlePageCount && i < pages.Count; i++)
+        {
+            var t = pages[i].GetFullText();
+            if (string.IsNullOrWhiteSpace(t)) continue;
+            if (sb.Length > 0) sb.Append(' ');
+            sb.Append(t);
+        }
+        return sb.ToString();
+    }
 
-    /// <summary>Returns the journal content from all content pages (pages 1+), newline-separated.</summary>
+    /// <summary>
+    /// Returns the journal content from all content pages (pages TitlePageCount+),
+    /// newline-separated. Content always starts after all title pages.
+    /// </summary>
     public string GetContentText()
     {
         var sb = new System.Text.StringBuilder();
-        for (int i = 1; i < pages.Count; i++)
+        for (int i = _titlePageCount; i < pages.Count; i++)
         {
             var text = pages[i].GetFullText();
             if (string.IsNullOrWhiteSpace(text)) continue;
@@ -861,7 +904,8 @@ public class ScribbleManager : MonoBehaviour
         WhiteboardPageManager.Instance?.UpdateUI(
             CurrentPage.GetFullText(),
             currentPageIndex,
-            pages.Count);
+            pages.Count,
+            _titlePageCount);
     }
 
     private void FireTextChanged()
