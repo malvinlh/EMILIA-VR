@@ -18,6 +18,11 @@ using TMPro;
 [DefaultExecutionOrder(300)]
 public class JournalMicController : MonoBehaviour
 {
+    [Header("Panel")]
+    [Tooltip("Parent panel that contains the mic button (e.g. MicBtnPanel). " +
+             "Starts hidden; shown only while SessionState == Journaling — mirrors DonePanel behaviour.")]
+    [SerializeField] private GameObject micPanel;
+
     [Header("Footer References")]
     [SerializeField] private Button   micButton;
     [SerializeField] private TMP_Text micLabel;  // optional — TMP label on the mic button
@@ -43,6 +48,11 @@ public class JournalMicController : MonoBehaviour
     private enum MicState { Idle, Recording, Transcribing }
     private MicState  _micState = MicState.Idle;
     private Coroutine _pulseCo;
+    private float     _recordingStartTime;
+
+    // Minimum seconds that must elapse before a Stop is accepted.
+    // Guards against the poke gesture firing start+stop within the same gesture.
+    private const float MIN_RECORDING_SEC = 1.0f;
 
     private const string TAG = "[JournalMicController]";
 
@@ -54,6 +64,9 @@ public class JournalMicController : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(this); return; }
         Instance = this;
+
+        // Start hidden — same as DonePanel.
+        ShowMicPanel(false);
     }
 
     private void Start()
@@ -80,6 +93,36 @@ public class JournalMicController : MonoBehaviour
         // Accessing it early (and requesting permission if needed) warms up the
         // subsystem so it is ready before the user presses the mic button.
         StartCoroutine(WarmUpMicrophone());
+    }
+
+    private void OnEnable()
+    {
+        // Sync immediately on re-enable rather than waiting for the next Update tick.
+        var session = JournalSessionManager.Instance;
+        bool journaling = session != null &&
+                          session.CurrentState == JournalSessionManager.SessionState.Journaling;
+        ShowMicPanel(journaling);
+    }
+
+    private void Update()
+    {
+        var session = JournalSessionManager.Instance;
+        bool journaling = session != null &&
+                          session.CurrentState == JournalSessionManager.SessionState.Journaling;
+
+        ShowMicPanel(journaling);
+
+        // If a session ended mid-recording, stop cleanly.
+        if (!journaling && _micState == MicState.Recording)
+        {
+            recorder?.StopRecording();
+        }
+    }
+
+    private void ShowMicPanel(bool show)
+    {
+        if (micPanel != null && micPanel.activeSelf != show)
+            micPanel.SetActive(show);
     }
 
     private IEnumerator WarmUpMicrophone()
@@ -125,6 +168,12 @@ public class JournalMicController : MonoBehaviour
 
         if (_micState == MicState.Recording)
         {
+            float elapsed = Time.realtimeSinceStartup - _recordingStartTime;
+            if (elapsed < MIN_RECORDING_SEC)
+            {
+                Debug.Log($"{TAG} Stop ignored — only {elapsed:F2}s recorded (min {MIN_RECORDING_SEC}s). Poke double-fire guard.");
+                return;
+            }
             recorder.StopRecording();
             return;
         }
@@ -166,6 +215,8 @@ public class JournalMicController : MonoBehaviour
 
     private void OnRecorderMicStateChanged(bool isRecording)
     {
+        if (isRecording)
+            _recordingStartTime = Time.realtimeSinceStartup;
         _micState = isRecording ? MicState.Recording : MicState.Idle;
         UpdateMicVisual();
     }

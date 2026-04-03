@@ -10123,7 +10123,7 @@ GameObject:
   - component: {fileID: 999338473}
   - component: {fileID: 999338472}
   m_Layer: 0
-  m_Name: DoneButton
+  m_Name: MicBtnPanel
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -23166,6 +23166,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 13a719fbc0570cd41ba47baed864a456, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JournalMicController
+  micPanel: {fileID: 648374491}
   micButton: {fileID: 1179564458}
   micLabel: {fileID: 0}
   recorder: {fileID: 210936538}
