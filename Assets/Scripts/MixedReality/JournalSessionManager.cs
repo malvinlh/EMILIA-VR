@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using EMILIA.Data;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.Hands;
@@ -973,9 +974,18 @@ public class JournalSessionManager : MonoBehaviour
 
         if (reviewController != null)
         {
+            // Collect journal content now, while ScribbleManager data is intact.
+            // Apply the same page-0 fallback used in SaveJournalCoroutine so the
+            // sentiment API always receives something meaningful to analyse.
+            string jTitle   = ScribbleManager.Instance?.GetTitleText().Trim()   ?? string.Empty;
+            string jContent = ScribbleManager.Instance?.GetContentText().Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(jContent) && !string.IsNullOrWhiteSpace(jTitle))
+                jContent = jTitle;
+
             reviewController.BeginReview(
                 saveJournal => StartCoroutine(EndSessionCoroutine(saveJournal)),
-                originalXROriginY);
+                originalXROriginY,
+                jContent);
             return;
         }
 
@@ -1027,6 +1037,16 @@ public class JournalSessionManager : MonoBehaviour
         string title   = sm.GetTitleText().Trim();
         string content = sm.GetContentText().Trim();
 
+        // Fallback: if the user wrote only on the title page (page 0) and never
+        // navigated to a content page, GetContentText() returns "".
+        // Treat the title-page text as the journal body and auto-derive a title.
+        if (string.IsNullOrWhiteSpace(content) && !string.IsNullOrWhiteSpace(title))
+        {
+            Debug.Log("[JournalSession] No content pages written — using title-page text as journal content.");
+            content = title;
+            title   = DeriveTitleFromContent(content);
+        }
+
         if (string.IsNullOrWhiteSpace(content))
         {
             Debug.Log("[JournalSession] No content written — skipping save.");
@@ -1050,11 +1070,13 @@ public class JournalSessionManager : MonoBehaviour
         }
 
         bool done = false;
+        Journal savedJournal = null;
         yield return ServiceManager.Instance.JournalService.CreateJournal(
             userId, title, content, _sessionCreatedAtIso,
-            onSuccess: _ =>
+            onSuccess: j =>
             {
                 Debug.Log($"[JournalSession] Journal saved — title: \"{title}\"");
+                savedJournal = j;
                 done = true;
             },
             onError: err =>
@@ -1064,6 +1086,40 @@ public class JournalSessionManager : MonoBehaviour
             }
         );
 
+        yield return new WaitUntil(() => done);
+
+        // Fire-and-forget sentiment analysis.
+        // Runs in the background so the session-end flow is not stalled by AI inference.
+        if (savedJournal != null && ServiceManager.Instance?.SentimentApi != null)
+            StartCoroutine(AnalyzeAndSaveSentiment(savedJournal.Id, content));
+    }
+
+    /// <summary>
+    /// Calls the /sentiment API and persists the result (tone + AI reason) to the journal row.
+    /// Non-blocking relative to EndSessionCoroutine — started as a fire-and-forget coroutine.
+    /// </summary>
+    private IEnumerator AnalyzeAndSaveSentiment(string journalId, string content)
+    {
+        bool done = false;
+        yield return ServiceManager.Instance.SentimentApi.AnalyzeJournal(
+            content,
+            onSuccess: result =>
+            {
+                StartCoroutine(ServiceManager.Instance.JournalService.UpdateJournalSentiment(
+                    journalId,
+                    result.tone,
+                    result.reason,
+                    onSuccess: () => Debug.Log($"[JournalSession] Sentiment saved — tone: {result.tone}"),
+                    onError: err => Debug.LogError($"[JournalSession] Sentiment update failed: {err}")
+                ));
+                done = true;
+            },
+            onError: err =>
+            {
+                Debug.LogWarning($"[JournalSession] Sentiment API failed (non-fatal): {err}");
+                done = true;
+            }
+        );
         yield return new WaitUntil(() => done);
     }
 

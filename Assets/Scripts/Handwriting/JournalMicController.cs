@@ -74,6 +74,29 @@ public class JournalMicController : MonoBehaviour
         }
 
         UpdateMicVisual();
+
+        // On Android/Quest, Microphone.devices can return empty for the first few
+        // seconds after a scene loads while the OS audio stack initialises.
+        // Accessing it early (and requesting permission if needed) warms up the
+        // subsystem so it is ready before the user presses the mic button.
+        StartCoroutine(WarmUpMicrophone());
+    }
+
+    private IEnumerator WarmUpMicrophone()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        const string MIC_PERMISSION = "android.permission.RECORD_AUDIO";
+        if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(MIC_PERMISSION))
+        {
+            UnityEngine.Android.Permission.RequestUserPermission(MIC_PERMISSION);
+            // Give the permission dialog time to resolve before polling devices.
+            yield return new UnityEngine.WaitForSeconds(1f);
+        }
+#endif
+        // Touch Microphone.devices to trigger subsystem init (harmless if already ready).
+        int deviceCount = Microphone.devices.Length;
+        Debug.Log($"{TAG} WarmUpMicrophone — devices found on start: {deviceCount}");
+        yield break;
     }
 
     private void OnDestroy()
@@ -101,9 +124,40 @@ public class JournalMicController : MonoBehaviour
         if (_micState == MicState.Transcribing) return; // busy
 
         if (_micState == MicState.Recording)
+        {
             recorder.StopRecording();
-        else
-            recorder.StartRecording();
+            return;
+        }
+
+        // On Android the audio stack may still be initialising at the time of the
+        // first button press. Retry for up to 5 s instead of failing immediately.
+        if (Microphone.devices.Length == 0)
+        {
+            StartCoroutine(RetryStartRecording());
+            return;
+        }
+
+        recorder.StartRecording();
+    }
+
+    private IEnumerator RetryStartRecording()
+    {
+        Debug.Log($"{TAG} Microphone not ready — waiting for devices...");
+        float elapsed = 0f;
+        while (Microphone.devices.Length == 0 && elapsed < 5f)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (Microphone.devices.Length == 0)
+        {
+            Debug.LogError($"{TAG} Microphone still unavailable after 5 s retry — aborting.");
+            yield break;
+        }
+
+        Debug.Log($"{TAG} Microphone became available after {elapsed:F1} s — starting recording.");
+        recorder.StartRecording();
     }
 
     // ==================================================================

@@ -106,10 +106,15 @@ public class JournalReviewController : MonoBehaviour
     /// <summary>True while the player should carry the sealed bottle to the wine rack.</summary>
     public bool IsWaitingForRack => _state == ReviewState.WaitingForRack;
 
-    private ReviewState _state      = ReviewState.Inactive;
-    private bool        _keepChosen;
+    private ReviewState  _state      = ReviewState.Inactive;
+    private bool         _keepChosen;
     private Action<bool> _onComplete;   // true = save the journal
     private float        _preJournalXROriginY;
+
+    // ── Sentiment (for dialogue) ───────────────────────────────────────────
+    private string _journalContent = string.Empty; // set by BeginReview, used by FetchSentimentForDialogue
+    private string _aiDialogueText = null;          // null = not ready or API failed (use fallback)
+    private bool   _sentimentReady = false;
 
     private VRDialoguePanel _dialoguePanel;
     private VRDialogueFader _dialogueFader;
@@ -182,16 +187,21 @@ public class JournalReviewController : MonoBehaviour
     /// <paramref name="onComplete"/> receives true if the journal should be saved.
     /// <paramref name="preJournalXROriginY"/> is the XR Origin Y before TeleportToSeatPoint —
     /// used to restore the player to their natural standing height during the review.
+    /// <paramref name="journalContent"/> is the written journal text — sent to the /sentiment
+    /// API so the AI's <c>reason</c> replaces the hardcoded dialogue comment.
     /// </summary>
-    public void BeginReview(Action<bool> onComplete, float preJournalXROriginY)
+    public void BeginReview(Action<bool> onComplete, float preJournalXROriginY, string journalContent = "")
     {
         if (_state != ReviewState.Inactive)
         {
             Debug.LogWarning("[JournalReview] BeginReview called while already in progress.");
             return;
         }
-        _onComplete           = onComplete;
-        _preJournalXROriginY  = preJournalXROriginY;
+        _onComplete          = onComplete;
+        _preJournalXROriginY = preJournalXROriginY;
+        _journalContent      = journalContent ?? string.Empty;
+        _aiDialogueText      = null;
+        _sentimentReady      = false;
         LogStateSnapshot("BeginReview.Start");
         StartCoroutine(ReviewCoroutine());
     }
@@ -204,6 +214,14 @@ public class JournalReviewController : MonoBehaviour
     {
         _state = ReviewState.ShowingComment;
         Debug.Log("[JournalReview] ReviewCoroutine started. Hiding WhiteboardUI.");
+
+        // 0. Kick off sentiment analysis immediately — the ~1 s of screen fades below
+        //    acts as a natural buffer so the AI response is (usually) ready before the
+        //    dialogue panel needs to open. Falls back gracefully if the API fails.
+        if (!string.IsNullOrWhiteSpace(_journalContent) && ServiceManager.Instance?.SentimentApi != null)
+            StartCoroutine(FetchSentimentForDialogue());
+        else
+            _sentimentReady = true; // no content or no service — skip wait
 
         // Hide the whiteboard UI immediately — it must not be visible during review or post-journal.
         if (whiteboardUIGroup != null) whiteboardUIGroup.SetActive(false);
@@ -230,17 +248,23 @@ public class JournalReviewController : MonoBehaviour
         //    enableFarCasting is left false and the controller trigger can't hit UI.
         RestoreControllerRay();
 
-        // 6. Show AI comment via dialogue panel.
-        const string aiComment =
-            "You've taken a meaningful step today by putting your thoughts into words. " +
-            "Reflecting on what you've written can help you better understand your feelings " +
-            "and find clarity in moments of uncertainty.\n\n" +
-            "Your words matter — and so do you. I'm proud of you for showing up.\n\n" +
-            "— EMILIA";
+        // 6. Wait for the sentiment API — should already be done during the fades above.
+        //    No timeout: the AI comment must be shown to the user (not a hardcoded fallback),
+        //    so we wait unconditionally until the response arrives or the request errors out.
+        yield return new WaitUntil(() => _sentimentReady);
 
-        ShowDialogue(aiComment);
+        // 7. Show AI comment — real reason from /sentiment, or hardcoded fallback.
+        string dialogueText = !string.IsNullOrWhiteSpace(_aiDialogueText)
+            ? _aiDialogueText
+            : "You've taken a meaningful step today by putting your thoughts into words. " +
+              "Reflecting on what you've written can help you better understand your feelings " +
+              "and find clarity in moments of uncertainty.\n\n" +
+              "Your words matter — and so do you. I'm proud of you for showing up.\n\n" +
+              "— EMILIA";
 
-        // 7. Wait for the typewriter to finish the last page.
+        ShowDialogue(dialogueText);
+
+        // 8. Wait for the typewriter to finish the last page.
         bool commentDone = false;
         if (_dialoguePanel != null)
         {
@@ -259,9 +283,34 @@ public class JournalReviewController : MonoBehaviour
         yield return new WaitUntil(() => commentDone);
         yield return new WaitForSeconds(0.6f);
 
-        // 8. Present the keep-or-release choice.
+        // 9. Present the keep-or-release choice.
         _state = ReviewState.ShowingChoice;
         ShowChoicePanel();
+    }
+
+    /// <summary>
+    /// Calls /sentiment with the journal content and stores the AI's <c>reason</c> in
+    /// <see cref="_aiDialogueText"/>. Sets <see cref="_sentimentReady"/> when done (success
+    /// or failure) so <see cref="ReviewCoroutine"/> can proceed.
+    /// </summary>
+    private IEnumerator FetchSentimentForDialogue()
+    {
+        Debug.Log("[JournalReview] Fetching AI sentiment for dialogue...");
+        yield return ServiceManager.Instance.SentimentApi.AnalyzeJournal(
+            _journalContent,
+            onSuccess: result =>
+            {
+                _aiDialogueText = result.reason;
+                _sentimentReady = true;
+                Debug.Log($"[JournalReview] Sentiment received — tone: {result.tone}");
+            },
+            onError: err =>
+            {
+                Debug.LogWarning($"[JournalReview] Sentiment API error — fallback dialogue will be used. Error: {err}");
+                _aiDialogueText = null;
+                _sentimentReady = true;
+            }
+        );
     }
 
     // ── Avatar ───────────────────────────────────────────────────────────

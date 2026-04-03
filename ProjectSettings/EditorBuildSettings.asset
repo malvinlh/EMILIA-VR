@@ -21,26 +21,29 @@ EditorBuildSettings:
     path: Assets/Scenes/3D_Journal.unity
     guid: e298f398d4f56ff4193f51d148338bf3
   - enabled: 0
-    path: Assets/Scenes/3D_Journal_mr.unity
+    path: Assets/Scenes/dump/3D_Journal_mr.unity
     guid: 2804918a51186a041b4ae253b88a3d54
   - enabled: 0
-    path: Assets/Scenes/3D_Journal_horizontal.unity
+    path: Assets/Scenes/dump/3D_Journal_horizontal.unity
     guid: 2101b3ca193d8f04cb4c9b101aab43f5
   - enabled: 0
-    path: Assets/Scenes/3D_Journal_scribble.unity
+    path: Assets/Scenes/dump/3D_Journal_scribble.unity
     guid: 27465ef4337b7524d89c7840a7c948ad
   - enabled: 0
-    path: Assets/Scenes/3D_Journal_full.unity
+    path: Assets/Scenes/dump/3D_Journal_full.unity
     guid: dc25b0399afea5d44b91b6e910e6892a
   - enabled: 0
-    path: Assets/Scenes/3D_Journal_full_extended.unity
+    path: Assets/Scenes/dump/3D_Journal_full_extended.unity
     guid: 8c0d49f8e66c1fc4e867741e3c078e2c
   - enabled: 1
     path: Assets/Scenes/3D_Chat_playground.unity
     guid: 594615e139b2ae84295b8cb7ea1fce00
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/3D_Journal_CURRENT_IMPROVE.unity
     guid: e3df2cd3fd0ec2943868737db8f14c45
+  - enabled: 1
+    path: Assets/Scenes/3D_Journal_CURRENT_JOURNAL_LIST.unity
+    guid: 5c132f70d6e126444b8e6f9ec310da3a
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 12ce517d4990ce841994808bf5c4f998, type: 2}

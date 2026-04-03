@@ -11206,7 +11206,7 @@ MonoBehaviour:
   autoWireInEditor: 1
   autoCreateMissingReferences: 1
   autoCreateComfortFadeCanvas: 1
-  targetScene: Assets/Scenes/3D_Journal_CURRENT_IMPROVE.unity
+  targetScene: Assets/Scenes/3D_Journal_CURRENT_JOURNAL_LIST.unity
   loadDelay: 1.2
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
@@ -13069,11 +13069,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 810019319561094050, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_UseGravity
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 4
+      value: 4.25
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode
