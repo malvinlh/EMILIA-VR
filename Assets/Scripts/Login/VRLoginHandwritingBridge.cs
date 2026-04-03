@@ -2,6 +2,7 @@ using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using UnityEngine.XR.Hands;
 
 /// <summary>
@@ -26,6 +27,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     [Header("Selection")]
     [SerializeField] private LoginField defaultField = LoginField.Nickname;
     [SerializeField] private Color selectedFieldColor = new Color(0.87f, 0.96f, 1f, 1f);
+    [SerializeField] private bool usePinchSelectionRay = true;
     [SerializeField] [Range(0.05f, 1.0f)] private float pinchProximitySelectionDistance = 0.35f;
     [SerializeField] [Range(-30f, 30f)] private float selectionPitchOffsetDegrees = 0f;
 
@@ -115,8 +117,45 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
     private void Update()
     {
-        UpdateRightHandSelection();
+        if (usePinchSelectionRay)
+            UpdateRightHandSelection();
+        else
+            UpdateSelectionFromFocusedInput();
+
         UpdateHintLabel();
+    }
+
+    private void UpdateSelectionFromFocusedInput()
+    {
+        EventSystem currentEventSystem = EventSystem.current;
+        if (currentEventSystem == null)
+            return;
+
+        GameObject selectedObject = currentEventSystem.currentSelectedGameObject;
+        if (selectedObject == null)
+            return;
+
+        TMP_InputField selectedInput = selectedObject.GetComponent<TMP_InputField>();
+        if (selectedInput == null)
+            selectedInput = selectedObject.GetComponentInParent<TMP_InputField>();
+
+        if (selectedInput == null)
+            return;
+
+        LoginField nextField;
+        if (selectedInput == nicknameInput)
+            nextField = LoginField.Nickname;
+        else if (selectedInput == fullNameInput)
+            nextField = LoginField.FullName;
+        else
+            return;
+
+        if (nextField == activeField)
+            return;
+
+        activeField = nextField;
+        UpdateFieldSelectionVisuals();
+        ResetRecognitionContextForNewField();
     }
 
     private void ResolveInputReferences()
@@ -224,13 +263,18 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             return;
 
         string activeLabel = activeField == LoginField.Nickname ? "Nickname" : "Full Name";
-        string trackingLine = isRightHandTracked
-            ? "Right hand detected. Pinch to choose a field."
-            : "Put controllers down, then raise your right hand.";
+        string selectionInstruction = usePinchSelectionRay
+            ? "1) Pinch with RIGHT hand to choose input field"
+            : "1) Aim either hand ray and pinch to click input field";
+        string trackingLine = usePinchSelectionRay
+            ? (isRightHandTracked
+                ? "Right hand detected. Pinch to choose a field."
+                : "Put controllers down, then raise your right hand.")
+            : "Cursor ray is always visible. Pinch works as click/select.";
 
         hintText.text =
             "Handwriting Login\n" +
-            "1) Pinch with RIGHT hand to choose input field\n" +
+            selectionInstruction + "\n" +
             "2) Write on whiteboard with your index finger\n" +
             "3) Press Continue when both fields are ready\n" +
             $"Active field: {activeLabel}\n" +

@@ -10677,44 +10677,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4f17a1b36fcb274449d030ef08f66941, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!21 &687553549
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!64 &724524168
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -10856,6 +10818,44 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -3207903925705005131, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
+--- !u!21 &816081156
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -13046,7 +13046,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.01
+      value: 1.32
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalPosition.z
@@ -13088,6 +13088,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: AZKi
       objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: 54a83325115ce584ea067268c4a12301, type: 2}
     - target: {fileID: 8947969726423503919, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -13099,7 +13103,13 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1530796890}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1441545086}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2147540001}
   m_SourcePrefab: {fileID: 100100000, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
 --- !u!4 &1377243293 stripped
 Transform:
@@ -13128,6 +13138,36 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -6481035732721346306, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
+--- !u!1 &1441545084 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
+  m_PrefabInstance: {fileID: 1377243292}
+  m_PrefabAsset: {fileID: 0}
+--- !u!143 &1441545086
+CharacterController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1441545084}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Height: 1.36144
+  m_Radius: 0.1
+  m_SlopeLimit: 45
+  m_StepOffset: 0.15
+  m_SkinWidth: 0.08
+  m_MinMoveDistance: 0.001
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!64 &1479777725
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -15173,7 +15213,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 687553549}
+  - {fileID: 816081156}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -16363,6 +16403,22 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 3817143315767626932, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
+--- !u!114 &2147540001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1441545084}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 935602776615b344fbb928c0a709535d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  gravity: -18
+  groundedStickVelocity: -2
+  terminalVelocity: -35
+  stepOffsetSafetyMargin: 0.01
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
