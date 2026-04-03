@@ -27,6 +27,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     [SerializeField] private LoginField defaultField = LoginField.Nickname;
     [SerializeField] private Color selectedFieldColor = new Color(0.87f, 0.96f, 1f, 1f);
     [SerializeField] [Range(0.05f, 1.0f)] private float pinchProximitySelectionDistance = 0.35f;
+    [SerializeField] [Range(-30f, 30f)] private float selectionPitchOffsetDegrees = 0f;
 
     [Header("Right Hand Pinch")]
     [SerializeField] [Range(0.005f, 0.05f)] private float pinchCloseThreshold = 0.020f;
@@ -278,48 +279,44 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
         if (isPinching && !wasPinching)
         {
-            if (TryBuildSelectionRay(rightHand, tipPose, tipWorld, thumbWorld, out Ray selectionRay))
+            if (TryBuildSelectionRay(rightHand, tipWorld, thumbWorld, out Ray selectionRay))
                 TrySelectField(selectionRay);
         }
 
         wasPinching = isPinching;
     }
 
-    private bool TryBuildSelectionRay(XRHand rightHand, Pose tipPose, Vector3 tipWorld, Vector3 thumbWorld, out Ray selectionRay)
+    private bool TryBuildSelectionRay(XRHand rightHand, Vector3 tipWorld, Vector3 thumbWorld, out Ray selectionRay)
     {
-        Vector3 rayOrigin = Vector3.Lerp(tipWorld, thumbWorld, 0.5f);
-        Vector3 rayDirection = Vector3.zero;
+        // Use wrist/palm joint rotation for controller-like ray aiming.
+        // Tilting the wrist steers the ray fluidly, exactly like a controller.
+        bool gotWristPose = rightHand.GetJoint(XRHandJointID.Wrist).TryGetPose(out Pose wristPose);
+        bool gotPalmPose  = rightHand.GetJoint(XRHandJointID.Palm).TryGetPose(out Pose palmPose);
 
-        if (TryGetJointWorld(rightHand, XRHandJointID.IndexDistal, out Vector3 distalWorld))
-        {
-            rayDirection = tipWorld - distalWorld;
-        }
-        else if (TryGetJointWorld(rightHand, XRHandJointID.IndexIntermediate, out Vector3 intermediateWorld))
-        {
-            rayDirection = tipWorld - intermediateWorld;
-        }
-        else if (TryGetJointWorld(rightHand, XRHandJointID.IndexProximal, out Vector3 proximalWorld))
-        {
-            rayDirection = tipWorld - proximalWorld;
-        }
+        Vector3 rayOrigin;
+        Vector3 rayDirection;
 
-        if (TryGetJointWorld(rightHand, XRHandJointID.Palm, out Vector3 palmWorld))
+        if (gotWristPose)
         {
-            Vector3 palmToTip = tipWorld - palmWorld;
-            if (palmToTip.sqrMagnitude > 0.0001f)
+            rayOrigin    = JointToWorld(wristPose.position);
+            rayDirection = JointRotToWorld(wristPose.rotation) * Vector3.forward;
+
+            if (gotPalmPose)
             {
-                Vector3 palmDirection = palmToTip.normalized;
-                rayDirection = rayDirection.sqrMagnitude > 0.0001f
-                    ? Vector3.Slerp(palmDirection, rayDirection.normalized, 0.7f)
-                    : palmDirection;
+                Vector3 palmForward = JointRotToWorld(palmPose.rotation) * Vector3.forward;
+                rayDirection = Vector3.Slerp(rayDirection, palmForward, 0.5f);
             }
         }
-
-        if (rayDirection.sqrMagnitude < 0.0001f)
-            rayDirection = JointDirectionToWorld(tipPose.forward);
-
-        if (rayDirection.sqrMagnitude < 0.0001f && headTransform != null)
-            rayDirection = headTransform.forward;
+        else if (gotPalmPose)
+        {
+            rayOrigin    = JointToWorld(palmPose.position);
+            rayDirection = JointRotToWorld(palmPose.rotation) * Vector3.forward;
+        }
+        else
+        {
+            rayOrigin    = tipWorld;
+            rayDirection = headTransform != null ? headTransform.forward : Vector3.forward;
+        }
 
         if (rayDirection.sqrMagnitude < 0.0001f)
         {
@@ -327,8 +324,28 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             return false;
         }
 
-        selectionRay = new Ray(rayOrigin, rayDirection.normalized);
+        rayDirection.Normalize();
+
+        if (Mathf.Abs(selectionPitchOffsetDegrees) > 0.001f)
+        {
+            Vector3 up = headTransform != null ? headTransform.up : Vector3.up;
+            Vector3 right = Vector3.Cross(up, rayDirection).normalized;
+            if (right.sqrMagnitude < 0.0001f)
+                right = Vector3.right;
+
+            rayDirection = Quaternion.AngleAxis(selectionPitchOffsetDegrees, right) * rayDirection;
+            rayDirection.Normalize();
+        }
+
+        selectionRay = new Ray(rayOrigin, rayDirection);
         return true;
+    }
+
+    private Quaternion JointRotToWorld(Quaternion sessionSpaceRot)
+    {
+        return cameraOffsetTransform != null
+            ? cameraOffsetTransform.rotation * sessionSpaceRot
+            : sessionSpaceRot;
     }
 
     private bool TryGetJointWorld(XRHand hand, XRHandJointID jointId, out Vector3 worldPosition)
@@ -357,8 +374,11 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             nextField = LoginField.FullName;
         else
         {
-            if (!TryResolveFieldByProximity(ray.origin, out nextField))
-                return;
+            if (!TryResolveFieldByRayProximity(ray, out nextField))
+            {
+                if (!TryResolveFieldByProximity(ray.origin, out nextField))
+                    return;
+            }
         }
 
         bool changed = nextField != activeField;
@@ -371,6 +391,66 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
         if (changed)
             ResetRecognitionContextForNewField();
+    }
+
+    private bool TryResolveFieldByRayProximity(Ray ray, out LoginField resolvedField)
+    {
+        resolvedField = activeField;
+
+        bool hasNicknameCenter = TryGetInputCenterWorld(nicknameInput, out Vector3 nicknameCenter);
+        bool hasFullNameCenter = TryGetInputCenterWorld(fullNameInput, out Vector3 fullNameCenter);
+
+        float nicknameLateralDistance = float.MaxValue;
+        float fullNameLateralDistance = float.MaxValue;
+
+        bool canUseNickname = hasNicknameCenter &&
+            TryComputeRayLateralDistance(ray, nicknameInput, nicknameCenter, out nicknameLateralDistance);
+        bool canUseFullName = hasFullNameCenter &&
+            TryComputeRayLateralDistance(ray, fullNameInput, fullNameCenter, out fullNameLateralDistance);
+
+        if (!canUseNickname && !canUseFullName)
+            return false;
+
+        if (canUseNickname && canUseFullName)
+        {
+            resolvedField = nicknameLateralDistance <= fullNameLateralDistance
+                ? LoginField.Nickname
+                : LoginField.FullName;
+            return true;
+        }
+
+        resolvedField = canUseNickname ? LoginField.Nickname : LoginField.FullName;
+        return true;
+    }
+
+    private bool TryComputeRayLateralDistance(Ray ray, TMP_InputField input, Vector3 centerWorld, out float lateralDistance)
+    {
+        lateralDistance = float.MaxValue;
+
+        var rect = input != null ? input.transform as RectTransform : null;
+        if (rect == null)
+            return false;
+
+        float forwardDistance = Vector3.Dot(centerWorld - ray.origin, ray.direction);
+        if (forwardDistance < 0f || forwardDistance > pinchRayMaxDistance)
+            return false;
+
+        Vector3 closestPoint = ray.origin + ray.direction * forwardDistance;
+        lateralDistance = Vector3.Distance(centerWorld, closestPoint);
+
+        float worldRadius = EstimateRectWorldRadius(rect);
+        float maxAllowedDistance = worldRadius + pinchProximitySelectionDistance;
+        return lateralDistance <= maxAllowedDistance;
+    }
+
+    private static float EstimateRectWorldRadius(RectTransform rect)
+    {
+        Vector3[] corners = new Vector3[4];
+        rect.GetWorldCorners(corners);
+
+        float width = Vector3.Distance(corners[0], corners[3]);
+        float height = Vector3.Distance(corners[0], corners[1]);
+        return 0.5f * Mathf.Sqrt(width * width + height * height);
     }
 
     private bool TryResolveFieldByProximity(Vector3 rayOrigin, out LoginField resolvedField)
@@ -559,15 +639,6 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         return cameraOffsetTransform != null
             ? cameraOffsetTransform.TransformPoint(sessionSpace)
             : sessionSpace;
-    }
-
-    private Vector3 JointDirectionToWorld(Vector3 sessionSpaceDirection)
-    {
-        Vector3 worldDirection = cameraOffsetTransform != null
-            ? cameraOffsetTransform.TransformDirection(sessionSpaceDirection)
-            : sessionSpaceDirection;
-
-        return worldDirection.normalized;
     }
 
     private void NormalizeWhiteboardPensForLogin()

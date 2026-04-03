@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using UnityEngine;
 using SQLite;
@@ -88,12 +89,23 @@ namespace EMILIA.Data
         /// </summary>
         private void InitializeDatabase()
         {
-            var path = GetDatabasePath();
-            Debug.Log($"[DatabaseManager] Opening SQLite DB at: {path}");
+            try
+            {
+                var path = GetDatabasePath();
+                Debug.Log($"[DatabaseManager] DB path resolved: {path}");
+                Debug.Log($"[DatabaseManager] Directory exists: {Directory.Exists(Path.GetDirectoryName(path))}");
 
-            _db = CreateConnection(path);
-            EnableForeignKeys(_db);
-            CreateTables();
+                _db = CreateConnection(path);
+                Debug.Log("[DatabaseManager] SQLite connection created.");
+
+                EnableForeignKeys(_db);
+                CreateTables();
+                Debug.Log("[DatabaseManager] Tables ensured. DB ready.");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[DatabaseManager] INIT FAILED: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
+            }
         }
 
         #endregion
@@ -106,10 +118,16 @@ namespace EMILIA.Data
         /// </summary>
         private static string GetDatabasePath()
         {
-            string folderPath = @"D:\Emilia\AI";
+#if UNITY_ANDROID && !UNITY_EDITOR
+            string folderPath = "/sdcard/Android/data/" + Application.identifier + "/files";
+#else
+            string folderPath = Application.persistentDataPath;
+#endif
+            Debug.Log($"[DatabaseManager] Using folder: {folderPath}");
 
             if (!Directory.Exists(folderPath))
             {
+                Debug.Log($"[DatabaseManager] Folder not found, creating: {folderPath}");
                 Directory.CreateDirectory(folderPath);
             }
 
