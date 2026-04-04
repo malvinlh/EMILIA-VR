@@ -27,6 +27,8 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     [Header("Login Fields")]
     [SerializeField] private TMP_InputField fullNameInput;
     [SerializeField] private TMP_InputField nicknameInput;
+    [SerializeField] private Button backspaceButton;
+    [SerializeField] [Range(0f, 1f)] private float backspaceActivationCooldownSeconds = 0.25f;
 
     [Header("Selection")]
     [SerializeField] private LoginField defaultField = LoginField.Nickname;
@@ -133,6 +135,12 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     private Vector3 _prevCameraOffsetPos;
     private bool _hasPrevCameraOffsetPos;
 
+    private const float BackspacePokeHoverDist = 0.04f;  // 4 cm outer zone
+    private const float BackspacePokeFireDist  = 0.012f; // 12 mm fire zone
+    private readonly bool[] _backspacePokeInZone   = new bool[2]; // [0]=left [1]=right
+    private readonly bool[] _backspacePokeWasClose = new bool[2];
+    private float _nextBackspaceActivationTime;
+
     private const string Tag = "[VRLoginHandwriting]";
     private const int LeftHandPointerId = -10;
     private const int RightHandPointerId = -11;
@@ -237,6 +245,9 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         NormalizeWhiteboardPensForLogin();
         SubscribeRecognition();
 
+        if (backspaceButton)
+            backspaceButton.onClick.AddListener(OnBackspaceClicked);
+
         if (IsQuestStylePointerEnabled)
         {
             EnsureEventSystemExists();
@@ -277,11 +288,12 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (!IsQuestStylePointerEnabled)
-            return;
-
         // Update rays in LateUpdate so visuals follow latest tracked poses in the frame.
-        UpdateQuestStyleHandRays();
+        if (IsQuestStylePointerEnabled)
+            UpdateQuestStyleHandRays();
+
+        if (backspaceButton)
+            UpdateBackspacePoke();
     }
 
     private void UpdateSelectionFromFocusedInput()
@@ -798,6 +810,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
                 button = button
             });
         }
+
     }
 
     private void UpdateQuestStyleHandRays()
@@ -1486,6 +1499,59 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         return true;
     }
 
+    private void UpdateBackspacePoke()
+    {
+        if (handSubsystem == null || !handSubsystem.running)
+            handSubsystem = WhiteboardPen.GetHandSubsystem();
+        if (handSubsystem == null)
+            return;
+
+        PollHandBackspacePoke(handSubsystem.leftHand,  0);
+        PollHandBackspacePoke(handSubsystem.rightHand, 1);
+    }
+
+    private void PollHandBackspacePoke(XRHand hand, int idx)
+    {
+        if (!hand.isTracked || !hand.GetJoint(XRHandJointID.IndexTip).TryGetPose(out Pose tip))
+        {
+            _backspacePokeInZone[idx] = _backspacePokeWasClose[idx] = false;
+            return;
+        }
+        CheckBackspacePoke(JointToWorld(tip.position), idx);
+    }
+
+    private void CheckBackspacePoke(Vector3 fingertipWorld, int idx)
+    {
+        var rt    = (RectTransform)backspaceButton.transform;
+        var plane = new Plane(-rt.forward, rt.position);
+        float adist   = Mathf.Abs(plane.GetDistanceToPoint(fingertipWorld));
+        Vector3 local = rt.InverseTransformPoint(plane.ClosestPointOnPlane(fingertipWorld));
+        Rect r        = rt.rect;
+        bool inBounds  = local.x >= r.xMin && local.x <= r.xMax
+                      && local.y >= r.yMin && local.y <= r.yMax;
+
+        bool inZone  = inBounds && adist <= BackspacePokeHoverDist;
+        bool isClose = inBounds && adist <= BackspacePokeFireDist;
+
+        if (!inZone)
+        {
+            _backspacePokeInZone[idx] = _backspacePokeWasClose[idx] = false;
+            return;
+        }
+
+        _backspacePokeInZone[idx] = true;
+
+        if (isClose && !_backspacePokeWasClose[idx] && backspaceButton.interactable && CanActivateBackspace())
+            backspaceButton.onClick.Invoke();
+
+        _backspacePokeWasClose[idx] = isClose;
+    }
+
+    private bool CanActivateBackspace()
+    {
+        return Time.unscaledTime >= _nextBackspaceActivationTime;
+    }
+
     private void UpdateRightHandSelection()
     {
         if (handSubsystem == null || !handSubsystem.running)
@@ -1815,6 +1881,27 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         recognitionPipeline.OnFinalTextRecognized -= OnFinalTextRecognized;
     }
 
+    private void OnBackspaceClicked()
+    {
+        if (!CanActivateBackspace())
+            return;
+
+        _nextBackspaceActivationTime = Time.unscaledTime + Mathf.Max(0f, backspaceActivationCooldownSeconds);
+
+        TMP_InputField target = GetActiveInputField();
+        if (target == null)
+            return;
+
+        string current = target.text;
+        if (string.IsNullOrEmpty(current))
+            return;
+
+        string trimmed = current.TrimEnd();
+        int lastSpace = trimmed.LastIndexOf(' ');
+        target.text = lastSpace >= 0 ? trimmed[..lastSpace] : string.Empty;
+        target.ForceLabelUpdate();
+    }
+
     private void OnFinalTextRecognized(string recognizedText)
     {
         string cleaned = SanitizeRecognizedText(recognizedText);
@@ -1914,6 +2001,8 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             {
                 retainedRightPen = pen;
                 retainedRightPen.allowWithoutJournalSession = true;
+                if (backspaceButton && backspaceButton.transform.parent is RectTransform footerRect)
+                    retainedRightPen.loginHandwritingExclusionArea = footerRect;
                 pen.enabled = true;
                 continue;
             }

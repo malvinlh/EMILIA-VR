@@ -92,7 +92,6 @@ def summary_chat(chat: List[Dict[str, str]]) -> str:
 
 def transcribe_audio(audio_path):
     result = WHISPER_MODEL.transcribe(audio_path, language=STT_LANGUAGE)
-    # clear_cache(model)
     return result['text']
 
 def chat_response(prompt: str, query: str):
@@ -195,7 +194,6 @@ def journal_sentiment_response(journal_text: str) -> dict:
 
         raw = raw.strip()
 
-        # CASE 1️⃣: JSON langsung
         if raw.startswith("{"):
             try:
                 data = json.loads(raw)
@@ -204,7 +202,6 @@ def journal_sentiment_response(journal_text: str) -> dict:
         else:
             data = None
 
-        # CASE 2️⃣: {"response": "<json string>"}
         if isinstance(data, dict) and "response" in data:
             inner = data["response"]
 
@@ -213,11 +210,9 @@ def journal_sentiment_response(journal_text: str) -> dict:
 
             return json.loads(inner)
 
-        # CASE 3️⃣: JSON langsung valid
         if isinstance(data, dict):
             return data
 
-        # CASE 4️⃣: Ambil blok JSON dari teks (fallback terakhir)
         import re
         match = re.search(r"\{[\s\S]*\}", raw)
         if match:
@@ -329,25 +324,12 @@ async def agentic(
     user_id: str = Form(None),
     username: str = Form(None),
     question: str = Form(None),
-    # audio: UploadFile = File(None)
 ):
     if user_id is None or question is None:
         raise HTTPException(status_code=400, detail="Both 'user_id' and 'question' must be provided.")
     
     if username is None:
         username = "Pengguna"
-        
-    # if audio:
-    #     if audio.content_type not in ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp3", "audio/x-mp3", "audio/m4a"]:
-    #         raise HTTPException(status_code=400, detail="Invalid audio format. Only MP3 and WAV are supported.")
-    #     folder_voice = "./voice_temp"
-    #     if not os.path.exists(folder_voice):
-    #         os.makedirs(folder_voice)
-    #     audio_path = f"{folder_voice}/{uuid4()}.{audio.filename.split('.')[-1]}"
-    #     with open(audio_path, "wb") as f:
-    #         shutil.copyfileobj(audio.file, f)
-    #     question = transcribe_audio(audio_path)
-    #     os.remove(audio_path)
 
     try:
         response = agentic_response(query=question, user_id=user_id, username=username)

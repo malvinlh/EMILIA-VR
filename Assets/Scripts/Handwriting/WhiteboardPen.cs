@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Hands;
+using System;
 
 /// <summary>
 /// Draws on a whiteboard using XR Hand Tracking (index finger tip).
@@ -14,6 +15,9 @@ public class WhiteboardPen : MonoBehaviour
 
     [Tooltip("Allows this pen to run when no JournalSessionManager exists (for non-journal scenes such as login).")]
     public bool allowWithoutJournalSession;
+
+    /// <summary>Login scene: hits inside this rect are treated as outside the handwriting area (blocks drawing over buttons).</summary>
+    [NonSerialized] public RectTransform loginHandwritingExclusionArea;
     
     [Tooltip("Which hand drives this pen.")]
     public Handedness handedness = Handedness.Right;
@@ -1091,6 +1095,15 @@ public class WhiteboardPen : MonoBehaviour
     /// </summary>
     private bool IsInsideHandwritingArea(Vector3 worldPoint)
     {
+        if (loginHandwritingExclusionArea != null)
+        {
+            Vector3 localEx = loginHandwritingExclusionArea.InverseTransformPoint(worldPoint);
+            Rect rEx = loginHandwritingExclusionArea.rect;
+            if (localEx.x >= rEx.xMin && localEx.x <= rEx.xMax
+             && localEx.y >= rEx.yMin && localEx.y <= rEx.yMax)
+                return false;
+        }
+
         var pm = WhiteboardPageManager.Instance;
         if (pm == null || pm.handwritingArea == null) return true;
 
