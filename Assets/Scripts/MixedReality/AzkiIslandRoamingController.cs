@@ -7,7 +7,7 @@ using UnityEngine.AI;
 ///
 /// - Captures the authored scene pose once and can lock back to it for review moments.
 /// - Builds/uses a NavMeshSurface at runtime and drives random patrol movement.
-/// - Enforces only Idle, IdleB, and Walk animator states for patrol behavior.
+/// - Enforces patrol animation control (Idle, IdleB, Walk) plus review overrides (Talk, Cheering).
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(NavMeshAgent))]
@@ -50,6 +50,15 @@ public class AzkiIslandRoamingController : MonoBehaviour
     [Min(0f)]
     [SerializeField] private float maxIdleDuration = 4.2f;
 
+    [Header("IdleB Frequency")]
+    [Tooltip("Chance to play IdleB when an idle window starts and cooldown is satisfied.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float idleBChancePerIdleWindow = 0.3f;
+
+    [Tooltip("Minimum number of idle windows between IdleB plays.")]
+    [Min(0)]
+    [SerializeField] private int minIdleWindowsBetweenIdleB = 2;
+
     [Header("Animation")]
     [Tooltip("Animator state path for patrol idle.")]
     [SerializeField] private string idleStateName = "Base Layer.Idle";
@@ -59,6 +68,12 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
     [Tooltip("Animator state path for patrol walk.")]
     [SerializeField] private string walkStateName = "Base Layer.Walk";
+
+    [Tooltip("Animator state path for review talking animation.")]
+    [SerializeField] private string talkStateName = "Base Layer.Talk";
+
+    [Tooltip("Animator state path for ending cheering animation.")]
+    [SerializeField] private string cheeringStateName = "Base Layer.Cheering";
 
     [Tooltip("Cross-fade duration used when changing patrol animation state.")]
     [Range(0f, 0.5f)]
@@ -76,7 +91,16 @@ public class AzkiIslandRoamingController : MonoBehaviour
     {
         Idle,
         IdleB,
-        Walk
+        Walk,
+        Talk,
+        Cheering
+    }
+
+    private enum AnimationOverrideMode
+    {
+        None,
+        TalkLoop,
+        CheeringOnce
     }
 
     private NavMeshAgent _agent;
@@ -92,16 +116,24 @@ public class AzkiIslandRoamingController : MonoBehaviour
     private bool _isLocked;
     private bool _isIdling;
     private float _idleUntilTime;
+    private int _idleWindowsSinceIdleB = int.MaxValue;
 
     private PatrolAnimation _currentPatrolAnimation = PatrolAnimation.Idle;
     private float _nextAnimSwitchTime;
 
+    private AnimationOverrideMode _overrideMode = AnimationOverrideMode.None;
+    private bool _cheeringFinished;
+
     private int _idleHash;
     private int _idleBHash;
     private int _walkHash;
+    private int _talkHash;
+    private int _cheeringHash;
     private int _idleShortHash;
     private int _idleBShortHash;
     private int _walkShortHash;
+    private int _talkShortHash;
+    private int _cheeringShortHash;
 
     private void Awake()
     {
@@ -126,7 +158,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
     {
         if (_isLocked)
         {
-            EnforceAnimation(PatrolAnimation.Idle, force: false);
+            HandleLockedMode();
             return;
         }
 
@@ -183,6 +215,8 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
         _isLocked = true;
         _isIdling = false;
+        _overrideMode = AnimationOverrideMode.None;
+        _cheeringFinished = false;
 
         if (_gravityController != null)
             _gravityController.enabled = false;
@@ -212,6 +246,27 @@ public class AzkiIslandRoamingController : MonoBehaviour
     }
 
     /// <summary>
+    /// Plays the Talk animation in a forced loop while AZKi remains locked at authored pose.
+    /// </summary>
+    public void PlayTalkLoop()
+    {
+        LockAtAuthoredPose();
+        _overrideMode = AnimationOverrideMode.TalkLoop;
+        EnforceAnimation(PatrolAnimation.Talk, force: true);
+    }
+
+    /// <summary>
+    /// Plays the Cheering animation once while AZKi remains locked at authored pose.
+    /// </summary>
+    public void PlayCheeringOneShot()
+    {
+        LockAtAuthoredPose();
+        _overrideMode = AnimationOverrideMode.CheeringOnce;
+        _cheeringFinished = false;
+        EnforceAnimation(PatrolAnimation.Cheering, force: true);
+    }
+
+    /// <summary>
     /// Enables roaming behavior. If needed, builds a runtime NavMesh first.
     /// </summary>
     public void ResumeRoaming()
@@ -219,6 +274,8 @@ public class AzkiIslandRoamingController : MonoBehaviour
         InitializeIfNeeded();
 
         _isLocked = false;
+        _overrideMode = AnimationOverrideMode.None;
+        _cheeringFinished = false;
 
         if (_gravityController != null)
             _gravityController.enabled = false;
@@ -269,7 +326,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
         if (!_authoredPoseCaptured)
             CaptureAuthoredPose();
 
-        if (_idleHash == 0 || _idleBHash == 0 || _walkHash == 0)
+        if (_idleHash == 0 || _idleBHash == 0 || _walkHash == 0 || _talkHash == 0 || _cheeringHash == 0)
             CacheAnimatorStateHashes();
     }
 
@@ -278,10 +335,14 @@ public class AzkiIslandRoamingController : MonoBehaviour
         _idleHash = Animator.StringToHash(idleStateName);
         _idleBHash = Animator.StringToHash(idleBStateName);
         _walkHash = Animator.StringToHash(walkStateName);
+        _talkHash = Animator.StringToHash(talkStateName);
+        _cheeringHash = Animator.StringToHash(cheeringStateName);
 
         _idleShortHash = HashShortStateName(idleStateName);
         _idleBShortHash = HashShortStateName(idleBStateName);
         _walkShortHash = HashShortStateName(walkStateName);
+        _talkShortHash = HashShortStateName(talkStateName);
+        _cheeringShortHash = HashShortStateName(cheeringStateName);
     }
 
     private void BuildRuntimeNavMesh()
@@ -376,8 +437,62 @@ public class AzkiIslandRoamingController : MonoBehaviour
             _agent.ResetPath();
 
         _idleUntilTime = Time.time + Random.Range(minIdleDuration, maxIdleDuration);
-        PatrolAnimation idleVariant = Random.value < 0.5f ? PatrolAnimation.Idle : PatrolAnimation.IdleB;
+
+        // IdleB should appear occasionally, not after every walk.
+        bool canUseIdleB = _animator != null && _animator.HasState(0, _idleHash) && _animator.HasState(0, _idleBHash);
+        bool cooldownSatisfied = _idleWindowsSinceIdleB >= minIdleWindowsBetweenIdleB;
+        bool playIdleB = canUseIdleB && cooldownSatisfied && Random.value <= idleBChancePerIdleWindow;
+
+        if (playIdleB)
+            _idleWindowsSinceIdleB = 0;
+        else if (_idleWindowsSinceIdleB < int.MaxValue)
+            _idleWindowsSinceIdleB++;
+
+        PatrolAnimation idleVariant = playIdleB ? PatrolAnimation.IdleB : PatrolAnimation.Idle;
+
         EnforceAnimation(idleVariant, force: true);
+    }
+
+    private void HandleLockedMode()
+    {
+        switch (_overrideMode)
+        {
+            case AnimationOverrideMode.TalkLoop:
+                EnforceAnimation(PatrolAnimation.Talk, force: false);
+
+                if (_animator == null || _animator.IsInTransition(0))
+                    return;
+
+                var talkInfo = _animator.GetCurrentAnimatorStateInfo(0);
+                if (StateMatches(talkInfo, _talkHash, _talkShortHash) && talkInfo.normalizedTime >= 1f)
+                    _animator.Play(_talkHash, 0, 0f);
+                return;
+
+            case AnimationOverrideMode.CheeringOnce:
+                if (!_cheeringFinished)
+                {
+                    EnforceAnimation(PatrolAnimation.Cheering, force: false);
+
+                    if (_animator == null || _animator.IsInTransition(0))
+                        return;
+
+                    var cheerInfo = _animator.GetCurrentAnimatorStateInfo(0);
+                    if (StateMatches(cheerInfo, _cheeringHash, _cheeringShortHash) && cheerInfo.normalizedTime >= 1f)
+                    {
+                        _cheeringFinished = true;
+                        EnforceAnimation(PatrolAnimation.Idle, force: true);
+                    }
+                }
+                else
+                {
+                    EnforceAnimation(PatrolAnimation.Idle, force: false);
+                }
+                return;
+
+            default:
+                EnforceAnimation(PatrolAnimation.Idle, force: false);
+                return;
+        }
     }
 
     private void EnforceAnimation(PatrolAnimation target, bool force)
@@ -392,14 +507,18 @@ public class AzkiIslandRoamingController : MonoBehaviour
         {
             PatrolAnimation.Idle => _idleHash,
             PatrolAnimation.IdleB => _idleBHash,
-            _ => _walkHash
+            PatrolAnimation.Walk => _walkHash,
+            PatrolAnimation.Talk => _talkHash,
+            _ => _cheeringHash
         };
 
         int targetShortHash = target switch
         {
             PatrolAnimation.Idle => _idleShortHash,
             PatrolAnimation.IdleB => _idleBShortHash,
-            _ => _walkShortHash
+            PatrolAnimation.Walk => _walkShortHash,
+            PatrolAnimation.Talk => _talkShortHash,
+            _ => _cheeringShortHash
         };
 
         if (!_animator.HasState(0, targetHash))
@@ -440,6 +559,14 @@ public class AzkiIslandRoamingController : MonoBehaviour
     {
         if (_animator == null)
             return true;
+
+        // If we're currently blending into IdleB, it has not completed yet.
+        if (_animator.IsInTransition(0))
+        {
+            var next = _animator.GetNextAnimatorStateInfo(0);
+            if (StateMatches(next, _idleBHash, _idleBShortHash))
+                return false;
+        }
 
         var current = _animator.GetCurrentAnimatorStateInfo(0);
         bool currentIsIdleB = StateMatches(current, _idleBHash, _idleBShortHash);

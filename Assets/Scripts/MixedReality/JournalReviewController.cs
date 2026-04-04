@@ -274,6 +274,8 @@ public class JournalReviewController : MonoBehaviour
               "Your words matter — and so do you. I'm proud of you for showing up.\n\n" +
               "— EMILIA";
 
+            // During the AI comment panel, AZKi should talk in a loop.
+            avatarRoamingController?.PlayTalkLoop();
         ShowDialogue(dialogueText);
 
         // 8. Wait for the typewriter to finish the last page.
@@ -294,6 +296,9 @@ public class JournalReviewController : MonoBehaviour
 
         yield return new WaitUntil(() => commentDone);
         yield return new WaitForSeconds(0.6f);
+
+        // After the AI comment finishes, stop talking and return to standby idle pose.
+        avatarRoamingController?.LockAtAuthoredPose();
 
         // 9. Present the keep-or-release choice.
         _state = ReviewState.ShowingChoice;
@@ -751,6 +756,9 @@ public class JournalReviewController : MonoBehaviour
         _state = ReviewState.Complete;
         Debug.Log($"[JournalReview] BottleDisposedCoroutine — state locked to Complete. saveJournal={saveJournal}. dialoguePanel={(_dialoguePanel != null ? "OK" : "NULL")}");
         HideChoicePanel();
+
+        // During ending dialogue, AZKi plays a one-shot cheering animation.
+        avatarRoamingController?.PlayCheeringOneShot();
 
         // Avatar says something short and calming.
         ShowDialogue(message);
