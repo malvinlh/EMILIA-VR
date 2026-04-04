@@ -30,7 +30,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     [Header("Selection")]
     [SerializeField] private LoginField defaultField = LoginField.Nickname;
     [SerializeField] private Color selectedFieldColor = new Color(0.87f, 0.96f, 1f, 1f);
-    [SerializeField] private bool usePinchSelectionRay = true;
+    [SerializeField] private bool usePinchSelectionRay = false;
     [SerializeField] [Range(0.05f, 1.0f)] private float pinchProximitySelectionDistance = 0.35f;
     [SerializeField] [Range(-30f, 30f)] private float selectionPitchOffsetDegrees = 0f;
 
@@ -40,13 +40,14 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     [SerializeField] private float pinchRayMaxDistance = 5.5f;
 
     [Header("Quest-Style Hand Ray Cursor")]
-    [SerializeField] private bool useQuestStyleHandRayCursor = true;
+    [SerializeField] private bool useQuestStyleHandRayCursor = false;
     [SerializeField] [Range(0.75f, 12f)] private float questRayMaxDistance = 6f;
     [SerializeField] [Range(0.04f, 0.45f)] private float questClickHoldSeconds = 0.14f;
     [SerializeField] [Range(0.002f, 0.02f)] private float questRayStartWidth = 0.004f;
     [SerializeField] [Range(0.001f, 0.02f)] private float questRayEndWidth = 0.0025f;
     [SerializeField] [Range(0.005f, 0.06f)] private float questCursorWorldSize = 0.018f;
     [SerializeField] [Range(0f, 0.02f)] private float questCursorSurfaceOffset = 0.0015f;
+    [SerializeField] [Range(0f, 0.5f)] private float handRayLineStartOffset = 0.15f;
     [SerializeField] private bool showQuestRayWhenNoHit = true;
     [SerializeField] private LayerMask questPhysicsMask = -1;
     [SerializeField] private Color questRayColor = new Color(1f, 1f, 1f, 0.9f);
@@ -66,12 +67,12 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     [SerializeField] private bool disableBuiltInXriControllerRayWhenCustomRayIsActive = true;
 
     [Header("Ray Stabilization")]
-    [SerializeField] [Range(0f, 40f)] private float questFreeAimSmoothing = 18f;
-    [SerializeField] [Range(0f, 40f)] private float questPinchSmoothing = 28f;
-    [SerializeField] [Range(0f, 1f)] private float questPinchDirectionLock = 0.82f;
-    [SerializeField] [Range(0f, 1f)] private float questFreeAimIndexWeight = 0.0f;
-    [SerializeField] [Range(0f, 1f)] private float questPinchIndexWeight = 0.08f;
-    [SerializeField] private bool freezeHandRayWhilePinching = true;
+    // System aim pose (XR_EXT_hand_interaction) is already pre-filtered by Meta's runtime,
+    // so only light additional smoothing is needed — lower value = more lag, higher = more responsive.
+    [SerializeField] [Range(0f, 80f)] private float questSystemPoseSmoothing = 40f;
+    // Joint-derived fallback (when system pose is unavailable) needs heavier smoothing.
+    [SerializeField] [Range(0f, 80f)] private float questFreeAimSmoothing = 18f;
+    [SerializeField] private bool preferOpenXRSystemHandPointerPose = true;
     [SerializeField] [Range(0f, 1f)] private float handRayTipMidpointWeight = 0.0f;
     [SerializeField] [Range(0f, 0.12f)] private float handRayDetachDistance = 0.028f;
     [SerializeField] [Range(0f, 1f)] private float handRayPalmOriginBlend = 0.82f;
@@ -121,10 +122,15 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     private readonly List<RectRayTarget> questUiTargets = new();
     private readonly List<InputDevice> leftControllerDevices = new();
     private readonly List<InputDevice> rightControllerDevices = new();
+    private readonly List<InputDevice> leftHandTrackingDevices = new();
+    private readonly List<InputDevice> rightHandTrackingDevices = new();
 
     private static Material questLineMaterial;
     private static Sprite questDiscSprite;
     private static Sprite questRingSprite;
+
+    private Vector3 _prevCameraOffsetPos;
+    private bool _hasPrevCameraOffsetPos;
 
     private const string Tag = "[VRLoginHandwriting]";
     private const int LeftHandPointerId = -10;
@@ -134,7 +140,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     private static readonly InputFeatureUsage<Vector3> PointerPositionUsage = new InputFeatureUsage<Vector3>("PointerPosition");
     private static readonly InputFeatureUsage<Quaternion> PointerRotationUsage = new InputFeatureUsage<Quaternion>("PointerRotation");
 
-    private bool IsQuestStylePointerEnabled => useQuestStyleHandRayCursor || useQuestStyleControllerRayCursor;
+    private bool IsQuestStylePointerEnabled => useQuestStyleControllerRayCursor;
 
     private sealed class RectRayTarget
     {
@@ -206,6 +212,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
     private void Awake()
     {
+        EnforceControllerOnlyInteractionMode();
         ResolveInputReferences();
         CacheFieldImages();
         EnsureHintLabel();
@@ -258,8 +265,6 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         {
             UpdateSelectionFromFocusedInput();
         }
-        else if (usePinchSelectionRay)
-            UpdateRightHandSelection();
         else
             UpdateSelectionFromFocusedInput();
 
@@ -403,9 +408,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
         string activeLabel = activeField == LoginField.Nickname ? "Nickname" : "Full Name";
         string selectionInstruction = IsQuestStylePointerEnabled
-            ? (controllerActive
-                ? "1) Aim controller ray and hold trigger until cursor fills"
-                : "1) Aim hand ray and pinch-hold until cursor fills")
+            ? "1) Aim controller ray and hold trigger until cursor fills"
             : usePinchSelectionRay
             ? "1) Pinch with RIGHT hand to choose input field"
             : "1) Aim either hand ray and pinch to click input field";
@@ -432,11 +435,13 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             return "Both controllers detected. Hold trigger to click.";
         if (isLeftControllerTracked || isRightControllerTracked)
             return "Controller detected. Hold trigger to click.";
-        if (isLeftHandTracked && isRightHandTracked)
-            return "Both hands detected. Pinch-hold to click.";
-        if (isLeftHandTracked || isRightHandTracked)
-            return "One hand detected. Pinch-hold to click.";
-        return "Raise either hand or use controller to start cursor tracking.";
+        return "Controller ray ready. Hands are handwriting-only in this mode.";
+    }
+
+    private void EnforceControllerOnlyInteractionMode()
+    {
+        useQuestStyleHandRayCursor = false;
+        usePinchSelectionRay = false;
     }
 
     private void EnsureEventSystemExists()
@@ -538,8 +543,10 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
     private void EnsureQuestRayVisuals()
     {
-        leftQuestRay ??= CreateQuestRayState("Left");
-        rightQuestRay ??= CreateQuestRayState("Right");
+        DestroyQuestRayState(leftQuestRay);
+        DestroyQuestRayState(rightQuestRay);
+        leftQuestRay = null;
+        rightQuestRay = null;
 
         if (useQuestStyleControllerRayCursor)
         {
@@ -780,6 +787,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
     private void UpdateQuestStyleHandRays()
     {
+        CompensateSmoothedStatesForRigMovement();
         EnsureQuestRayVisuals();
         DisableBuiltInXriControllerRayIfNeeded();
 
@@ -802,56 +810,14 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             HideQuestHandRay(rightControllerQuestRay);
         }
 
-        if (!useQuestStyleHandRayCursor)
-        {
-            isLeftHandTracked = false;
-            isRightHandTracked = false;
-            ResetQuestPinchState(leftQuestRay);
-            ResetQuestPinchState(rightQuestRay);
-            HideQuestHandRay(leftQuestRay);
-            HideQuestHandRay(rightQuestRay);
-            return;
-        }
-
-        if (handSubsystem == null || !handSubsystem.running)
-            handSubsystem = WhiteboardPen.GetHandSubsystem();
-
-        if (handSubsystem == null || !handSubsystem.running)
-        {
-            isLeftHandTracked = false;
-            isRightHandTracked = false;
-            ResetQuestPinchState(leftQuestRay);
-            ResetQuestPinchState(rightQuestRay);
-            if (leftQuestRay != null)
-                leftQuestRay.hasSmoothedPose = false;
-            if (rightQuestRay != null)
-                rightQuestRay.hasSmoothedPose = false;
-            HideQuestHandRay(leftQuestRay);
-            HideQuestHandRay(rightQuestRay);
-            return;
-        }
-
-        if (!isLeftControllerTracked)
-        {
-            UpdateQuestHand(handSubsystem.leftHand, leftQuestRay, LeftHandPointerId, ref isLeftHandTracked);
-        }
-        else
-        {
-            isLeftHandTracked = false;
-            ResetQuestPinchState(leftQuestRay);
-            HideQuestHandRay(leftQuestRay);
-        }
-
-        if (!isRightControllerTracked)
-        {
-            UpdateQuestHand(handSubsystem.rightHand, rightQuestRay, RightHandPointerId, ref isRightHandTracked);
-        }
-        else
-        {
-            isRightHandTracked = false;
-            ResetQuestPinchState(rightQuestRay);
-            HideQuestHandRay(rightQuestRay);
-        }
+        // Hand rays are disabled in controller-only mode.
+        isLeftHandTracked = false;
+        isRightHandTracked = false;
+        wasPinching = false;
+        ResetQuestPinchState(leftQuestRay);
+        ResetQuestPinchState(rightQuestRay);
+        HideQuestHandRay(leftQuestRay);
+        HideQuestHandRay(rightQuestRay);
     }
 
     private void UpdateQuestController(bool isLeftController, HandRayCursorState state, int pointerId, ref bool tracked)
@@ -951,6 +917,54 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         return device.isValid;
     }
 
+    private bool TryGetHandTrackingDevice(bool isLeftHand, out InputDevice device)
+    {
+        var characteristics = InputDeviceCharacteristics.HandTracking |
+                              InputDeviceCharacteristics.TrackedDevice |
+                              (isLeftHand ? InputDeviceCharacteristics.Left : InputDeviceCharacteristics.Right);
+
+        List<InputDevice> devices = isLeftHand ? leftHandTrackingDevices : rightHandTrackingDevices;
+        devices.Clear();
+        InputDevices.GetDevicesWithCharacteristics(characteristics, devices);
+
+        if (devices.Count == 0)
+        {
+            device = default;
+            return false;
+        }
+
+        device = devices[0];
+        return device.isValid;
+    }
+
+    private bool TryGetSystemHandPointerRay(bool isLeftHand, out Ray ray)
+    {
+        ray = default;
+        if (!preferOpenXRSystemHandPointerPose)
+            return false;
+
+        if (!TryGetHandTrackingDevice(isLeftHand, out InputDevice handDevice))
+            return false;
+
+        if (handDevice.TryGetFeatureValue(CommonUsages.isTracked, out bool tracked) && !tracked)
+            return false;
+
+        bool gotPointerPosition = handDevice.TryGetFeatureValue(PointerPositionUsage, out Vector3 pointerPosition);
+        bool gotPointerRotation = handDevice.TryGetFeatureValue(PointerRotationUsage, out Quaternion pointerRotation);
+        if (!gotPointerPosition || !gotPointerRotation)
+            return false;
+
+        Vector3 worldOrigin = JointToWorld(pointerPosition);
+        Vector3 worldDirection = JointRotToWorld(pointerRotation) * Vector3.forward;
+        if (worldDirection.sqrMagnitude < 0.0001f)
+            return false;
+
+        worldDirection.Normalize();
+        worldOrigin += worldDirection * handRayDetachDistance;
+        ray = new Ray(worldOrigin, worldDirection);
+        return true;
+    }
+
     private bool EvaluateControllerPress(InputDevice device, bool wasPressedPreviously)
     {
         float analogValue = 0f;
@@ -999,8 +1013,13 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         }
 
         bool isPinching = EvaluatePinch(hand, state.wasPinching);
+        bool isLeftHand = pointerId == LeftHandPointerId;
 
-        if (!TryBuildQuestRay(hand, out Ray rawRay))
+        // Prefer the OpenXR hand-interaction aim pose (XR_EXT_hand_interaction).
+        // Meta's runtime pre-filters this pose, so only light additional smoothing is needed.
+        // Fall back to joint-derived pose when the system pose is unavailable.
+        bool gotSystemPose = TryGetSystemHandPointerRay(isLeftHand, out Ray rawRay);
+        if (!gotSystemPose && !TryBuildHandRayFromJoints(hand, out rawRay))
         {
             tracked = false;
             ResetQuestPinchState(state);
@@ -1011,17 +1030,17 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
         tracked = true;
 
-        // Pinch only controls click state; ray pose remains independent from pinch.
-        float smoothing = questFreeAimSmoothing;
+        float smoothing = gotSystemPose ? questSystemPoseSmoothing : questFreeAimSmoothing;
         Ray questRay = StabilizeQuestRay(state, rawRay, smoothing);
-        state.pinchDirectionLocked = false;
 
         QuestRayHit hit = ResolveQuestRayHit(questRay, questRayMaxDistance);
         Vector3 endpoint = hit.hasHit
             ? hit.point
             : questRay.origin + questRay.direction * questRayMaxDistance;
 
-        UpdateQuestLineRenderer(state, questRay.origin, endpoint, hit.hasHit);
+        // Start the line ahead of the aim origin to visually separate it from the hand (Quest 3 style).
+        Vector3 lineStart = questRay.origin + questRay.direction * handRayLineStartOffset;
+        UpdateQuestLineRenderer(state, lineStart, endpoint, hit.hasHit);
         UpdateQuestReticle(state, hit, questRay);
 
         state.clickHoldDuration = questClickHoldSeconds;
@@ -1068,6 +1087,33 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         }
 
         state.wasPinching = true;
+    }
+
+    private void CompensateSmoothedStatesForRigMovement()
+    {
+        if (cameraOffsetTransform == null)
+            return;
+
+        Vector3 currentPos = cameraOffsetTransform.position;
+        if (_hasPrevCameraOffsetPos)
+        {
+            Vector3 delta = currentPos - _prevCameraOffsetPos;
+            if (delta.sqrMagnitude > 1e-8f)
+            {
+                ShiftSmoothedOrigin(leftQuestRay, delta);
+                ShiftSmoothedOrigin(rightQuestRay, delta);
+                ShiftSmoothedOrigin(leftControllerQuestRay, delta);
+                ShiftSmoothedOrigin(rightControllerQuestRay, delta);
+            }
+        }
+        _prevCameraOffsetPos = currentPos;
+        _hasPrevCameraOffsetPos = true;
+    }
+
+    private static void ShiftSmoothedOrigin(HandRayCursorState state, Vector3 delta)
+    {
+        if (state != null && state.hasSmoothedPose)
+            state.smoothedOrigin += delta;
     }
 
     private Ray StabilizeQuestRay(HandRayCursorState state, Ray rawRay, float smoothing)
@@ -1125,32 +1171,6 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         return new Ray(state.smoothedOrigin, state.smoothedDirection);
     }
 
-    private Ray ApplyPinchDirectionLock(HandRayCursorState state, Ray ray)
-    {
-        if (!state.pinchDirectionLocked)
-        {
-            state.pinchDirectionLocked = true;
-            state.pinchLockedDirection = ray.direction;
-            return ray;
-        }
-
-        Vector3 lockedDirection = Vector3.Slerp(ray.direction, state.pinchLockedDirection, questPinchDirectionLock).normalized;
-        state.pinchLockedDirection = Vector3.Slerp(state.pinchLockedDirection, ray.direction, 0.08f).normalized;
-        return new Ray(ray.origin, lockedDirection);
-    }
-
-    private Ray ApplyPinchRayFreeze(HandRayCursorState state, Ray ray, Vector3 liveOrigin)
-    {
-        if (!state.pinchDirectionLocked)
-        {
-            state.pinchDirectionLocked = true;
-            state.pinchLockedDirection = ray.direction;
-        }
-
-        // Quest-like behavior: keep aim direction stable during pinch while the ray origin stays on the moving hand.
-        return new Ray(liveOrigin, state.pinchLockedDirection);
-    }
-
     private void HideQuestHandRay(HandRayCursorState state)
     {
         if (state == null)
@@ -1197,8 +1217,9 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             ? questRayColor
             : new Color(questRayColor.r, questRayColor.g, questRayColor.b, questRayColor.a * 0.35f);
 
+        Color endColor = new Color(lineColor.r, lineColor.g, lineColor.b, lineColor.a * 0.15f);
         state.line.startColor = lineColor;
-        state.line.endColor = lineColor;
+        state.line.endColor = endColor;
         state.line.SetPosition(0, start);
         state.line.SetPosition(1, end);
     }
@@ -1230,7 +1251,8 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             state.reticleFill.color = questCursorFillColor;
     }
 
-    private bool TryBuildQuestRay(XRHand hand, out Ray questRay)
+    // Fallback joint-derived ray used when the OpenXR system aim pose is unavailable.
+    private bool TryBuildHandRayFromJoints(XRHand hand, out Ray questRay)
     {
         bool gotPalmPose = hand.GetJoint(XRHandJointID.Palm).TryGetPose(out Pose palmPose);
         bool gotWristPose = hand.GetJoint(XRHandJointID.Wrist).TryGetPose(out Pose wristPose);
@@ -1241,8 +1263,6 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
         Vector3 origin;
         Vector3 direction = Vector3.zero;
-
-        bool hasStablePalmWristPose = gotPalmPose || gotWristPose;
 
         if (gotPalmPose && gotWristPose)
         {
@@ -1301,13 +1321,6 @@ public class VRLoginHandwritingBridge : MonoBehaviour
                 if (indexDirection.sqrMagnitude > 0.0001f)
                     direction = indexDirection;
             }
-        }
-
-        if (!hasStablePalmWristPose && gotIndexTip && gotIndexKnuckle && questFreeAimIndexWeight > 0.001f)
-        {
-            Vector3 indexDirection = (indexTipWorld - indexKnuckleWorld).normalized;
-            if (indexDirection.sqrMagnitude > 0.0001f)
-                direction += indexDirection * questFreeAimIndexWeight;
         }
 
         if (direction.sqrMagnitude < 0.0001f)
