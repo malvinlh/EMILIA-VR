@@ -100,6 +100,30 @@ public class JournalSessionManager : MonoBehaviour
              "If null, falls back to JournalChairTable, then MainIsland.")]
     public Transform heightAdjustmentRoot;
 
+    [Header("MainIsland Boundary (Editor Tool)")]
+    [Tooltip("Extra padding for the optional outer box wall generator (metres).")]
+    [Range(0f, 5f)]
+    public float boundaryPadding = 0.35f;
+
+    [Tooltip("Generated wall height (metres).")]
+    [Range(0.5f, 6f)]
+    public float boundaryWallHeight = 2.2f;
+
+    [Tooltip("Generated wall thickness (metres).")]
+    [Range(0.02f, 1f)]
+    public float boundaryWallThickness = 0.2f;
+
+    [Tooltip("Inset from MainIsland renderer bounds for the coastline ring (metres).")]
+    [Range(0f, 5f)]
+    public float boundaryCoastInset = 0.75f;
+
+    [Tooltip("Number of wall segments used to approximate the coastline ring.")]
+    [Range(8, 64)]
+    public int boundaryRingSegments = 28;
+
+    [Tooltip("Also generate an outer rectangular guard wall around MainIsland bounds.")]
+    public bool boundaryCreateOuterBox = true;
+
     [Header("Comfort - Height Alignment")]
     [Tooltip("If enabled, adjusts XR Origin Y so the returned VR eye height matches the real eye-above-table relationship captured in passthrough.")]
     public bool calibrateUserEyeHeight = true;
