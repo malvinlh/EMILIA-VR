@@ -192,8 +192,8 @@ MonoBehaviour:
     y: 0
     width: 674
     height: 577
-  m_MinSize: {x: 200, y: 200}
-  m_MaxSize: {x: 4000, y: 4000}
+  m_MinSize: {x: 201, y: 226}
+  m_MaxSize: {x: 4001, y: 4026}
   m_ActualView: {fileID: 14}
   m_Panes:
   - {fileID: 14}
@@ -275,8 +275,8 @@ MonoBehaviour:
     y: 0
     width: 445
     height: 933
-  m_MinSize: {x: 275, y: 50}
-  m_MaxSize: {x: 4000, y: 4000}
+  m_MinSize: {x: 276, y: 76}
+  m_MaxSize: {x: 4001, y: 4026}
   m_ActualView: {fileID: 13}
   m_Panes:
   - {fileID: 13}
@@ -305,7 +305,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 43
+    y: 0
     width: 1920
     height: 36
   m_SerializedDataModeController:
@@ -570,8 +570,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Inspector\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 1475
-    y: 79
+    x: 1476
+    y: 24
     width: 444
     height: 907
   m_SerializedDataModeController:
@@ -622,7 +622,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 79
+    y: 24
     width: 673
     height: 551
   m_SerializedDataModeController:
@@ -641,10 +641,9 @@ MonoBehaviour:
   m_SceneHierarchy:
     m_TreeViewState:
       scrollPos: {x: 0, y: 0}
-      m_SelectedIDs:
-      - m_Data: 2855824
+      m_SelectedIDs: []
       m_LastClickedID:
-        m_Data: 2855824
+        m_Data: 0
       m_ExpandedIDs:
       - m_Data: -1947518
       - m_Data: -1947060
@@ -1005,8 +1004,8 @@ MonoBehaviour:
       - m_Data: 2855824
       m_RenameOverlay:
         m_UserAcceptedRename: 0
-        m_Name: PortalCalmRing_Auto
-        m_OriginalName: PortalCalmRing_Auto
+        m_Name: 
+        m_OriginalName: 
         m_EditFieldRect:
           serializedVersion: 2
           x: 0
@@ -1014,10 +1013,10 @@ MonoBehaviour:
           width: 0
           height: 0
         m_UserData:
-          m_Data: 1883002
+          m_Data: 0
         m_IsWaitingForDelay: 0
         m_IsRenaming: 0
-        m_OriginalEventType: 0
+        m_OriginalEventType: 11
         m_IsRenamingFilename: 0
         m_TrimLeadingAndTrailingWhitespace: 0
         m_ClientGUIView: {fileID: 8}
@@ -1049,8 +1048,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Scene\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 674
-    y: 79
+    x: 675
+    y: 24
     width: 799
     height: 551
   m_SerializedDataModeController:
@@ -1715,11 +1714,11 @@ MonoBehaviour:
   m_Rotation:
     m_Target: {x: 0.098574124, y: -0.6106522, z: 0.07697874, w: 0.7819625}
     speed: 2
-    m_Value: {x: 0.09834255, y: -0.61299413, z: 0.077273965, w: 0.7801255}
+    m_Value: {x: -0.09857413, y: 0.6106522, z: -0.07697874, w: -0.7819625}
   m_Size:
     m_Target: 0.029673008
     speed: 2
-    m_Value: 0.028395222
+    m_Value: 0.029673008
   m_Ortho:
     m_Target: 0
     speed: 2
@@ -1952,7 +1951,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 656
+    y: 601
     width: 1474
     height: 330
   m_SerializedDataModeController:
@@ -2003,20 +2002,18 @@ MonoBehaviour:
       m_Data: 67426
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 67026
-    - m_Data: 67404
-    - m_Data: 67412
-    - m_Data: 67416
-    - m_Data: 67426
-    - m_Data: 67428
-    - m_Data: 67432
-    - m_Data: 115446
-    - m_Data: 115460
-    - m_Data: 1117694
-    - m_Data: 1117696
-    - m_Data: 1117698
-    - m_Data: 2077430
-    - m_Data: 1000000000
+    - m_Data: 69930
+    - m_Data: 69932
+    - m_Data: 69934
+    - m_Data: 69936
+    - m_Data: 69938
+    - m_Data: 69940
+    - m_Data: 69942
+    - m_Data: 69944
+    - m_Data: 69946
+    - m_Data: 69948
+    - m_Data: 69950
+    - m_Data: 69952
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2049,8 +2046,18 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 67026
-    - m_Data: 1000000000
+    - m_Data: 69930
+    - m_Data: 69932
+    - m_Data: 69934
+    - m_Data: 69936
+    - m_Data: 69938
+    - m_Data: 69940
+    - m_Data: 69942
+    - m_Data: 69944
+    - m_Data: 69946
+    - m_Data: 69948
+    - m_Data: 69950
+    - m_Data: 69952
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2090,8 +2097,8 @@ MonoBehaviour:
     - m_Data: 87246
     m_RenameOverlay:
       m_UserAcceptedRename: 0
-      m_Name: Journal
-      m_OriginalName: Journal
+      m_Name: 
+      m_OriginalName: 
       m_EditFieldRect:
         serializedVersion: 2
         x: 0
@@ -2099,10 +2106,10 @@ MonoBehaviour:
         width: 0
         height: 0
       m_UserData:
-        m_Data: 115522
+        m_Data: 0
       m_IsWaitingForDelay: 0
       m_IsRenaming: 0
-      m_OriginalEventType: 0
+      m_OriginalEventType: 11
       m_IsRenamingFilename: 1
       m_TrimLeadingAndTrailingWhitespace: 0
       m_ClientGUIView: {fileID: 10}
@@ -2190,21 +2197,18 @@ MonoBehaviour:
       m_Data: 2096322
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 67026
-    - m_Data: 67404
-    - m_Data: 67412
-    - m_Data: 67416
-    - m_Data: 67426
-    - m_Data: 67436
-    - m_Data: 115446
-    - m_Data: 115460
-    - m_Data: 465502
-    - m_Data: 1117696
-    - m_Data: 1117698
-    - m_Data: 1117702
-    - m_Data: 1241028
-    - m_Data: 2096324
-    - m_Data: 1000000000
+    - m_Data: 69930
+    - m_Data: 69932
+    - m_Data: 69934
+    - m_Data: 69936
+    - m_Data: 69938
+    - m_Data: 69940
+    - m_Data: 69942
+    - m_Data: 69944
+    - m_Data: 69946
+    - m_Data: 69948
+    - m_Data: 69950
+    - m_Data: 69952
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2237,8 +2241,18 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 67026
-    - m_Data: 1000000000
+    - m_Data: 69930
+    - m_Data: 69932
+    - m_Data: 69934
+    - m_Data: 69936
+    - m_Data: 69938
+    - m_Data: 69940
+    - m_Data: 69942
+    - m_Data: 69944
+    - m_Data: 69946
+    - m_Data: 69948
+    - m_Data: 69950
+    - m_Data: 69952
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2277,8 +2291,8 @@ MonoBehaviour:
     - m_Data: 236216
     m_RenameOverlay:
       m_UserAcceptedRename: 0
-      m_Name: 3D_LoginArea_PG
-      m_OriginalName: 3D_LoginArea_PG
+      m_Name: 
+      m_OriginalName: 
       m_EditFieldRect:
         serializedVersion: 2
         x: 0
@@ -2286,10 +2300,10 @@ MonoBehaviour:
         width: 0
         height: 0
       m_UserData:
-        m_Data: 2076074
+        m_Data: 0
       m_IsWaitingForDelay: 0
       m_IsRenaming: 0
-      m_OriginalEventType: 0
+      m_OriginalEventType: 11
       m_IsRenamingFilename: 1
       m_TrimLeadingAndTrailingWhitespace: 0
       m_ClientGUIView: {fileID: 10}
@@ -2377,12 +2391,18 @@ MonoBehaviour:
       m_Data: 67426
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 67026
-    - m_Data: 67404
-    - m_Data: 67434
-    - m_Data: 115446
-    - m_Data: 371750
-    - m_Data: 1000000000
+    - m_Data: 69930
+    - m_Data: 69932
+    - m_Data: 69934
+    - m_Data: 69936
+    - m_Data: 69938
+    - m_Data: 69940
+    - m_Data: 69942
+    - m_Data: 69944
+    - m_Data: 69946
+    - m_Data: 69948
+    - m_Data: 69950
+    - m_Data: 69952
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2415,8 +2435,18 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 67026
-    - m_Data: 1000000000
+    - m_Data: 69930
+    - m_Data: 69932
+    - m_Data: 69934
+    - m_Data: 69936
+    - m_Data: 69938
+    - m_Data: 69940
+    - m_Data: 69942
+    - m_Data: 69944
+    - m_Data: 69946
+    - m_Data: 69948
+    - m_Data: 69950
+    - m_Data: 69952
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2449,8 +2479,8 @@ MonoBehaviour:
     m_ExpandedInstanceIDs: []
     m_RenameOverlay:
       m_UserAcceptedRename: 0
-      m_Name: Portal
-      m_OriginalName: Portal
+      m_Name: 
+      m_OriginalName: 
       m_EditFieldRect:
         serializedVersion: 2
         x: 0
@@ -2458,10 +2488,10 @@ MonoBehaviour:
         width: 0
         height: 0
       m_UserData:
-        m_Data: 2019744
+        m_Data: 0
       m_IsWaitingForDelay: 0
       m_IsRenaming: 0
-      m_OriginalEventType: 0
+      m_OriginalEventType: 11
       m_IsRenamingFilename: 1
       m_TrimLeadingAndTrailingWhitespace: 0
       m_ClientGUIView: {fileID: 10}
@@ -2554,4 +2584,4 @@ MonoBehaviour:
     m_DynamicPanelBehavior: 0
   m_LockTracker:
     m_IsLocked: 0
-  m_LastSelectedObjectID: 2582234
+  m_LastSelectedObjectID: 0
