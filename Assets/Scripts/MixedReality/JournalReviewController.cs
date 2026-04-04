@@ -11,7 +11,7 @@ using UnityEngine.XR.Interaction.Toolkit.UI;
 /// Manages the post-journal review flow that runs after the user presses DONE.
 ///
 /// Flow:
-///   1. Screen fades to black; AZKi avatar is enabled at its authored scene position and
+///   1. Screen fades to black; AZKi is locked to its authored scene position and
 ///      the player's camera yaw is snapped to face the avatar invisibly.
 ///   2. Screen fades back in; an AI comment appears via VRDialoguePanel.
 ///   3. After the comment a "Keep or release?" choice panel appears near the avatar.
@@ -24,7 +24,8 @@ using UnityEngine.XR.Interaction.Toolkit.UI;
 ///      bottle destroyed, groups reset.
 ///
 /// Wire up in Inspector:
-///   • avatarRoot              — AZKi root Transform (must be inactive at scene start)
+///   • avatarRoot              — AZKi root Transform
+///   • avatarRoamingController — Optional roaming controller (auto-added if omitted)
 ///   • dialoguePanelGO         — VRDialoguePanel root GameObject
 ///   • journalChairTable       — used for ocean Y-threshold only
 ///   • bottleRoot              — PostJournal bottle root Transform
@@ -37,8 +38,15 @@ using UnityEngine.XR.Interaction.Toolkit.UI;
 public class JournalReviewController : MonoBehaviour
 {
     [Header("Avatar")]
-    [Tooltip("Root transform of the AZKi avatar. Activated at its authored scene position when review begins.")]
+    [Tooltip("Root transform of the AZKi avatar. Review mode locks this avatar back to its authored scene position.")]
     public Transform avatarRoot;
+
+    [Header("Avatar Roaming")]
+    [Tooltip("Optional roaming controller. If missing, one is auto-added to avatarRoot at runtime.")]
+    [SerializeField] private AzkiIslandRoamingController avatarRoamingController;
+
+    [Tooltip("Enable AZKi roaming as soon as this scene starts.")]
+    [SerializeField] private bool startAvatarRoamingOnAwake = true;
 
     [Header("Dialogue")]
     [Tooltip("VRDialoguePanel root GameObject (contains VRDialoguePanel + VRDialogueFader).")]
@@ -174,6 +182,10 @@ public class JournalReviewController : MonoBehaviour
             _bottleOriginalLocalScale = bottleRoot.localScale;
             _bottleOriginalStored   = true;
         }
+
+        EnsureAvatarRoamingController();
+        if (startAvatarRoamingOnAwake)
+            ResumeAvatarRoaming();
 
         LogStateSnapshot("Awake.AfterInit");
     }
@@ -318,7 +330,30 @@ public class JournalReviewController : MonoBehaviour
     private void EnableAvatar()
     {
         if (avatarRoot == null) return;
+
         avatarRoot.gameObject.SetActive(true);
+        EnsureAvatarRoamingController();
+        avatarRoamingController?.LockAtAuthoredPose();
+    }
+
+    private void EnsureAvatarRoamingController()
+    {
+        if (avatarRoot == null) return;
+
+        if (avatarRoamingController == null)
+            avatarRoamingController = avatarRoot.GetComponent<AzkiIslandRoamingController>();
+
+        if (avatarRoamingController == null)
+            avatarRoamingController = avatarRoot.gameObject.AddComponent<AzkiIslandRoamingController>();
+    }
+
+    private void ResumeAvatarRoaming()
+    {
+        if (avatarRoot == null) return;
+
+        avatarRoot.gameObject.SetActive(true);
+        EnsureAvatarRoamingController();
+        avatarRoamingController?.ResumeRoaming();
     }
 
     // ── Dialogue ─────────────────────────────────────────────────────────
@@ -737,10 +772,9 @@ public class JournalReviewController : MonoBehaviour
         Debug.Log("[JournalReview] Typewriter done. Waiting 1s...");
         yield return new WaitForSeconds(1f);
 
-        // Fade out dialogue and hide avatar.
+        // Fade out dialogue and resume island roaming.
         _dialogueFader?.FadeOut();
-        if (avatarRoot != null)
-            avatarRoot.gameObject.SetActive(false);
+        ResumeAvatarRoaming();
 
         // Re-enable the start button area, whiteboard UI, and hide the post-journal bottle.
         ResetSceneGroups();
@@ -1009,8 +1043,7 @@ public class JournalReviewController : MonoBehaviour
         _dialogueFader?.FadeOut();
         HideChoicePanel();
 
-        if (avatarRoot != null)
-            avatarRoot.gameObject.SetActive(false);
+        ResumeAvatarRoaming();
 
         ResetSceneGroups();
         _onComplete?.Invoke(saveJournal);
