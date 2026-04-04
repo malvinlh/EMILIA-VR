@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -219,6 +220,9 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
         activeField = defaultField;
         UpdateFieldSelectionVisuals();
+
+        if (fullNameInput != null)  fullNameInput.shouldHideMobileInput = true;
+        if (nicknameInput != null)  nicknameInput.shouldHideMobileInput = true;
     }
 
     private void Start()
@@ -451,6 +455,17 @@ public class VRLoginHandwritingBridge : MonoBehaviour
 
         var eventSystemObject = new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         eventSystemObject.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+    }
+
+    private static readonly FieldInfo TmpKeyboardField = typeof(TMP_InputField)
+        .GetField("m_Keyboard", BindingFlags.NonPublic | BindingFlags.Instance);
+
+    private static void SuppressKeyboardAfterActivation(TMP_InputField field)
+    {
+        if (TmpKeyboardField?.GetValue(field) is not TouchScreenKeyboard keyboard)
+            return;
+        keyboard.active = false;
+        TmpKeyboardField.SetValue(field, null);
     }
 
     private void DisableBuiltInXriControllerRayIfNeeded()
@@ -1462,6 +1477,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             EnsureEventSystemExists();
             selectedInput.Select();
             selectedInput.ActivateInputField();
+            SuppressKeyboardAfterActivation(selectedInput);
         }
 
         if (changed)

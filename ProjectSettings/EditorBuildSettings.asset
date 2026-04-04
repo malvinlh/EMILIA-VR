@@ -12,13 +12,13 @@ EditorBuildSettings:
     path: Assets/Scenes/3D_StartArea.unity
     guid: 7b667000356914844b21eb34fb0ee087
   - enabled: 0
-    path: Assets/Scenes/3D_LoginArea.unity
+    path: Assets/Scenes/dump/3D_LoginArea.unity
     guid: 2bec35f045363b4429ec5eca414de024
   - enabled: 0
-    path: Assets/Scenes/3D_Chat.unity
+    path: Assets/Scenes/dump/3D_Chat.unity
     guid: 948a122c9a272fb43a887ab6d1702893
   - enabled: 0
-    path: Assets/Scenes/3D_Journal.unity
+    path: Assets/Scenes/dump/3D_Journal.unity
     guid: e298f398d4f56ff4193f51d148338bf3
   - enabled: 0
     path: Assets/Scenes/dump/3D_Journal_mr.unity
