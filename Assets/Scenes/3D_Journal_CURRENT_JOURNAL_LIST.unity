@@ -6360,7 +6360,7 @@ PrefabInstance:
     - target: {fileID: 5866666021909216657, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_Controller
       value: 
-      objectReference: {fileID: 9100000, guid: 54a83325115ce584ea067268c4a12301, type: 2}
+      objectReference: {fileID: 9100000, guid: 499754ac82c53e04a85d484eca7bb490, type: 2}
     - target: {fileID: 8947969726423503919, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -12092,44 +12092,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1767841092945693504, guid: 0b6231c4c580502459334ec0466d7117, type: 3}
   m_PrefabInstance: {fileID: 1194482152}
   m_PrefabAsset: {fileID: 0}
---- !u!21 &1197811804
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1209396061
 GameObject:
   m_ObjectHideFlags: 0
@@ -14805,7 +14767,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1197811804}
+  - {fileID: 2127227605}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -22902,6 +22864,44 @@ Transform:
   - {fileID: 1543201648}
   m_Father: {fileID: 251825959}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!21 &2127227605
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!114 &2147540002
 MonoBehaviour:
   m_ObjectHideFlags: 0
