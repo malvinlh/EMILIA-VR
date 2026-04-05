@@ -105,6 +105,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
     private NavMeshAgent _agent;
     private Animator _animator;
+    private AzkiBlendShapeExpressionController _blendShapeController;
     private NpcCharacterControllerGravity _gravityController;
     private NavMeshPath _pathBuffer;
 
@@ -139,6 +140,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
     {
         _agent = GetComponent<NavMeshAgent>();
         _animator = GetComponent<Animator>();
+        EnsureBlendShapeController();
         _gravityController = GetComponent<NpcCharacterControllerGravity>();
         _pathBuffer = new NavMeshPath();
 
@@ -318,6 +320,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
             _agent = GetComponent<NavMeshAgent>();
         if (_animator == null)
             _animator = GetComponent<Animator>();
+        EnsureBlendShapeController();
         if (_gravityController == null)
             _gravityController = GetComponent<NpcCharacterControllerGravity>();
         if (_pathBuffer == null)
@@ -328,6 +331,15 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
         if (_idleHash == 0 || _idleBHash == 0 || _walkHash == 0 || _talkHash == 0 || _cheeringHash == 0)
             CacheAnimatorStateHashes();
+    }
+
+    private void EnsureBlendShapeController()
+    {
+        if (_blendShapeController == null)
+            _blendShapeController = GetComponent<AzkiBlendShapeExpressionController>();
+
+        if (_blendShapeController == null)
+            _blendShapeController = gameObject.AddComponent<AzkiBlendShapeExpressionController>();
     }
 
     private void CacheAnimatorStateHashes()
