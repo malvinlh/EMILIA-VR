@@ -12943,7 +12943,7 @@ GameObject:
   - component: {fileID: 1019932750}
   - component: {fileID: 1019932749}
   m_Layer: 5
-  m_Name: PreviousBtnCanvas
+  m_Name: PreviousButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -16100,7 +16100,7 @@ GameObject:
   - component: {fileID: 1186999416}
   - component: {fileID: 1186999415}
   m_Layer: 5
-  m_Name: JournalCanvas
+  m_Name: JournalDetailCanvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -17382,44 +17382,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 37.6, y: 90, z: 0}
---- !u!21 &1276907043
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!64 &1283607379
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -17565,7 +17527,7 @@ MonoBehaviour:
   m_ParentInteractableObject: {fileID: 0}
   m_AttachTransform: {fileID: 1286493202}
   m_SecondaryAttachTransform: {fileID: 0}
-  m_UseDynamicAttach: 0
+  m_UseDynamicAttach: 1
   m_MatchAttachPosition: 1
   m_MatchAttachRotation: 1
   m_SnapToColliderVolume: 1
@@ -17590,7 +17552,7 @@ MonoBehaviour:
   m_SmoothScaleAmount: 8
   m_TightenScale: 0.1
   m_ThrowOnDetach: 1
-  m_ThrowSmoothingDuration: 0.25
+  m_ThrowSmoothingDuration: 0.18
   m_ThrowSmoothingCurve:
     serializedVersion: 2
     m_Curve:
@@ -17606,8 +17568,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  m_ThrowVelocityScale: 1.5
-  m_ThrowAngularVelocityScale: 1
+  m_ThrowVelocityScale: 2.2
+  m_ThrowAngularVelocityScale: 1.15
   m_ForceGravityOnDetach: 0
   m_RetainTransformParent: 1
   m_StartingSingleGrabTransformers: []
@@ -17831,7 +17793,7 @@ Transform:
   m_GameObject: {fileID: 1286493203}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.00036, y: 0.00001, z: 0.00128}
+  m_LocalPosition: {x: 0.00062, y: -0.00006, z: 0.00122}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -17933,7 +17895,7 @@ GameObject:
   - component: {fileID: 1333922690}
   - component: {fileID: 1333922689}
   m_Layer: 5
-  m_Name: PreviousButton
+  m_Name: CloseButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -17955,7 +17917,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -889, y: 468.5}
+  m_AnchoredPosition: {x: 889, y: 468.5}
   m_SizeDelta: {x: 358, y: 358}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1333922689
@@ -18019,18 +17981,6 @@ MonoBehaviour:
       - m_Target: {fileID: 0}
         m_TargetAssemblyTypeName: UnityEngine.AudioSource, UnityEngine
         m_MethodName: Play
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 1
-        m_CallState: 2
-      - m_Target: {fileID: 1333922689}
-        m_TargetAssemblyTypeName: SceneButtonHandler, Assembly-CSharp
-        m_MethodName: LoadTargetScene
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -19959,7 +19909,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1276907043}
+  - {fileID: 1757912384}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -27243,6 +27193,44 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.0010545539, y: 0.0005439072, z: 0.0018487385}
   m_Center: {x: 3.7252902e-11, y: -0.0000050309673, z: 0.0009936824}
+--- !u!21 &1757912384
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!64 &1762368308
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -31220,16 +31208,11 @@ MonoBehaviour:
   journalCanvas: {fileID: 1186999413}
   detailTitleField: {fileID: 109393538}
   detailContentField: {fileID: 1213061405}
-  previousButton: {fileID: 1333922690}
+  previousButton: {fileID: 1019932750}
   listContentParent: {fileID: 567793872}
   journalEntryPrefab: {fileID: 6116714263341541039, guid: 833be3171a636324db32093580b14a91, type: 3}
-  listTitleMaxWords: 6
   bgNoJournals: {fileID: 131814471}
   closeButton: {fileID: 1333922690}
-  autoResolveNavigationButtons: 1
-  enforceOpaqueDetailBackdrop: 1
-  detailBackdropColor: {r: 0.98, g: 0.94, b: 0.96, a: 1}
-  detailBackdropSprite: {fileID: 0}
 --- !u!114 &6000000017
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -145211,7 +145194,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SeaBottleDetector
   reviewController: {fileID: 6000000011}
-  seaSplashClip: {fileID: 8300000, guid: 0798dc58d63ee65489e1e01ed43316a0, type: 3}
+  seaSplashClip: {fileID: 8300000, guid: 0a762286b24d5e64e8e0bcdd464c028f, type: 3}
   seaSplashVolume: 1
   bottleTag: JournalBottle
 --- !u!65 &7388969272661954647
