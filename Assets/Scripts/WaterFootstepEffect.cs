@@ -11,6 +11,7 @@ public class WaterFootstepEffect : MonoBehaviour
     [SerializeField] private Transform waterSurface;
 
     [Header("Splash SFX")]
+    [Tooltip("Splash clips used for water footsteps. Playback is randomized with alternation bias.")]
     [SerializeField] private AudioClip[] splashClips;
     [SerializeField, Range(0f, 1f)] private float splashVolume = 0.4f;
 
@@ -24,11 +25,12 @@ public class WaterFootstepEffect : MonoBehaviour
     [Tooltip("Distance the player must move (XZ) before a footstep triggers.")]
     [SerializeField] private float stepDistance = 0.65f;
     [Tooltip("Minimum seconds between footstep triggers.")]
-    [SerializeField] private float stepCooldown = 0.45f;
+    [SerializeField] private float stepCooldown = 0.6f;
 
     private Vector3 _lastStepPosition;
     private Camera _playerCamera;
     private float _lastStepTime;
+    private int _lastFootstepClipIndex = -1;
 
     // Simple object pool for ripple quads
     private const int PoolSize = 10;
@@ -176,7 +178,32 @@ public class WaterFootstepEffect : MonoBehaviour
     {
         if (splashClips == null || splashClips.Length == 0) return;
 
-        int idx = Random.Range(0, splashClips.Length);
+        int clipCount = splashClips.Length;
+        int idx;
+
+        if (clipCount == 1)
+        {
+            idx = 0;
+        }
+        else
+        {
+            // Mostly alternate from the previous clip, but keep some randomness
+            // so footsteps do not become a predictable ABAB pattern.
+            bool chooseDifferentClip = _lastFootstepClipIndex >= 0 && Random.value < 0.75f;
+            if (chooseDifferentClip)
+            {
+                idx = Random.Range(0, clipCount - 1);
+                if (idx >= _lastFootstepClipIndex)
+                    idx++;
+            }
+            else
+            {
+                idx = Random.Range(0, clipCount);
+            }
+        }
+
+        _lastFootstepClipIndex = idx;
+
         _audioSource.pitch = Random.Range(0.9f, 1.1f); // slight variation
         _audioSource.PlayOneShot(splashClips[idx], splashVolume);
     }
