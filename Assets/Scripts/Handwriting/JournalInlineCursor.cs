@@ -62,6 +62,9 @@ public class JournalInlineCursor : MonoBehaviour
     [SerializeField] [Range(0.005f, 0.05f)] private float pinchThreshold   = 0.020f;
     [SerializeField] [Range(0.005f, 0.05f)] private float releaseThreshold = 0.030f;
 
+    [Header("Button poke")]
+    [SerializeField] [Range(0f, 1f)] private float pokeClickCooldownSec = 0.25f;
+
     [Header("Cursor blink")]
     [SerializeField] [Range(0.1f, 2f)] private float blinkOnTime  = 0.5f;
     [SerializeField] [Range(0.1f, 2f)] private float blinkOffTime = 0.3f;
@@ -91,6 +94,8 @@ public class JournalInlineCursor : MonoBehaviour
     private const float POKE_FIRE_DIST  = 0.012f; // 12 mm — trigger press
     private bool[] _btnInZone;
     private bool[] _btnWasClose;
+    private float[] _btnLastClickTime;
+    private int[] _btnLastClickFrame;
 
     // ── Public API ────────────────────────────────────────────────────────
     /// <summary>True while a word-range selection (not just a cursor) is active.</summary>
@@ -657,6 +662,13 @@ public class JournalInlineCursor : MonoBehaviour
         {
             _btnInZone   = new bool[btns.Length];
             _btnWasClose = new bool[btns.Length];
+            _btnLastClickTime = new float[btns.Length];
+            _btnLastClickFrame = new int[btns.Length];
+            for (int j = 0; j < btns.Length; j++)
+            {
+                _btnLastClickTime[j] = -999f;
+                _btnLastClickFrame[j] = -1;
+            }
         }
 
         for (int i = 0; i < btns.Length; i++)
@@ -696,7 +708,23 @@ public class JournalInlineCursor : MonoBehaviour
             {
                 Debug.Log($"{TAG} Poke '{btn.name}' sdist={sdist * 1000f:F1} mm interactable={btn.interactable}");
                 if (btn.interactable)
-                    btn.onClick.Invoke();
+                {
+                    float now = Time.unscaledTime;
+                    bool sameFrame = _btnLastClickFrame[i] == Time.frameCount;
+                    bool inCooldown = pokeClickCooldownSec > 0f
+                                   && now - _btnLastClickTime[i] < pokeClickCooldownSec;
+
+                    if (!sameFrame && !inCooldown)
+                    {
+                        btn.onClick.Invoke();
+                        _btnLastClickFrame[i] = Time.frameCount;
+                        _btnLastClickTime[i] = now;
+                    }
+                    else if (inCooldown)
+                    {
+                        Debug.Log($"{TAG} Poke '{btn.name}' ignored by cooldown ({now - _btnLastClickTime[i]:F3}s < {pokeClickCooldownSec:F3}s).");
+                    }
+                }
             }
             _btnWasClose[i] = isClose;
         }
