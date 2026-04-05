@@ -30,6 +30,10 @@ public class JournalMicController : MonoBehaviour
     [Header("Audio Recording")]
     [SerializeField] private RecordAudio recorder;
 
+    [Header("Input Guard")]
+    [Tooltip("Minimum delay between accepted mic button clicks to prevent poke press+release double fire.")]
+    [SerializeField] private float clickCooldownSec = 0.25f;
+
     [Header("Button Colors")]
     [SerializeField] private Color idleColor         = new Color(0.55f, 0.65f, 0.75f, 1f);
     [SerializeField] private Color recordingColor    = new Color(0.90f, 0.25f, 0.25f, 1f);
@@ -50,6 +54,8 @@ public class JournalMicController : MonoBehaviour
     private Coroutine _pulseCo;
     private Coroutine _transcribeCo;
     private float     _recordingStartTime;
+    private float     _lastAcceptedClickTime = -999f;
+    private int       _lastAcceptedClickFrame = -1;
 
     // Minimum seconds that must elapse before a Stop is accepted.
     // Guards against the poke gesture firing start+stop within the same gesture.
@@ -173,6 +179,20 @@ public class JournalMicController : MonoBehaviour
 
     private void OnMicClicked()
     {
+        float now = Time.unscaledTime;
+        if (_lastAcceptedClickFrame == Time.frameCount)
+        {
+            Debug.Log($"{TAG} Duplicate click ignored in frame {Time.frameCount}.");
+            return;
+        }
+        if (clickCooldownSec > 0f && now - _lastAcceptedClickTime < clickCooldownSec)
+        {
+            Debug.Log($"{TAG} Click ignored by cooldown ({now - _lastAcceptedClickTime:F3}s < {clickCooldownSec:F3}s).");
+            return;
+        }
+        _lastAcceptedClickFrame = Time.frameCount;
+        _lastAcceptedClickTime = now;
+
         Debug.Log($"{TAG} OnMicClicked state={_micState}");
         if (recorder == null) return;
         if (_micState == MicState.Transcribing)
