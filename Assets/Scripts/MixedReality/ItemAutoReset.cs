@@ -1,7 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Interactors;
 
 /// <summary>
 /// Blinks an item back to its authored scene position when it has drifted too far away
@@ -22,13 +24,31 @@ public class ItemAutoReset : MonoBehaviour
              "before it blinks back.")]
     public float outsideDelay = 1.5f;
 
+    [Header("Held Collision")]
+    [Tooltip("When enabled, collisions between this held item and the selecting " +
+             "interactor's rig colliders are ignored while held, then restored on release.")]
+    [SerializeField] private bool ignoreInteractorRigCollisionsWhileHeld = true;
+
+    [Tooltip("Also ignore trigger colliders while held. Usually keep this off so trigger" +
+             " interactions still work.")]
+    [SerializeField] private bool includeTriggerColliders = false;
+
     // ── Cached state ───────────────────────────────────────────────────
     private Transform  _originParent;
     private Vector3    _originLocalPos;
     private Quaternion _originLocalRot;
     private XRBaseInteractable _interactable;
+    private Collider[] _itemColliders;
     private float _outsideTimer;
     private bool  _blinking;
+
+    private readonly List<IgnoredCollisionPair> _ignoredCollisionPairs = new();
+
+    private struct IgnoredCollisionPair
+    {
+        public Collider item;
+        public Collider rig;
+    }
 
     // ================================================================
     // UNITY
@@ -42,10 +62,35 @@ public class ItemAutoReset : MonoBehaviour
 
         _interactable = GetComponent<XRBaseInteractable>()
                      ?? GetComponentInChildren<XRBaseInteractable>(includeInactive: true);
+
+        _itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
+    }
+
+    private void OnEnable()
+    {
+        if (_interactable == null) return;
+
+        _interactable.selectEntered.AddListener(OnSelectEntered);
+        _interactable.selectExited.AddListener(OnSelectExited);
+    }
+
+    private void OnDisable()
+    {
+        if (_interactable != null)
+        {
+            _interactable.selectEntered.RemoveListener(OnSelectEntered);
+            _interactable.selectExited.RemoveListener(OnSelectExited);
+        }
+
+        RestoreIgnoredCollisions();
     }
 
     private void Update()
     {
+        // Fallback restore in case release happened through an external path.
+        if (_ignoredCollisionPairs.Count > 0 && (_interactable == null || !_interactable.isSelected))
+            RestoreIgnoredCollisions();
+
         // If the interactable is disabled the item is locked (e.g. cork sealed to bottle).
         if (_interactable != null && !_interactable.enabled)
         {
@@ -74,6 +119,78 @@ public class ItemAutoReset : MonoBehaviour
         {
             _outsideTimer = 0f;
         }
+    }
+
+    private void OnSelectEntered(SelectEnterEventArgs args)
+    {
+        if (!ignoreInteractorRigCollisionsWhileHeld) return;
+
+        ApplyIgnoreWithInteractorRig(args.interactorObject);
+    }
+
+    private void OnSelectExited(SelectExitEventArgs args)
+    {
+        RestoreIgnoredCollisions();
+    }
+
+    private void ApplyIgnoreWithInteractorRig(IXRSelectInteractor interactor)
+    {
+        RestoreIgnoredCollisions();
+
+        if (interactor == null || _itemColliders == null || _itemColliders.Length == 0)
+            return;
+
+        var interactorTf = interactor.transform;
+        if (interactorTf == null)
+            return;
+
+        var rigRoot = interactorTf.root != null ? interactorTf.root : interactorTf;
+        var rigColliders = rigRoot.GetComponentsInChildren<Collider>(includeInactive: true);
+
+        foreach (var itemCol in _itemColliders)
+        {
+            if (!IsEligibleCollider(itemCol))
+                continue;
+
+            foreach (var rigCol in rigColliders)
+            {
+                if (!IsEligibleCollider(rigCol))
+                    continue;
+
+                if (itemCol == rigCol)
+                    continue;
+
+                Physics.IgnoreCollision(itemCol, rigCol, true);
+                _ignoredCollisionPairs.Add(new IgnoredCollisionPair { item = itemCol, rig = rigCol });
+            }
+        }
+    }
+
+    private bool IsEligibleCollider(Collider c)
+    {
+        if (c == null || !c.enabled)
+            return false;
+
+        if (!includeTriggerColliders && c.isTrigger)
+            return false;
+
+        return true;
+    }
+
+    private void RestoreIgnoredCollisions()
+    {
+        if (_ignoredCollisionPairs.Count == 0)
+            return;
+
+        foreach (var pair in _ignoredCollisionPairs)
+        {
+            if (pair.item == null || pair.rig == null)
+                continue;
+
+            Physics.IgnoreCollision(pair.item, pair.rig, false);
+        }
+
+        _ignoredCollisionPairs.Clear();
     }
 
     // ================================================================

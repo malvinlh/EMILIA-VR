@@ -86,10 +86,11 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     [SerializeField] private bool autoClearWhiteboardAfterCommit = true;
     [SerializeField] private float duplicateSuppressWindowSeconds = 0.75f;
 
-    [Header("Proximity Hint")]
-    [SerializeField] private bool showProximityHint = true;
-    [SerializeField] private float hintVisibleDistance = 3.0f;
-    [SerializeField] private Transform proximityAnchor;
+    // Proximity hint is temporarily disabled.
+    // [Header("Proximity Hint")]
+    // [SerializeField] private bool showProximityHint = true;
+    // [SerializeField] private float hintVisibleDistance = 3.0f;
+    // [SerializeField] private Transform proximityAnchor;
 
     private RecognitionPipeline recognitionPipeline;
     private DigitalInkBridge inkBridge;
@@ -111,7 +112,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
     private Color nicknameBaseColor = Color.white;
     private Color fullNameBaseColor = Color.white;
 
-    private TextMeshProUGUI hintText;
+    // private TextMeshProUGUI hintText;
 
     private string lastCommitNormalized = string.Empty;
     private float lastCommitTime = -999f;
@@ -224,7 +225,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         EnforceControllerOnlyInteractionMode();
         ResolveInputReferences();
         CacheFieldImages();
-        EnsureHintLabel();
+        // EnsureHintLabel();
 
         activeField = defaultField;
         UpdateFieldSelectionVisuals();
@@ -256,8 +257,8 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             DisableBuiltInXriControllerRayIfNeeded();
         }
 
-        if (proximityAnchor == null)
-            proximityAnchor = whiteboard != null ? whiteboard.transform : transform;
+        // if (proximityAnchor == null)
+        //     proximityAnchor = whiteboard != null ? whiteboard.transform : transform;
 
         if (recognitionPipeline == null)
             Debug.LogWarning($"{Tag} RecognitionPipeline not found. Handwriting text will not be committed.");
@@ -283,7 +284,7 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         else
             UpdateSelectionFromFocusedInput();
 
-        UpdateHintLabel();
+        // UpdateHintLabel();
     }
 
     private void LateUpdate()
@@ -364,6 +365,8 @@ public class VRLoginHandwritingBridge : MonoBehaviour
         if (fullNameImage != null)
             fullNameBaseColor = fullNameImage.color;
     }
+
+#if false
 
     private void EnsureHintLabel()
     {
@@ -453,6 +456,8 @@ public class VRLoginHandwritingBridge : MonoBehaviour
             return "Controller detected. Hold trigger to click.";
         return "Controller ray ready. Hands are handwriting-only in this mode.";
     }
+
+#endif
 
     private void EnforceControllerOnlyInteractionMode()
     {

@@ -29,6 +29,12 @@ public class SeaBottleDetector : MonoBehaviour
     public AudioClip seaSplashClip;
     [Tooltip("Volume for the sea splash SFX.")]
     [Range(0f, 1f)] public float seaSplashVolume = 1f;
+    [Tooltip("Dedicated source used for splash playback. If null and auto-create is enabled, one is created on this GameObject.")]
+    public AudioSource seaSplashSource;
+    [Tooltip("Play splash in 2D so it is always audible regardless of listener distance.")]
+    public bool playSplashAs2D = true;
+    [Tooltip("Create/fetch an AudioSource automatically when seaSplashSource is not assigned.")]
+    public bool autoCreateSplashSource = true;
 
     [Header("Detection")]
     [Tooltip("Tag assigned to the PostJournal bottle root GameObject.")]
@@ -49,6 +55,10 @@ public class SeaBottleDetector : MonoBehaviour
 
         if (string.IsNullOrEmpty(bottleTag))
             Debug.LogError("[SeaBottleDetector] bottleTag is empty — bottle detection will never match.");
+
+        EnsureSeaSplashSource();
+        if (seaSplashClip != null && !seaSplashClip.preloadAudioData && seaSplashClip.loadState == AudioDataLoadState.Unloaded)
+            seaSplashClip.LoadAudioData();
     }
 
     // ================================================================
@@ -105,7 +115,45 @@ public class SeaBottleDetector : MonoBehaviour
             return;
         }
 
-        AudioSource.PlayClipAtPoint(seaSplashClip, worldPosition, seaSplashVolume);
+        AudioSource source = EnsureSeaSplashSource();
+        if (source == null)
+        {
+            // Last-resort fallback if source setup is intentionally disabled.
+            AudioSource.PlayClipAtPoint(seaSplashClip, worldPosition, seaSplashVolume);
+            return;
+        }
+
+        source.spatialBlend = playSplashAs2D ? 0f : 1f;
+        if (!playSplashAs2D)
+            source.transform.position = worldPosition;
+
+        source.volume = 1f;
+        source.PlayOneShot(seaSplashClip, seaSplashVolume);
+    }
+
+    private AudioSource EnsureSeaSplashSource()
+    {
+        if (seaSplashSource != null)
+            return seaSplashSource;
+
+        if (!autoCreateSplashSource)
+            return null;
+
+        seaSplashSource = GetComponent<AudioSource>();
+        if (seaSplashSource == null)
+            seaSplashSource = gameObject.AddComponent<AudioSource>();
+
+        seaSplashSource.playOnAwake = false;
+        seaSplashSource.loop = false;
+        seaSplashSource.mute = false;
+        seaSplashSource.priority = 0;
+        seaSplashSource.dopplerLevel = 0f;
+        seaSplashSource.rolloffMode = AudioRolloffMode.Linear;
+        seaSplashSource.minDistance = 1f;
+        seaSplashSource.maxDistance = 25f;
+        seaSplashSource.outputAudioMixerGroup = null;
+
+        return seaSplashSource;
     }
 
     /// <summary>
