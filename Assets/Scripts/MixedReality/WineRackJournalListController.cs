@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using TMPro;
 using UnityEngine;
@@ -72,7 +73,18 @@ public class WineRackJournalListController : MonoBehaviour
     [Tooltip("Button that dismisses the entire JournalListCanvas.")]
     public Button closeButton;
 
+    [Header("Detail Backdrop (Runtime)")]
+    [Tooltip("When enabled, creates/updates an opaque backdrop behind JournalCanvas content to stop world objects showing through.")]
+    public bool enforceOpaqueDetailBackdrop = true;
+
+    [Tooltip("Fallback color for runtime detail backdrop. Alpha is clamped to at least 0.9.")]
+    public Color detailBackdropColor = new Color(0.98f, 0.94f, 0.96f, 1f);
+
+    [Tooltip("Optional sprite for runtime detail backdrop. Leave empty for flat color fill.")]
+    public Sprite detailBackdropSprite;
+
     // ── Private State ────────────────────────────────────────────────
+    private const string AutoDetailBackdropName = "__AutoDetailBackdrop";
     private XRSimpleInteractable _interactable;
     private bool _isVisible;
 
@@ -103,6 +115,8 @@ public class WineRackJournalListController : MonoBehaviour
             if (journalCanvas.GetComponent<Canvas>() != null)
                 EnsureTrackedRaycaster(journalCanvas);
         }
+
+        EnsureOpaqueDetailBackdrop();
 
         // Force both display fields permanently non-interactable so the Quest
         // keyboard never opens when the user accidentally touches them.
@@ -211,7 +225,11 @@ public class WineRackJournalListController : MonoBehaviour
             detailContentField.text = journal.Content;
 
         if (homeCanvas != null)    homeCanvas.SetActive(false);
-        if (journalCanvas != null) journalCanvas.SetActive(true);
+        if (journalCanvas != null)
+        {
+            EnsureOpaqueDetailBackdrop();
+            journalCanvas.SetActive(true);
+        }
     }
 
     private void HideDetail()
@@ -273,7 +291,7 @@ public class WineRackJournalListController : MonoBehaviour
             var go = Instantiate(journalEntryPrefab, listContentParent);
             go.name = $"Journal_{j.Id}";
 
-            SetTMP(go, "TitleText",   j.Title);
+            SetTMP(go, "TitleText",   TruncateTitleForList(j.Title));
             SetTMP(go, "ContentText", j.Content);
             SetTMP(go, "TimestampBG/TimestampText",
                 j.CreatedAt.ToString("dd/MM/yyyy hh:mm tt", CultureInfo.InvariantCulture));
@@ -296,6 +314,71 @@ public class WineRackJournalListController : MonoBehaviour
     // ================================================================
     // HELPERS
     // ================================================================
+
+    private void EnsureOpaqueDetailBackdrop()
+    {
+        if (!enforceOpaqueDetailBackdrop || journalCanvas == null)
+            return;
+
+        var journalRect = journalCanvas.GetComponent<RectTransform>();
+        if (journalRect == null)
+            return;
+
+        Transform existing = journalRect.Find(AutoDetailBackdropName);
+        Image backdropImage;
+
+        if (existing == null)
+        {
+            var go = new GameObject(AutoDetailBackdropName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            var backdropRect = go.GetComponent<RectTransform>();
+            backdropRect.SetParent(journalRect, false);
+            backdropRect.anchorMin = Vector2.zero;
+            backdropRect.anchorMax = Vector2.one;
+            backdropRect.offsetMin = Vector2.zero;
+            backdropRect.offsetMax = Vector2.zero;
+            backdropRect.SetAsFirstSibling();
+
+            backdropImage = go.GetComponent<Image>();
+        }
+        else
+        {
+            var existingRect = existing as RectTransform;
+            if (existingRect != null)
+            {
+                existingRect.anchorMin = Vector2.zero;
+                existingRect.anchorMax = Vector2.one;
+                existingRect.offsetMin = Vector2.zero;
+                existingRect.offsetMax = Vector2.zero;
+                existingRect.SetAsFirstSibling();
+            }
+
+            backdropImage = existing.GetComponent<Image>();
+            if (backdropImage == null)
+                backdropImage = existing.gameObject.AddComponent<Image>();
+        }
+
+        Color color = detailBackdropColor;
+        color.a = Mathf.Max(0.9f, Mathf.Clamp01(color.a));
+        backdropImage.color = color;
+        backdropImage.sprite = detailBackdropSprite;
+        backdropImage.type = detailBackdropSprite != null ? Image.Type.Sliced : Image.Type.Simple;
+        backdropImage.raycastTarget = false;
+    }
+
+    private static string TruncateTitleForList(string title, int maxWords = 5)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return string.Empty;
+
+        if (maxWords < 1)
+            maxWords = 1;
+
+        string[] words = title.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length <= maxWords)
+            return string.Join(" ", words);
+
+        return string.Join(" ", words, 0, maxWords) + "...";
+    }
 
     private static void SetTMP(GameObject parent, string path, string value)
     {
