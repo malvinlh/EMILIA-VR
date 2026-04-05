@@ -86,6 +86,9 @@ public class ScribbleManager : MonoBehaviour
     private readonly List<PageData> pages = new List<PageData> { new PageData(), new PageData() };
     private int currentPageIndex;
     private int _titlePageCount = 1;
+    // Once the user moves from the last title page to content via Next,
+    // keep the title/content split stable for the rest of the session.
+    private bool _titleBoundaryLocked;
     private PageData CurrentPage => pages[currentPageIndex];
 
     private readonly Queue<WhiteboardPen.StrokeMetadata> pendingMeta =
@@ -499,25 +502,29 @@ public class ScribbleManager : MonoBehaviour
         // ── Update display ───────────────────────────────────────────
         RefreshUI();
 
-        // ── Board-full: silently create next page so Next button appears ─
-        if (IsBoardFull() && currentPageIndex == pages.Count - 1)
+        // ── Board-full: prepare the next page where writing should continue ─
+        if (IsBoardFull())
         {
-            if (currentPageIndex < _titlePageCount)
+            bool isTitlePage = currentPageIndex < _titlePageCount;
+            bool isLastTitlePage = isTitlePage && currentPageIndex == _titlePageCount - 1;
+
+            if (isLastTitlePage && !_titleBoundaryLocked)
             {
-                // Title page overflow: insert a new title page immediately after
-                // the last title page so content pages (if any) stay in place.
+                // Title overflow: extend the title section right before content.
+                // This works even when content pages already exist after title.
                 pages.Insert(_titlePageCount, new PageData());
                 _titlePageCount++;
                 Debug.Log($"{TAG} Title full — created title page {_titlePageCount}. " +
                           "Press Next to continue title.");
+                RefreshUI(); // keep Next available on title pages
             }
-            else
+            else if (!isTitlePage && currentPageIndex == pages.Count - 1)
             {
                 pages.Add(new PageData());
                 Debug.Log($"{TAG} Board full — created content page {pages.Count - _titlePageCount}. " +
                           "Press Next to continue.");
+                RefreshUI(); // show Next for the newly created content page
             }
-            RefreshUI(); // so Next button becomes visible
         }
     }
 
@@ -562,6 +569,15 @@ public class ScribbleManager : MonoBehaviour
             Debug.Log($"{TAG} Already on last page — no next page.");
             return;
         }
+
+        // Lock the title/content split once the user explicitly leaves
+        // the last title page using Next.
+        if (!_titleBoundaryLocked && currentPageIndex == _titlePageCount - 1)
+        {
+            _titleBoundaryLocked = true;
+            Debug.Log($"{TAG} Title finalized at page {_titlePageCount}. Following pages are content.");
+        }
+
         GoToPage(currentPageIndex + 1);
     }
 
@@ -705,6 +721,7 @@ public class ScribbleManager : MonoBehaviour
         pages.Add(new PageData()); // page 1 = first content page
         currentPageIndex = 0;
         _titlePageCount  = 1;
+        _titleBoundaryLocked = false;
         _insertCursor    = -1;
 
         pendingMeta.Clear();
