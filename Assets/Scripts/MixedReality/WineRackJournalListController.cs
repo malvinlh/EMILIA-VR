@@ -66,12 +66,19 @@ public class WineRackJournalListController : MonoBehaviour
            + "and a BackButton that opens the detail view.")]
     public GameObject journalEntryPrefab;
 
+    [Tooltip("Maximum words shown for each journal title in the list before adding ellipsis.")]
+    [Min(1)] public int listTitleMaxWords = 6;
+
     [Tooltip("Shown when the user has no saved journals.")]
     public GameObject bgNoJournals;
 
     [Header("Close Button (Optional)")]
     [Tooltip("Button that dismisses the entire JournalListCanvas.")]
     public Button closeButton;
+
+    [Header("Navigation")]
+    [Tooltip("Auto-fix button references if Previous/Close are miswired to the same object in scene.")]
+    public bool autoResolveNavigationButtons = true;
 
     [Header("Detail Backdrop (Runtime)")]
     [Tooltip("When enabled, creates/updates an opaque backdrop behind JournalCanvas content to stop world objects showing through.")]
@@ -85,6 +92,7 @@ public class WineRackJournalListController : MonoBehaviour
 
     // ── Private State ────────────────────────────────────────────────
     private const string AutoDetailBackdropName = "__AutoDetailBackdrop";
+    private Image _detailBackdropImage;
     private XRSimpleInteractable _interactable;
     private bool _isVisible;
 
@@ -117,17 +125,16 @@ public class WineRackJournalListController : MonoBehaviour
         }
 
         EnsureOpaqueDetailBackdrop();
+        SetDetailBackdropActive(false);
 
         // Force both display fields permanently non-interactable so the Quest
         // keyboard never opens when the user accidentally touches them.
         if (detailTitleField != null)   detailTitleField.interactable  = false;
         if (detailContentField != null) detailContentField.interactable = false;
 
-        if (previousButton != null)
-            previousButton.onClick.AddListener(HideDetail);
-
-        if (closeButton != null)
-            closeButton.onClick.AddListener(HideCanvas);
+        ResolveNavigationButtons();
+        WireNavigationButtons();
+        UpdateNavigationButtons(isDetailView: false);
     }
 
     /// <summary>
@@ -198,9 +205,12 @@ public class WineRackJournalListController : MonoBehaviour
         if (journalListCanvas != null)
             journalListCanvas.SetActive(true);
 
+        SetDetailBackdropActive(false);
+
         // Always open on the list view.
         if (homeCanvas != null)    homeCanvas.SetActive(true);
         if (journalCanvas != null) journalCanvas.SetActive(false);
+        UpdateNavigationButtons(isDetailView: false);
 
         FetchAndPopulate();
     }
@@ -208,6 +218,8 @@ public class WineRackJournalListController : MonoBehaviour
     public void HideCanvas()
     {
         _isVisible = false;
+        SetDetailBackdropActive(false);
+        UpdateNavigationButtons(isDetailView: false);
         if (journalListCanvas != null)
             journalListCanvas.SetActive(false);
     }
@@ -228,14 +240,19 @@ public class WineRackJournalListController : MonoBehaviour
         if (journalCanvas != null)
         {
             EnsureOpaqueDetailBackdrop();
+            SetDetailBackdropActive(true);
             journalCanvas.SetActive(true);
         }
+
+        UpdateNavigationButtons(isDetailView: true);
     }
 
     private void HideDetail()
     {
+        SetDetailBackdropActive(false);
         if (journalCanvas != null) journalCanvas.SetActive(false);
         if (homeCanvas != null)    homeCanvas.SetActive(true);
+        UpdateNavigationButtons(isDetailView: false);
     }
 
     // ================================================================
@@ -291,7 +308,7 @@ public class WineRackJournalListController : MonoBehaviour
             var go = Instantiate(journalEntryPrefab, listContentParent);
             go.name = $"Journal_{j.Id}";
 
-            SetTMP(go, "TitleText",   TruncateTitleForList(j.Title));
+            SetTMP(go, "TitleText",   TruncateTitleForList(j.Title, listTitleMaxWords));
             SetTMP(go, "ContentText", j.Content);
             SetTMP(go, "TimestampBG/TimestampText",
                 j.CreatedAt.ToString("dd/MM/yyyy hh:mm tt", CultureInfo.InvariantCulture));
@@ -315,28 +332,185 @@ public class WineRackJournalListController : MonoBehaviour
     // HELPERS
     // ================================================================
 
+    private void ResolveNavigationButtons()
+    {
+        if (!autoResolveNavigationButtons)
+            return;
+
+        Transform detailRoot = journalCanvas != null ? journalCanvas.transform : null;
+        Transform listRoot = journalListCanvas != null ? journalListCanvas.transform : null;
+
+        bool previousLooksInvalid = previousButton == null
+                                    || previousButton == closeButton
+                                    || (detailRoot != null && !IsDescendantOf(previousButton.transform, detailRoot));
+        if (previousLooksInvalid && detailRoot != null)
+        {
+            Button resolvedPrevious = FindButtonInHierarchy(detailRoot, "previous");
+            if (resolvedPrevious != null)
+                previousButton = resolvedPrevious;
+        }
+
+        bool closeLooksInvalid = closeButton == null
+                                 || closeButton == previousButton
+                                 || (detailRoot != null && IsDescendantOf(closeButton.transform, detailRoot));
+        if (closeLooksInvalid && listRoot != null)
+        {
+            Button resolvedClose = FindButtonOutsideHierarchy(listRoot, detailRoot, "close", previousButton);
+            if (resolvedClose == null)
+                resolvedClose = FindButtonOutsideHierarchy(listRoot, detailRoot, "previous", previousButton);
+            if (resolvedClose != null)
+                closeButton = resolvedClose;
+        }
+
+        if (previousButton != null && closeButton != null && previousButton == closeButton)
+            Debug.LogWarning("[WineRackJournalList] Previous and Close still reference the same button. Using context-based click fallback.");
+    }
+
+    private void WireNavigationButtons()
+    {
+        if (previousButton != null && closeButton != null && previousButton == closeButton)
+        {
+            previousButton.onClick = new Button.ButtonClickedEvent();
+            previousButton.onClick.AddListener(OnSharedNavigationButtonClicked);
+            return;
+        }
+
+        if (previousButton != null)
+        {
+            previousButton.onClick = new Button.ButtonClickedEvent();
+            previousButton.onClick.AddListener(OnPreviousButtonClicked);
+        }
+
+        if (closeButton != null)
+        {
+            closeButton.onClick = new Button.ButtonClickedEvent();
+            closeButton.onClick.AddListener(OnCloseButtonClicked);
+        }
+    }
+
+    private void UpdateNavigationButtons(bool isDetailView)
+    {
+        if (previousButton != null && closeButton != null && previousButton == closeButton)
+        {
+            previousButton.gameObject.SetActive(_isVisible);
+            return;
+        }
+
+        if (previousButton != null)
+            previousButton.gameObject.SetActive(_isVisible && isDetailView);
+
+        if (closeButton != null)
+            closeButton.gameObject.SetActive(_isVisible && !isDetailView);
+    }
+
+    private void OnPreviousButtonClicked()
+    {
+        HideDetail();
+    }
+
+    private void OnCloseButtonClicked()
+    {
+        HideCanvas();
+    }
+
+    private void OnSharedNavigationButtonClicked()
+    {
+        if (journalCanvas != null && journalCanvas.activeSelf)
+            HideDetail();
+        else
+            HideCanvas();
+    }
+
+    private static bool IsDescendantOf(Transform target, Transform potentialAncestor)
+    {
+        if (target == null || potentialAncestor == null)
+            return false;
+
+        Transform current = target;
+        while (current != null)
+        {
+            if (current == potentialAncestor)
+                return true;
+            current = current.parent;
+        }
+
+        return false;
+    }
+
+    private static Button FindButtonInHierarchy(Transform root, string nameContains)
+    {
+        if (root == null)
+            return null;
+
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        if (buttons == null || buttons.Length == 0)
+            return null;
+
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            var btn = buttons[i];
+            if (btn == null)
+                continue;
+
+            if (string.IsNullOrEmpty(nameContains)
+                || btn.gameObject.name.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) >= 0)
+                return btn;
+        }
+
+        return null;
+    }
+
+    private static Button FindButtonOutsideHierarchy(Transform root, Transform excludedRoot, string nameContains, Button excludeButton)
+    {
+        if (root == null)
+            return null;
+
+        Button[] buttons = root.GetComponentsInChildren<Button>(true);
+        if (buttons == null || buttons.Length == 0)
+            return null;
+
+        for (int i = 0; i < buttons.Length; i++)
+        {
+            var btn = buttons[i];
+            if (btn == null || btn == excludeButton)
+                continue;
+
+            if (excludedRoot != null && IsDescendantOf(btn.transform, excludedRoot))
+                continue;
+
+            if (!string.IsNullOrEmpty(nameContains)
+                && btn.gameObject.name.IndexOf(nameContains, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            return btn;
+        }
+
+        return null;
+    }
+
     private void EnsureOpaqueDetailBackdrop()
     {
-        if (!enforceOpaqueDetailBackdrop || journalCanvas == null)
+        if (!enforceOpaqueDetailBackdrop || journalListCanvas == null)
             return;
 
-        var journalRect = journalCanvas.GetComponent<RectTransform>();
-        if (journalRect == null)
+        var rootRect = journalListCanvas.GetComponent<RectTransform>();
+        if (rootRect == null)
             return;
 
-        Transform existing = journalRect.Find(AutoDetailBackdropName);
+        Transform existing = rootRect.Find(AutoDetailBackdropName);
         Image backdropImage;
 
         if (existing == null)
         {
             var go = new GameObject(AutoDetailBackdropName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
             var backdropRect = go.GetComponent<RectTransform>();
-            backdropRect.SetParent(journalRect, false);
+            backdropRect.SetParent(rootRect, false);
             backdropRect.anchorMin = Vector2.zero;
             backdropRect.anchorMax = Vector2.one;
             backdropRect.offsetMin = Vector2.zero;
             backdropRect.offsetMax = Vector2.zero;
-            backdropRect.SetAsFirstSibling();
+            int targetIndex = rootRect.childCount > 1 ? 1 : 0;
+            backdropRect.SetSiblingIndex(targetIndex);
 
             backdropImage = go.GetComponent<Image>();
         }
@@ -349,7 +523,8 @@ public class WineRackJournalListController : MonoBehaviour
                 existingRect.anchorMax = Vector2.one;
                 existingRect.offsetMin = Vector2.zero;
                 existingRect.offsetMax = Vector2.zero;
-                existingRect.SetAsFirstSibling();
+                int targetIndex = rootRect.childCount > 1 ? 1 : 0;
+                existingRect.SetSiblingIndex(targetIndex);
             }
 
             backdropImage = existing.GetComponent<Image>();
@@ -363,9 +538,27 @@ public class WineRackJournalListController : MonoBehaviour
         backdropImage.sprite = detailBackdropSprite;
         backdropImage.type = detailBackdropSprite != null ? Image.Type.Sliced : Image.Type.Simple;
         backdropImage.raycastTarget = false;
+
+        _detailBackdropImage = backdropImage;
     }
 
-    private static string TruncateTitleForList(string title, int maxWords = 5)
+    private void SetDetailBackdropActive(bool visible)
+    {
+        if (!enforceOpaqueDetailBackdrop)
+        {
+            if (_detailBackdropImage != null)
+                _detailBackdropImage.gameObject.SetActive(false);
+            return;
+        }
+
+        if (_detailBackdropImage == null)
+            EnsureOpaqueDetailBackdrop();
+
+        if (_detailBackdropImage != null)
+            _detailBackdropImage.gameObject.SetActive(visible);
+    }
+
+    private static string TruncateTitleForList(string title, int maxWords)
     {
         if (string.IsNullOrWhiteSpace(title))
             return string.Empty;

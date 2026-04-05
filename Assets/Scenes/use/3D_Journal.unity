@@ -1097,6 +1097,7 @@ ParticleSystemRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 0}
+  - {fileID: 0}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -8790,44 +8791,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 438892556}
   m_CullTransparentMesh: 1
---- !u!21 &450890498
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1001 &470563308
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -17419,6 +17382,44 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 37.6, y: 90, z: 0}
+--- !u!21 &1276907043
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!64 &1283607379
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -18393,7 +18394,7 @@ MonoBehaviour:
   enterAnimatorTrigger: Enter
   portalAudioSource: {fileID: 38149602}
   enterSfx: {fileID: 8300000, guid: 28247823dbcb92f4bb84b4932fde5dec, type: 3}
-  enterSfxVolume: 0.7
+  enterSfxVolume: 1
   stopIdleLoopOnEnter: 0
   playEnterBurstVfx: 0
   portalRingVfx: {fileID: 1361628423}
@@ -19958,7 +19959,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 450890498}
+  - {fileID: 1276907043}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -31140,7 +31141,7 @@ MonoBehaviour:
   _placeholderColliders: []
   _rackDetector: {fileID: 6000000014}
   plugSfxSource: {fileID: 1671912534}
-  _debugStateLogs: 1
+  _debugStateLogs: 0
 --- !u!4 &6000000012 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 262d1562b31badd4389ea90daefd1628, type: 3}
@@ -31222,8 +31223,10 @@ MonoBehaviour:
   previousButton: {fileID: 1333922690}
   listContentParent: {fileID: 567793872}
   journalEntryPrefab: {fileID: 6116714263341541039, guid: 833be3171a636324db32093580b14a91, type: 3}
+  listTitleMaxWords: 6
   bgNoJournals: {fileID: 131814471}
   closeButton: {fileID: 1333922690}
+  autoResolveNavigationButtons: 1
   enforceOpaqueDetailBackdrop: 1
   detailBackdropColor: {r: 0.98, g: 0.94, b: 0.96, a: 1}
   detailBackdropSprite: {fileID: 0}
@@ -145208,6 +145211,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SeaBottleDetector
   reviewController: {fileID: 6000000011}
+  seaSplashClip: {fileID: 8300000, guid: 0798dc58d63ee65489e1e01ed43316a0, type: 3}
+  seaSplashVolume: 1
   bottleTag: JournalBottle
 --- !u!65 &7388969272661954647
 BoxCollider:

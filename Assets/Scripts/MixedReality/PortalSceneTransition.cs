@@ -481,7 +481,7 @@ public class PortalSceneTransition : MonoBehaviour
     {
         enterSpinDuration = Mathf.Max(enterSpinDuration, minimumComfortLoadDelay);
         loadDelay = Mathf.Max(loadDelay, minimumComfortLoadDelay, enterSpinDuration);
-        enterSfxVolume = Mathf.Min(enterSfxVolume, 0.7f);
+        enterSfxVolume = Mathf.Min(enterSfxVolume, 1f);
 
         idleParticleSpinSpeed = Mathf.Clamp(idleParticleSpinSpeed, 0.05f, 0.35f);
         enterParticleSpinSpeed = Mathf.Max(enterParticleSpinSpeed, idleParticleSpinSpeed + 0.45f);

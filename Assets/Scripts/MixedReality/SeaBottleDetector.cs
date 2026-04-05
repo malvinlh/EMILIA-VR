@@ -24,6 +24,12 @@ public class SeaBottleDetector : MonoBehaviour
     [Tooltip("JournalReviewController that manages the post-journal flow.")]
     public JournalReviewController reviewController;
 
+    [Header("Audio")]
+    [Tooltip("Splash SFX played immediately on first valid bottle-sea contact.")]
+    public AudioClip seaSplashClip;
+    [Tooltip("Volume for the sea splash SFX.")]
+    [Range(0f, 1f)] public float seaSplashVolume = 1f;
+
     [Header("Detection")]
     [Tooltip("Tag assigned to the PostJournal bottle root GameObject.")]
     public string bottleTag = "JournalBottle";
@@ -81,12 +87,25 @@ public class SeaBottleDetector : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[SeaBottleDetector] Bottle '{other.name}' matched tag '{bottleTag}' — triggering HandleBottleInSea.");
         _triggered = true;
+        // First action on initial sea contact: play splash before bottle disposal flow.
+        PlaySeaSplash(other.position);
+        Debug.Log($"[SeaBottleDetector] Bottle '{other.name}' matched tag '{bottleTag}' — triggering HandleBottleInSea.");
         reviewController.HandleBottleInSea();
 
         // Reset after a delay so a new session can trigger it again.
         Invoke(nameof(ResetTrigger), 5f);
+    }
+
+    private void PlaySeaSplash(Vector3 worldPosition)
+    {
+        if (seaSplashClip == null)
+        {
+            Debug.LogWarning("[SeaBottleDetector] seaSplashClip is not assigned. Skipping splash SFX.");
+            return;
+        }
+
+        AudioSource.PlayClipAtPoint(seaSplashClip, worldPosition, seaSplashVolume);
     }
 
     /// <summary>
