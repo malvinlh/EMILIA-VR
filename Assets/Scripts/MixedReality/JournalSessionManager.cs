@@ -973,6 +973,9 @@ public class JournalSessionManager : MonoBehaviour
     /// </summary>
     private void OnJournalingEntered()
     {
+        // During writing, keep AZKi hidden and non-locomoting until review begins.
+        reviewController?.EnterJournalingMode();
+
         // Reset pages: title page (0) + first content page (1)
         ScribbleManager.Instance?.ClearAll();
 
@@ -1039,6 +1042,9 @@ public class JournalSessionManager : MonoBehaviour
 
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
+
+        // Session teardown is complete; AZKi may return to roaming from review lock/cheering hold.
+        reviewController?.OnSessionEnded();
 
         SetButtonVisible(true);
         CurrentState = SessionState.Idle;

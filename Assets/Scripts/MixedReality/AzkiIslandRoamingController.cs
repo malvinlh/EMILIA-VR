@@ -81,6 +81,10 @@ public class AzkiIslandRoamingController : MonoBehaviour
     [Tooltip("Animator state path for ending cheering animation.")]
     [SerializeField] private string cheeringStateName = "Base Layer.Cheering";
 
+    [Tooltip("Normalized time used when freezing the final cheering pose (1.0 = end of clip).")]
+    [Range(0.9f, 1f)]
+    [SerializeField] private float cheeringHoldNormalizedTime = 0.995f;
+
     [Tooltip("Cross-fade duration used when changing patrol animation state.")]
     [Range(0f, 0.5f)]
     [SerializeField] private float stateCrossFadeSeconds = 0.12f;
@@ -131,6 +135,8 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
     private AnimationOverrideMode _overrideMode = AnimationOverrideMode.None;
     private bool _cheeringFinished;
+    private bool _isCheeringPoseHeld;
+    private float _defaultAnimatorSpeed = 1f;
 
     private int _idleHash;
     private int _idleBHash;
@@ -155,7 +161,10 @@ public class AzkiIslandRoamingController : MonoBehaviour
         CacheAnimatorStateHashes();
 
         if (_animator != null)
+        {
             _animator.applyRootMotion = false;
+            _defaultAnimatorSpeed = Mathf.Approximately(_animator.speed, 0f) ? 1f : _animator.speed;
+        }
     }
 
     private void Start()
@@ -221,6 +230,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
     public void LockAtAuthoredPose()
     {
         InitializeIfNeeded();
+        ReleaseCheeringPoseHold();
 
         _isLocked = true;
         _isIdling = false;
@@ -270,6 +280,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
     public void PlayCheeringOneShot()
     {
         LockAtAuthoredPose();
+        ReleaseCheeringPoseHold();
         _overrideMode = AnimationOverrideMode.CheeringOnce;
         _cheeringFinished = false;
         EnforceAnimation(PatrolAnimation.Cheering, force: true);
@@ -281,6 +292,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
     public void ResumeRoaming()
     {
         InitializeIfNeeded();
+        ReleaseCheeringPoseHold();
 
         _isLocked = false;
         _overrideMode = AnimationOverrideMode.None;
@@ -511,6 +523,24 @@ public class AzkiIslandRoamingController : MonoBehaviour
                 return;
 
             case AnimationOverrideMode.CheeringOnce:
+                if (_isCheeringPoseHeld)
+                {
+                    if (_animator == null)
+                        return;
+
+                    if (_animator.IsInTransition(0))
+                        return;
+
+                    var heldInfo = _animator.GetCurrentAnimatorStateInfo(0);
+                    if (!StateMatches(heldInfo, _cheeringHash, _cheeringShortHash))
+                    {
+                        ReleaseCheeringPoseHold();
+                        _cheeringFinished = false;
+                        EnforceAnimation(PatrolAnimation.Cheering, force: true);
+                    }
+                    return;
+                }
+
                 if (!_cheeringFinished)
                 {
                     EnforceAnimation(PatrolAnimation.Cheering, force: false);
@@ -519,15 +549,18 @@ public class AzkiIslandRoamingController : MonoBehaviour
                         return;
 
                     var cheerInfo = _animator.GetCurrentAnimatorStateInfo(0);
-                    if (StateMatches(cheerInfo, _cheeringHash, _cheeringShortHash) && cheerInfo.normalizedTime >= 1f)
+                    if (!StateMatches(cheerInfo, _cheeringHash, _cheeringShortHash))
                     {
-                        _cheeringFinished = true;
-                        EnforceAnimation(PatrolAnimation.Idle, force: true);
+                        EnforceAnimation(PatrolAnimation.Cheering, force: true);
+                        return;
                     }
+
+                    if (cheerInfo.normalizedTime >= 1f)
+                        HoldCheeringPose();
                 }
                 else
                 {
-                    EnforceAnimation(PatrolAnimation.Idle, force: false);
+                    HoldCheeringPose();
                 }
                 return;
 
@@ -535,6 +568,32 @@ public class AzkiIslandRoamingController : MonoBehaviour
                 EnforceAnimation(PatrolAnimation.Idle, force: false);
                 return;
         }
+    }
+
+    private void HoldCheeringPose()
+    {
+        if (_animator == null || !_animator.HasState(0, _cheeringHash))
+            return;
+
+        float holdTime = Mathf.Clamp01(cheeringHoldNormalizedTime);
+        _animator.Play(_cheeringHash, 0, holdTime);
+        _animator.Update(0f);
+        _animator.speed = 0f;
+
+        _cheeringFinished = true;
+        _isCheeringPoseHeld = true;
+    }
+
+    private void ReleaseCheeringPoseHold()
+    {
+        if (_animator != null)
+        {
+            float restoreSpeed = Mathf.Approximately(_defaultAnimatorSpeed, 0f) ? 1f : _defaultAnimatorSpeed;
+            if (_isCheeringPoseHeld || Mathf.Approximately(_animator.speed, 0f))
+                _animator.speed = restoreSpeed;
+        }
+
+        _isCheeringPoseHeld = false;
     }
 
     private void EnforceAnimation(PatrolAnimation target, bool force)

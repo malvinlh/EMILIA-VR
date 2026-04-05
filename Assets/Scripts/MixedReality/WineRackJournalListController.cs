@@ -139,7 +139,7 @@ public class WineRackJournalListController : MonoBehaviour
         if (canvasRoot.GetComponent<TrackedDeviceGraphicRaycaster>() != null) return;
 
         var legacy = canvasRoot.GetComponent<GraphicRaycaster>();
-        if (legacy != null) Object.Destroy(legacy);
+        if (legacy != null) UnityEngine.Object.Destroy(legacy);
 
         canvasRoot.AddComponent<TrackedDeviceGraphicRaycaster>();
         Debug.Log("[WineRackJournalList] Replaced GraphicRaycaster with TrackedDeviceGraphicRaycaster.");

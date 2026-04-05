@@ -218,6 +218,36 @@ public class JournalReviewController : MonoBehaviour
         StartCoroutine(ReviewCoroutine());
     }
 
+    /// <summary>
+    /// Called when journaling starts so AZKi is hidden and cannot locomote during writing.
+    /// </summary>
+    public void EnterJournalingMode()
+    {
+        EnsureAvatarRoamingController();
+        avatarRoamingController?.LockAtAuthoredPose();
+
+        if (avatarRoot != null)
+            avatarRoot.gameObject.SetActive(false);
+
+        HideChoicePanel();
+        _dialoguePanel?.Hide();
+        _dialogueFader?.HideImmediate();
+        if (_screenFadeOverlay != null)
+            _screenFadeOverlay.SetActive(false);
+
+        LogStateSnapshot("EnterJournalingMode");
+    }
+
+    /// <summary>
+    /// Called by JournalSessionManager after the journaling session is fully ended.
+    /// Releases any review lock/pose hold and returns AZKi to roaming.
+    /// </summary>
+    public void OnSessionEnded()
+    {
+        ResumeAvatarRoaming();
+        LogStateSnapshot("OnSessionEnded");
+    }
+
     // ================================================================
     // REVIEW FLOW
     // ================================================================
@@ -780,9 +810,8 @@ public class JournalReviewController : MonoBehaviour
         Debug.Log("[JournalReview] Typewriter done. Waiting 1s...");
         yield return new WaitForSeconds(1f);
 
-        // Fade out dialogue and resume island roaming.
+        // Fade out dialogue. AZKi keeps the final cheering pose until session teardown completes.
         _dialogueFader?.FadeOut();
-        ResumeAvatarRoaming();
 
         // Re-enable the start button area, whiteboard UI, and hide the post-journal bottle.
         ResetSceneGroups();
@@ -1050,8 +1079,6 @@ public class JournalReviewController : MonoBehaviour
 
         _dialogueFader?.FadeOut();
         HideChoicePanel();
-
-        ResumeAvatarRoaming();
 
         ResetSceneGroups();
         _onComplete?.Invoke(saveJournal);
