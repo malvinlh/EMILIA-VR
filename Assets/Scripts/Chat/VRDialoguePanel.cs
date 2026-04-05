@@ -54,9 +54,22 @@ public class VRDialoguePanel : MonoBehaviour
     private int  _currentPage;
     private bool _waitingForAdvance;
     private string _fullParsedText;
+    private bool _isAssistantResponseVisible;
 
     /// <summary>Fired when the last page finishes typewriter reveal.</summary>
     public event Action OnContentFullyDisplayed;
+
+    /// <summary>
+    /// Fired when assistant response visibility changes.
+    /// True while AI response text/agentic content is visible, false when hidden or typing only.
+    /// </summary>
+    public event Action<bool> OnAssistantResponseVisibilityChanged;
+
+    /// <summary>
+    /// True while the panel is displaying assistant response content.
+    /// This excludes typing-indicator mode.
+    /// </summary>
+    public bool IsAssistantResponseVisible => _isAssistantResponseVisible;
 
     private struct PageSpan
     {
@@ -86,6 +99,12 @@ public class VRDialoguePanel : MonoBehaviour
             _pokeTarget.onClick.RemoveListener(AdvancePage);
     }
 
+    private void Update()
+    {
+        if (_isAssistantResponseVisible && _fader != null && _fader.IsHidden)
+            SetAssistantResponseVisible(false);
+    }
+
     #endregion
 
     #region Public API
@@ -96,6 +115,7 @@ public class VRDialoguePanel : MonoBehaviour
     public void ShowText(string rawText)
     {
         StopAllEffects();
+        SetAssistantResponseVisible(true);
 
         if (_quotePanel != null) _quotePanel.SetActive(false);
 
@@ -113,6 +133,7 @@ public class VRDialoguePanel : MonoBehaviour
     public void ShowAgentic(string reasoning, string response)
     {
         StopAllEffects();
+        SetAssistantResponseVisible(true);
 
         bool hasReasoning = !string.IsNullOrWhiteSpace(reasoning);
 
@@ -140,6 +161,7 @@ public class VRDialoguePanel : MonoBehaviour
     public void ShowTypingIndicator()
     {
         StopAllEffects();
+        SetAssistantResponseVisible(false);
 
         if (_quotePanel != null) _quotePanel.SetActive(false);
         HidePaginationUI();
@@ -154,6 +176,7 @@ public class VRDialoguePanel : MonoBehaviour
     public void Hide()
     {
         StopAllEffects();
+        SetAssistantResponseVisible(false);
         _fader.FadeOut();
     }
 
@@ -386,6 +409,15 @@ public class VRDialoguePanel : MonoBehaviour
 
         _pages.Clear();
         _currentPage = 0;
+    }
+
+    private void SetAssistantResponseVisible(bool visible)
+    {
+        if (_isAssistantResponseVisible == visible)
+            return;
+
+        _isAssistantResponseVisible = visible;
+        OnAssistantResponseVisibilityChanged?.Invoke(visible);
     }
 
     #endregion

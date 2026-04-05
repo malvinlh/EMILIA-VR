@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using EMILIA.Data;
 using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
 /// Orchestrates the VR chat experience in the 3D_Chat scene.
@@ -25,6 +26,9 @@ public class VRChatBridge : MonoBehaviour
 
     [Header("VR Dialogue")]
     [SerializeField] private VRDialoguePanel _dialoguePanel;
+
+    [Header("AZKi")]
+    [SerializeField] private AzkiChatWaypointPatrolController _azkiPatrol;
 
     [Header("Audio Recording")]
     [SerializeField] private RecordAudio _recorder;
@@ -85,10 +89,12 @@ public class VRChatBridge : MonoBehaviour
     private void Awake()
     {
         _isReasoningMode = _startInReasoningMode;
+        EnsureAzkiPatrol();
     }
 
     private void Start()
     {
+        EnsureAzkiPatrol();
         _userId = PlayerPrefs.GetString(PrefKeyNickname, "");
         FetchConversationIds();
     }
@@ -732,6 +738,128 @@ public class VRChatBridge : MonoBehaviour
             .Max() + 1;
 
         return $"{_userId}_cv{nextIdx:00}";
+    }
+
+    private void EnsureAzkiPatrol()
+    {
+        if (_dialoguePanel == null)
+            _dialoguePanel = FindFirstObjectByType<VRDialoguePanel>();
+
+        GameObject azkiHost = FindPreferredAzkiHostObject();
+        if (azkiHost != null)
+        {
+            var hostPatrol = azkiHost.GetComponent<AzkiChatWaypointPatrolController>();
+            if (hostPatrol == null)
+                hostPatrol = azkiHost.AddComponent<AzkiChatWaypointPatrolController>();
+
+            // Keep the parent-hosted controller as the active one.
+            var existingControllers = FindObjectsOfType<AzkiChatWaypointPatrolController>(true);
+            foreach (var controller in existingControllers)
+            {
+                if (controller == null || controller == hostPatrol)
+                    continue;
+
+                controller.enabled = false;
+            }
+
+            _azkiPatrol = hostPatrol;
+        }
+        else if (_azkiPatrol == null)
+        {
+            _azkiPatrol = FindFirstObjectByType<AzkiChatWaypointPatrolController>();
+        }
+
+        if (_azkiPatrol != null && _dialoguePanel != null)
+            _azkiPatrol.SetDialoguePanel(_dialoguePanel);
+    }
+
+    private GameObject FindPreferredAzkiHostObject()
+    {
+        Transform bestAnimatorTransform = null;
+        int bestAnimatorDepth = int.MaxValue;
+
+        var animators = FindObjectsOfType<Animator>(true);
+        foreach (var animator in animators)
+        {
+            if (animator == null)
+                continue;
+
+            if (animator.name.IndexOf("azki", StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            int depth = GetTransformDepth(animator.transform);
+            if (depth < bestAnimatorDepth)
+            {
+                bestAnimatorDepth = depth;
+                bestAnimatorTransform = animator.transform;
+            }
+        }
+
+        if (bestAnimatorTransform != null)
+            return ClimbToPreferredParent(bestAnimatorTransform).gameObject;
+
+        Transform bestByName = null;
+        int bestNameDepth = int.MaxValue;
+
+        var allTransforms = FindObjectsOfType<Transform>(true);
+        foreach (var t in allTransforms)
+        {
+            if (t == null)
+                continue;
+
+            if (t.name.IndexOf("azki", StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+
+            int depth = GetTransformDepth(t);
+            if (depth < bestNameDepth)
+            {
+                bestNameDepth = depth;
+                bestByName = t;
+            }
+        }
+
+        if (bestByName == null)
+            return null;
+
+        return ClimbToPreferredParent(bestByName).gameObject;
+    }
+
+    private static Transform ClimbToPreferredParent(Transform start)
+    {
+        Transform current = start;
+
+        while (current.parent != null)
+        {
+            Transform parent = current.parent;
+
+            bool parentLooksLikeAzki =
+                parent.name.IndexOf("azki", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool parentHasCoreComponents =
+                parent.GetComponent<Animator>() != null ||
+                parent.GetComponent<NavMeshAgent>() != null ||
+                parent.GetComponent<CharacterController>() != null;
+
+            if (!parentLooksLikeAzki && !parentHasCoreComponents)
+                break;
+
+            current = parent;
+        }
+
+        return current;
+    }
+
+    private static int GetTransformDepth(Transform t)
+    {
+        int depth = 0;
+        Transform cursor = t;
+
+        while (cursor.parent != null)
+        {
+            depth++;
+            cursor = cursor.parent;
+        }
+
+        return depth;
     }
 
     #endregion

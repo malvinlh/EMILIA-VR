@@ -20,7 +20,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
     [Tooltip("Radius (meters) from the authored AZKi position used for patrol destinations.")]
     [Min(0.5f)]
-    [SerializeField] private float patrolRadius = 12f;
+    [SerializeField] private float patrolRadius = 100f;
 
     [Tooltip("How close AZKi must be to consider a destination reached.")]
     [Min(0.05f)]
