@@ -38,8 +38,14 @@ public class AzkiIslandRoamingController : MonoBehaviour
     [Range(1, 64)]
     [SerializeField] private int maxPatrolPointAttempts = 12;
 
-    [Tooltip("If true, builds NavMeshSurface once at runtime when roaming starts.")]
-    [SerializeField] private bool buildNavMeshOnStart = true;
+    [Tooltip("Runtime fallback only. Keep disabled when scene navmesh is pre-baked.")]
+    [SerializeField] private bool buildNavMeshOnStart = false;
+
+    [Tooltip("Skip runtime build when a usable NavMesh is already available near AZKi.")]
+    [SerializeField] private bool skipRuntimeBuildIfNavMeshPresent = true;
+
+    [Tooltip("Geometry source for runtime build fallback. PhysicsColliders avoids mesh read-access warnings in player builds.")]
+    [SerializeField] private NavMeshCollectGeometry runtimeBuildGeometry = NavMeshCollectGeometry.PhysicsColliders;
 
     [Header("Idle Timing")]
     [Tooltip("Minimum idle duration between patrol points.")]
@@ -114,6 +120,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
     private bool _authoredPoseCaptured;
 
     private bool _navMeshBuilt;
+    private bool _loggedMissingNavMesh;
     private bool _isLocked;
     private bool _isIdling;
     private float _idleUntilTime;
@@ -289,10 +296,16 @@ public class AzkiIslandRoamingController : MonoBehaviour
             _agent.enabled = true;
 
         if (buildNavMeshOnStart && !_navMeshBuilt)
-            BuildRuntimeNavMesh();
+            BuildRuntimeNavMeshIfNeeded();
 
         if (!EnsureAgentOnNavMesh())
         {
+            if (!_loggedMissingNavMesh)
+            {
+                _loggedMissingNavMesh = true;
+                Debug.LogWarning("[AzkiIslandRoamingController] No NavMesh found for AZKi. Bake NavMesh for the scene or enable runtime build fallback.", this);
+            }
+
             EnforceAnimation(PatrolAnimation.Idle, force: true);
             return;
         }
@@ -367,11 +380,28 @@ public class AzkiIslandRoamingController : MonoBehaviour
             var surfaceGo = new GameObject("__AZKi_NavMeshSurfaceRuntime");
             navMeshSurface = surfaceGo.AddComponent<NavMeshSurface>();
             navMeshSurface.collectObjects = CollectObjects.All;
-            navMeshSurface.useGeometry = NavMeshCollectGeometry.RenderMeshes;
         }
+
+        navMeshSurface.useGeometry = runtimeBuildGeometry;
 
         navMeshSurface.BuildNavMesh();
         _navMeshBuilt = true;
+    }
+
+    private void BuildRuntimeNavMeshIfNeeded()
+    {
+        if (skipRuntimeBuildIfNavMeshPresent && IsNavMeshAvailable())
+            return;
+
+        BuildRuntimeNavMesh();
+    }
+
+    private bool IsNavMeshAvailable()
+    {
+        if (NavMesh.SamplePosition(transform.position, out _, navMeshSampleDistance, NavMesh.AllAreas))
+            return true;
+
+        return NavMesh.SamplePosition(_authoredPosition, out _, navMeshSampleDistance * 2f, NavMesh.AllAreas);
     }
 
     private bool EnsureAgentOnNavMesh()

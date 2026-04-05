@@ -8,15 +8,15 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/use/3D_Login.unity
     guid: 6c0015102a1fdb34dba0fb37f70de7d8
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/use/3D_Chat.unity
     guid: 594615e139b2ae84295b8cb7ea1fce00
   - enabled: 1
     path: Assets/Scenes/use/3D_Journal.unity
-    guid: 5c132f70d6e126444b8e6f9ec310da3a
+    guid: 131524dee0d392e4b877668af592d558
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 12ce517d4990ce841994808bf5c4f998, type: 2}

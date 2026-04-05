@@ -38,7 +38,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     [Header("Navigation")]
     [SerializeField] private NavMeshSurface navMeshSurface;
 
-    [SerializeField] private bool buildNavMeshOnStart = true;
+    [Tooltip("Runtime fallback only. Keep disabled when scene navmesh is pre-baked.")]
+    [SerializeField] private bool buildNavMeshOnStart = false;
 
     [Tooltip("Skip runtime build when NavMesh is already available near AZKi or patrol points.")]
     [SerializeField] private bool skipRuntimeBuildIfNavMeshPresent = true;
@@ -125,6 +126,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     private Quaternion _targetStopRotation;
 
     private bool _talkActive;
+    private bool _loggedMissingNavMesh;
 
     private int _stopsSinceIdleB = int.MaxValue;
     private AnimState _currentAnimState = AnimState.Idle;
@@ -180,6 +182,12 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
         if (!EnsureAgentOnNavMesh())
         {
+            if (!_loggedMissingNavMesh)
+            {
+                _loggedMissingNavMesh = true;
+                Debug.LogWarning("[AzkiChatWaypointPatrolController] No NavMesh found for AZKi. Bake NavMesh for 3D_Chat or enable runtime build fallback.", this);
+            }
+
             EnforceAnimation(AnimState.Idle, force: true);
             return;
         }
