@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using EMILIA.Data;
 using TMPro;
 using UnityEngine;
@@ -66,13 +67,17 @@ public class VRHistoryPanel : MonoBehaviour
 
     #region Colors
 
-    private static readonly Color ConvBtnNormal = new(1f, 1f, 1f, 0.06f);
-    private static readonly Color ConvBtnHighlight = new(1f, 1f, 1f, 0.15f);
-    private static readonly Color ConvBtnPressed = new(1f, 1f, 1f, 0.25f);
-    private static readonly Color UserNameColor = new(0.85f, 0.85f, 0.85f, 1f);
-    private static readonly Color EmiliaNameColor = new(140f / 255f, 191f / 255f, 255f / 255f, 1f);
-    private static readonly Color UserTextColor = new(0.75f, 0.75f, 0.75f, 1f);
-    private static readonly Color EmiliaTextColor = new(0.9f, 0.9f, 0.9f, 1f);
+    private static readonly Color ConvBtnNormal = new(0.49f, 0.36f, 0.42f, 0.92f);
+    private static readonly Color ConvBtnHighlight = new(0.58f, 0.43f, 0.5f, 0.95f);
+    private static readonly Color ConvBtnPressed = new(0.41f, 0.29f, 0.35f, 0.97f);
+    private static readonly Color ConvBtnTextColor = new(247f / 255f, 234f / 255f, 234f / 255f, 1f);
+    private static readonly Color UserNameColor = new(0.38f, 0.24f, 0.31f, 1f);
+    private static readonly Color EmiliaNameColor = new(0.5f, 0.29f, 0.39f, 1f);
+    private static readonly Color UserTextColor = new(0.23f, 0.16f, 0.21f, 1f);
+    private static readonly Color EmiliaTextColor = new(0.2f, 0.14f, 0.19f, 1f);
+
+    private static readonly Regex TopicPrefixRegex =
+        new(@"^\s*(judul\s*topik|topik|topic)\s*[:\-]\s*", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     #endregion
 
@@ -230,11 +235,11 @@ public class VRHistoryPanel : MonoBehaviour
         _spawnedItems.Add(go);
 
         var rect = go.AddComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(0, 50);
+        rect.sizeDelta = new Vector2(0, 58);
 
         var le = go.AddComponent<LayoutElement>();
         le.flexibleWidth   = 1;
-        le.preferredHeight = 50;
+        le.preferredHeight = 58;
 
         // Background image for button
         var img = go.AddComponent<Image>();
@@ -257,15 +262,15 @@ public class VRHistoryPanel : MonoBehaviour
         var textRect = textGo.AddComponent<RectTransform>();
         textRect.anchorMin = Vector2.zero;
         textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = new Vector2(12, 4);
-        textRect.offsetMax = new Vector2(-12, -4);
+        textRect.offsetMin = new Vector2(14, 6);
+        textRect.offsetMax = new Vector2(-14, -6);
 
         var tmp = textGo.AddComponent<TextMeshProUGUI>();
         if (_buttonFont != null) tmp.font = _buttonFont;
-        string title = _chatBridge.GetConversationTitle(convId);
+        string title = SanitizeTitleForDisplay(_chatBridge.GetConversationTitle(convId));
         tmp.text = title.Length > 40 ? title[..40] + "..." : title;
-        tmp.fontSize = 22;
-        tmp.color = new Color(0.92f, 0.92f, 0.95f, 1f);
+        tmp.fontSize = 24;
+        tmp.color = ConvBtnTextColor;
         tmp.alignment = TextAlignmentOptions.MidlineLeft;
         tmp.overflowMode = TextOverflowModes.Ellipsis;
         tmp.textWrappingMode = TextWrappingModes.NoWrap;
@@ -286,7 +291,7 @@ public class VRHistoryPanel : MonoBehaviour
 
         if (_titleLabel != null)
         {
-            string title = _chatBridge.GetConversationTitle(conversationId);
+            string title = SanitizeTitleForDisplay(_chatBridge.GetConversationTitle(conversationId));
             _titleLabel.text = title.Length > 25 ? title[..25] + "..." : title;
         }
         if (_backButton != null)
@@ -372,6 +377,15 @@ public class VRHistoryPanel : MonoBehaviour
     #endregion
 
     #region Helpers
+
+    private static string SanitizeTitleForDisplay(string title)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return "New Chat";
+
+        string cleaned = TopicPrefixRegex.Replace(title, "").Trim();
+        return string.IsNullOrWhiteSpace(cleaned) ? "New Chat" : cleaned;
+    }
 
     private void ClearItems()
     {

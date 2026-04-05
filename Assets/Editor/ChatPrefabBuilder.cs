@@ -296,6 +296,10 @@ public static class ChatPrefabBuilder
         string path = $"{PrefabFolder}/VRHistoryItem.prefab";
         if (!ConfirmOverwrite(path)) return false;
 
+        var historyItemBgColor = new Color(0.78f, 0.67f, 0.72f, 0.24f);
+        var historySpeakerColor = new Color(0.45882353f, 0.3019608f, 0.36862746f, 1f);
+        var historyBodyColor = new Color(0.23137255f, 0.16078432f, 0.21176471f, 1f);
+
         // ── Root with VerticalLayoutGroup for speaker + text stacking ──
         var root = new GameObject("VRHistoryItem");
         var rootRect = root.AddComponent<RectTransform>();
@@ -316,11 +320,11 @@ public static class ChatPrefabBuilder
 
         // Subtle separator background
         var bgImg = root.AddComponent<Image>();
-        bgImg.color = new Color(1f, 1f, 1f, 0.03f);
+        bgImg.color = historyItemBgColor;
         bgImg.raycastTarget = false;
 
         // ── SpeakerLabel ──
-        var speakerGo = CreateTMP(root, "SpeakerLabel", "EMILIA", inter, 20f, NameColor);
+        var speakerGo = CreateTMP(root, "SpeakerLabel", "EMILIA", inter, 20f, historySpeakerColor);
         var speakerTmp = speakerGo.GetComponent<TMP_Text>();
         speakerTmp.fontStyle = FontStyles.Bold;
         speakerTmp.alignment = TextAlignmentOptions.TopLeft;
@@ -329,7 +333,7 @@ public static class ChatPrefabBuilder
         speakerTmp.raycastTarget = false;
 
         // ── MessageText ──
-        var msgGo = CreateTMP(root, "MessageText", "", inter, 22f, BodyTextColor);
+        var msgGo = CreateTMP(root, "MessageText", "", inter, 22f, historyBodyColor);
         var msgTmp = msgGo.GetComponent<TMP_Text>();
         msgTmp.alignment = TextAlignmentOptions.TopLeft;
         msgTmp.enableWordWrapping = true;
