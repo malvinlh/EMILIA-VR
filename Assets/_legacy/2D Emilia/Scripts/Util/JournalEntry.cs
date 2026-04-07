@@ -38,7 +38,7 @@ public class JournalEntry : MonoBehaviour
 
         // Auto-find references if not assigned
         if (deleteButton == null)
-            deleteButton = transform.Find("DeleteButton")?.GetComponent<Button>();
+            deleteButton = transform.Find("LetNull")?.GetComponent<Button>();
         if (editButton == null)
             editButton = transform.Find("EditButton")?.GetComponent<Button>();
 
