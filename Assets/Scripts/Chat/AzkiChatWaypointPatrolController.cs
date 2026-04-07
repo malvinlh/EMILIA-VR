@@ -85,6 +85,25 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     [Min(1f)]
     [SerializeField] private float stopTurnSpeed = 360f;
 
+    [Header("Talk Facing")]
+    [Tooltip("Smoothly align AZKi toward the player before starting Talk animation.")]
+    [SerializeField] private bool useHybridPreTalkAlignment = true;
+
+    [Min(1f)]
+    [SerializeField] private float preTalkTurnSpeed = 900f;
+
+    [Range(0.5f, 45f)]
+    [SerializeField] private float preTalkStartAngleThreshold = 12f;
+
+    [Range(0f, 1f)]
+    [SerializeField] private float preTalkMaxDelaySeconds = 0.22f;
+
+    [Tooltip("Keep rotating toward the player while Talk animation is active.")]
+    [SerializeField] private bool trackPlayerWhileTalking = true;
+
+    [Min(1f)]
+    [SerializeField] private float talkTurnSpeed = 540f;
+
     [Header("Animation")]
     [SerializeField] private string idleStateName = "Base Layer.Idle";
 
@@ -127,6 +146,10 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     private bool _talkActive;
     private bool _loggedMissingNavMesh;
+    private Transform _cachedPlayerTransform;
+    private bool _isAligningBeforeTalk;
+    private bool _talkLoopStarted;
+    private float _preTalkDeadlineTime;
 
     private int _stopsSinceIdleB = int.MaxValue;
     private AnimState _currentAnimState = AnimState.Idle;
@@ -293,9 +316,26 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
             _isStopping = false;
             _currentStopUsesIdleB = false;
-            EnforceAnimation(AnimState.Talk, force: true);
+            _talkLoopStarted = false;
+
+            if (useHybridPreTalkAlignment)
+            {
+                _isAligningBeforeTalk = true;
+                _preTalkDeadlineTime = Time.time + Mathf.Max(0f, preTalkMaxDelaySeconds);
+                EnforceAnimation(AnimState.Idle, force: true);
+            }
+            else
+            {
+                _isAligningBeforeTalk = false;
+                FacePlayerBeforeTalk();
+                StartTalkLoop();
+            }
+
             return;
         }
+
+        _isAligningBeforeTalk = false;
+        _talkLoopStarted = false;
 
         BeginStopWindow();
     }
@@ -310,6 +350,27 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
             _agent.updateRotation = false;
         }
 
+        if (_isAligningBeforeTalk)
+        {
+            bool hasPlayer = RotateTowardsPlayer(preTalkTurnSpeed, out float remainingAngle);
+            bool aligned = hasPlayer && remainingAngle <= preTalkStartAngleThreshold;
+            bool timedOut = Time.time >= _preTalkDeadlineTime;
+
+            if (!aligned && !timedOut)
+            {
+                EnforceAnimation(AnimState.Idle, force: false);
+                return;
+            }
+
+            _isAligningBeforeTalk = false;
+            StartTalkLoop();
+        }
+
+        RotateTowardsPlayerWhileTalking();
+
+        if (!_talkLoopStarted)
+            StartTalkLoop();
+
         EnforceAnimation(AnimState.Talk, force: false);
 
         if (_animator == null || _animator.IsInTransition(0))
@@ -318,6 +379,88 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         var info = _animator.GetCurrentAnimatorStateInfo(0);
         if (StateMatches(info, _talkHash, _talkShortHash) && info.normalizedTime >= 1f)
             _animator.Play(_talkHash, 0, 0f);
+    }
+
+    private void StartTalkLoop()
+    {
+        if (_talkLoopStarted)
+            return;
+
+        _talkLoopStarted = true;
+        EnforceAnimation(AnimState.Talk, force: true);
+    }
+
+    private void RotateTowardsPlayerWhileTalking()
+    {
+        if (!trackPlayerWhileTalking)
+            return;
+
+        RotateTowardsPlayer(talkTurnSpeed, out _);
+    }
+
+    private void FacePlayerBeforeTalk()
+    {
+        Transform player = ResolvePlayerTransform();
+        if (player == null)
+            return;
+
+        Vector3 toPlayer = player.position - transform.position;
+        toPlayer.y = 0f;
+
+        if (toPlayer.sqrMagnitude < 0.0001f)
+            return;
+
+        transform.rotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
+    }
+
+    private bool RotateTowardsPlayer(float turnSpeedDegPerSec, out float remainingAngle)
+    {
+        remainingAngle = 180f;
+
+        Transform player = ResolvePlayerTransform();
+        if (player == null)
+            return false;
+
+        Vector3 toPlayer = player.position - transform.position;
+        toPlayer.y = 0f;
+
+        if (toPlayer.sqrMagnitude < 0.0001f)
+        {
+            remainingAngle = 0f;
+            return true;
+        }
+
+        Quaternion targetRotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
+        transform.rotation = Quaternion.RotateTowards(
+            transform.rotation,
+            targetRotation,
+            turnSpeedDegPerSec * Time.deltaTime
+        );
+
+        remainingAngle = Quaternion.Angle(transform.rotation, targetRotation);
+        return true;
+    }
+
+    private Transform ResolvePlayerTransform()
+    {
+        if (_cachedPlayerTransform != null)
+            return _cachedPlayerTransform;
+
+        Camera mainCam = Camera.main;
+        if (mainCam != null)
+        {
+            _cachedPlayerTransform = mainCam.transform;
+            return _cachedPlayerTransform;
+        }
+
+        Camera anyCam = FindFirstObjectByType<Camera>();
+        if (anyCam != null)
+        {
+            _cachedPlayerTransform = anyCam.transform;
+            return _cachedPlayerTransform;
+        }
+
+        return null;
     }
 
     private void HandleStopWindow()
