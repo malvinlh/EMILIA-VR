@@ -1,4 +1,5 @@
 #if TEXT_MESH_PRO_PRESENT || (UGUI_2_0_PRESENT && UNITY_6000_0_OR_NEWER)
+using System;
 using TMPro;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -193,6 +194,9 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.SpatialKeyboard
         [SerializeField, Tooltip("(Optional) Audio source played when key is pressed.")]
         AudioSource m_AudioSource;
 
+        [SerializeField, Tooltip("Minimum delay between accepted backspace key clicks to prevent poke double-fire on release.")]
+        float m_BackspaceClickCooldownSec = 0.25f;
+
         /// <summary>
         /// (Optional) Audio source played when key is pressed.
         /// </summary>
@@ -205,6 +209,8 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.SpatialKeyboard
         XRKeyboard m_Keyboard;
 
         float m_LastClickTime;
+        float m_LastBackspaceClickUnscaledTime = -999f;
+        int m_LastBackspaceClickFrame = -1;
         bool m_Shifted;
 
         /// <summary>
@@ -290,6 +296,9 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.SpatialKeyboard
 
         protected virtual void KeyClick()
         {
+            if (ShouldBlockBackspaceRapidClick())
+                return;
+
             // Local function of things to do to the key when pressed (Audio, etc.)
             KeyPressed();
 
@@ -308,6 +317,34 @@ namespace UnityEngine.XR.Interaction.Toolkit.Samples.SpatialKeyboard
             }
 
             m_LastClickTime = Time.time;
+        }
+
+        bool ShouldBlockBackspaceRapidClick()
+        {
+            if (!IsBackspaceKey())
+                return false;
+
+            var now = Time.unscaledTime;
+            var blockByFrame = m_LastBackspaceClickFrame == Time.frameCount;
+            var blockByCooldown = m_BackspaceClickCooldownSec > 0f &&
+                                  now - m_LastBackspaceClickUnscaledTime < m_BackspaceClickCooldownSec;
+
+            if (blockByFrame || blockByCooldown)
+                return true;
+
+            m_LastBackspaceClickFrame = Time.frameCount;
+            m_LastBackspaceClickUnscaledTime = now;
+            return false;
+        }
+
+        bool IsBackspaceKey()
+        {
+            if (m_KeyCode == KeyCode.Backspace)
+                return true;
+
+            var effectiveCharacter = GetEffectiveCharacter();
+            return string.Equals(effectiveCharacter, "\\b", StringComparison.Ordinal)
+                || string.Equals(m_Character, "\\b", StringComparison.Ordinal);
         }
 
         /// <summary>
