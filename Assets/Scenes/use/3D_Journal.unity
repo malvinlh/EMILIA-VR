@@ -8682,6 +8682,44 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 1707767736779715200, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
+--- !u!21 &414393681
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!64 &436069106
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -13184,24 +13222,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StylusCalibrationController
   passthroughManager: {fileID: 5000000007}
-  tipProvider: {fileID: 1672689253}
   wristTracker: {fileID: 259868253}
-  calibrationHand: 2
-  tipProximityThreshold: 0.02
-  holdDuration: 1
+  stylusHand: 2
   targetForwardDistance: 0.35
   targetBelowEye: 0.25
   targetRadius: 0.015
-  nextButtonForward: 0.5
-  nextButtonBelowEye: 0.1
-  nextButtonPokeDistance: 0.025
-  nextButtonArmDelay: 0.5
-  instructionDistance: 1
+  buttonForward: 0.5
+  buttonBelowEye: 0.05
+  buttonSideOffset: 0.18
+  buttonPokeDistance: 0.03
+  nextArmDelay: 0.6
+  instructionForward: 0.9
   instructionHeight: 0.2
   fontSize: 0.3
-  showDiagnostics: 1
-  diagMarkerRadius: 0.008
-  diagLogInterval: 0.5
+  showPokeMarker: 1
+  logEvents: 1
 --- !u!1 &992886154
 GameObject:
   m_ObjectHideFlags: 0
@@ -19485,7 +19520,7 @@ MonoBehaviour:
   boundaryCreateOuterBox: 1
   calibrateUserEyeHeight: 1
   tableWritingSurface: {fileID: 2105726778}
-  calibrationHeightBias: -0.007
+  calibrationHeightBias: -0.002
   realEyeAboveTableClamp: {x: 0.25, y: 0.85}
   applySceneHeightCorrection: 0
   maxHeightCorrection: 0.45
@@ -19728,7 +19763,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1766843414}
+  - {fileID: 414393681}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -27446,44 +27481,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -1281081761838074489, guid: c095a54adb5785f47b958774c44efb18, type: 3}
---- !u!21 &1766843414
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!64 &1769620411
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -30553,8 +30550,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4966719baa26e4b0e8231a24d9bd491a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARCameraManager
-  m_FocusMode: 1
-  m_LightEstimationMode: 0
+  m_FocusMode: -1
+  m_LightEstimationMode: -1
   m_AutoFocus: 1
   m_ImageStabilization: 0
   m_LightEstimation: 0

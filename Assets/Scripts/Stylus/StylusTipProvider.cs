@@ -31,8 +31,8 @@ public class StylusTipProvider : MonoBehaviour
 
     [Header("Writing Plane Snap")]
     [Tooltip("When the tip is within this distance (metres) of the writing plane, " +
-             "snap its normal coordinate to the plane. Replaces per-pixel depth.")]
-    public float planeSnapDistance = 0.015f;
+             "begin blending it toward the plane. Replaces per-pixel depth.")]
+    public float planeSnapDistance = 0.025f;
 
     [Header("CV Fusion (reserved)")]
     [Range(0f, 1f)] public float cvBlendWeight = 0.3f;
@@ -138,14 +138,18 @@ public class StylusTipProvider : MonoBehaviour
             filterY.Filter(fusedPos.y, now),
             filterZ.Filter(fusedPos.z, now));
 
-        // ── Writing plane snap (replaces Depth API) ──────────────────
+        // ── Writing plane snap ───────────────────────────────────────
+        // Within planeSnapDistance of the surface, lerp the tip onto the plane.
+        // Blend factor: 0 at the outer edge, 1 when right on the plane (smooth,
+        // no discontinuity). This corrects Z drift without hard-snapping.
         if (HasWritingPlane)
         {
             float signedDist = WritingPlane.GetDistanceToPoint(smoothed);
-            if (Mathf.Abs(signedDist) < planeSnapDistance)
+            float absDist = Mathf.Abs(signedDist);
+            if (absDist < planeSnapDistance)
             {
-                // Project onto plane along the plane normal
-                smoothed -= WritingPlane.normal * signedDist;
+                float blend = 1f - (absDist / planeSnapDistance); // 0..1
+                smoothed -= WritingPlane.normal * (signedDist * blend);
             }
         }
 
