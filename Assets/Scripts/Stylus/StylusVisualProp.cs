@@ -31,6 +31,16 @@ public class StylusVisualProp : MonoBehaviour
     [Tooltip("Colour of the pen tip marker.")]
     public Color tipColor = new Color(0.95f, 0.25f, 0.25f, 1f);
 
+    [Header("Visual Direction Bias")]
+    [Tooltip("Euler-angle offset (degrees) applied to the wrist→tip direction before " +
+             "the shaft is oriented. Rotates in wrist-local space so the bias stays " +
+             "consistent regardless of hand orientation.\n\n" +
+             "X = tilt toward/away from you (pitch).\n" +
+             "Z = tilt left/right (roll).\n\n" +
+             "Start with small values (±5–15°) to straighten the visual prop " +
+             "without affecting tracking accuracy.")]
+    public Vector3 shaftDirectionBias = Vector3.zero;
+
     [Header("Visibility")]
     [Tooltip("Hide the prop when the tip confidence is below this threshold.")]
     public float minConfidence = 0.1f;
@@ -87,6 +97,13 @@ public class StylusVisualProp : MonoBehaviour
         }
 
         Vector3 dir = wristToTip / fullLength;
+
+        // Apply wrist-local direction bias so the visual prop can be straightened
+        // without affecting the tracked tip position. The bias rotates in wrist-local
+        // space so it stays consistent as the hand moves and rotates.
+        if (shaftDirectionBias != Vector3.zero)
+            dir = (wristRot * Quaternion.Euler(shaftDirectionBias) * Quaternion.Inverse(wristRot)) * dir;
+
         Vector3 shaftStart = wristPos + dir * shaftStartFromWrist;
         Vector3 shaftEnd = tip;
         float shaftLength = Mathf.Max(0.01f, (shaftEnd - shaftStart).magnitude);
