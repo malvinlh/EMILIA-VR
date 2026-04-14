@@ -34,6 +34,7 @@ public class JournalSessionManager : MonoBehaviour
         Idle,
         RequestingPermission,
         Passthrough,
+        StylusCalibration,
         PlaneDiscovery,
         HandConfirmation,
         Preview,
@@ -69,6 +70,21 @@ public class JournalSessionManager : MonoBehaviour
              "Journaling state on Start. Useful for testing the journal UI and review flow " +
              "with XR Device Simulator without building to the headset.")]
     public bool skipToJournalingOnStart;
+
+    [Header("Stylus Calibration")]
+    [Tooltip("Optional stylus calibration controller. When assigned, a stylus calibration " +
+             "step runs after passthrough entry and before table detection. The user holds " +
+             "their physical pen and touches the tip to a virtual target to compute the " +
+             "wrist-to-tip offset used by the StylusTipProvider at runtime.")]
+    public StylusCalibrationController stylusCalibrationController;
+
+    [Tooltip("Optional StylusTipProvider. When assigned, the detected writing plane is passed " +
+             "to it after table confirmation, so the tip snaps to the real surface at runtime.")]
+    public StylusTipProvider stylusTipProvider;
+
+    [Tooltip("Skip stylus calibration and use legacy finger-tip tracking. Useful for testing " +
+             "without a physical pen or for users who prefer finger drawing.")]
+    public bool skipStylusCalibration;
 
     [Header("Scene Objects")]
     [Tooltip("The JournalChairTable parent that will be repositioned.")]
@@ -385,12 +401,58 @@ public class JournalSessionManager : MonoBehaviour
     {
         CurrentState = SessionState.Passthrough;
 
-        ShowInstruction("Find a flat surface and place both hands\nwith palms facing downward.");
+        bool willCalibrateStylus = !skipStylusCalibration && stylusCalibrationController != null;
+
+        ShowInstruction(willCalibrateStylus
+            ? "Hold your pen and prepare to calibrate\nwhen the target appears."
+            : "Find a flat surface and place both hands\nwith palms facing downward.");
 
         if (passthroughManager != null)
-            passthroughManager.EnterPassthrough(() => EnterPlaneDiscovery());
-        else
-            EnterPlaneDiscovery();
+            passthroughManager.EnterPassthrough(() =>
+            {
+                if (willCalibrateStylus) EnterStylusCalibration();
+                else EnterPlaneDiscovery();
+            });
+        else if (willCalibrateStylus) EnterStylusCalibration();
+        else EnterPlaneDiscovery();
+    }
+
+    // ================================================================
+    // STYLUS CALIBRATION
+    // ================================================================
+
+    private void EnterStylusCalibration()
+    {
+        CurrentState = SessionState.StylusCalibration;
+
+        Debug.Log("[JournalSession] Entered StylusCalibration state.");
+
+        // Hide the session instruction panel — StylusCalibrationController
+        // owns its own instruction text during this phase.
+        HideInstruction();
+
+        stylusCalibrationController.OnCalibrationComplete += OnStylusCalibrationComplete;
+        stylusCalibrationController.OnNextButtonPressed += OnStylusCalibrationNext;
+        stylusCalibrationController.BeginCalibration();
+    }
+
+    private void OnStylusCalibrationComplete()
+    {
+        // The controller updates its own UI; nothing else to do here yet.
+        Debug.Log("[JournalSession] Stylus calibration complete — awaiting Next button.");
+    }
+
+    private void OnStylusCalibrationNext()
+    {
+        if (stylusCalibrationController != null)
+        {
+            stylusCalibrationController.OnCalibrationComplete -= OnStylusCalibrationComplete;
+            stylusCalibrationController.OnNextButtonPressed -= OnStylusCalibrationNext;
+            stylusCalibrationController.Cleanup();
+        }
+
+        Debug.Log("[JournalSession] Transitioning from StylusCalibration to PlaneDiscovery.");
+        EnterPlaneDiscovery();
     }
 
     // ================================================================
@@ -976,6 +1038,17 @@ public class JournalSessionManager : MonoBehaviour
         // During writing, keep AZKi hidden and non-locomoting until review begins.
         reviewController?.EnterJournalingMode();
 
+        // Hand the virtual whiteboard surface plane to the stylus tip provider so
+        // it can snap the tip to the writing plane during drawing. The virtual
+        // surface has already been aligned with the real table via teleport +
+        // height adjustment, so this plane matches where the user physically writes.
+        if (stylusTipProvider != null)
+        {
+            float surfaceY = GetVirtualTableSurfaceY();
+            stylusTipProvider.SetWritingPlane(new Plane(Vector3.up, new Vector3(0f, surfaceY, 0f)));
+            Debug.Log($"[JournalSession] StylusTipProvider writing plane set at Y={surfaceY:F3}m");
+        }
+
         // Reset pages: title page (0) + first content page (1)
         ScribbleManager.Instance?.ClearAll();
 
@@ -1198,6 +1271,13 @@ public class JournalSessionManager : MonoBehaviour
 
         if (calibrationGuide != null)
             calibrationGuide.Hide();
+
+        if (stylusCalibrationController != null)
+        {
+            stylusCalibrationController.OnCalibrationComplete -= OnStylusCalibrationComplete;
+            stylusCalibrationController.OnNextButtonPressed -= OnStylusCalibrationNext;
+            stylusCalibrationController.Cleanup();
+        }
 
         if (passthroughManager != null)
             passthroughManager.OnPassthroughExited -= OnceAfterPassthroughExit;

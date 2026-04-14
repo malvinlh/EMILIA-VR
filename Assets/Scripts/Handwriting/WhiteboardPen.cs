@@ -22,6 +22,12 @@ public class WhiteboardPen : MonoBehaviour
     [Tooltip("Which hand drives this pen.")]
     public Handedness handedness = Handedness.Right;
 
+    [Header("Stylus (Optional)")]
+    [Tooltip("When assigned and calibrated, uses the physical stylus tip position " +
+             "from StylusTipProvider instead of the index finger tip. Falls back to " +
+             "finger tracking automatically if the stylus is not calibrated.")]
+    public StylusTipProvider stylusTipProvider;
+
     private Whiteboard whiteboard;
     private RaycastHit touch;
 
@@ -633,6 +639,28 @@ public class WhiteboardPen : MonoBehaviour
         Vector3 direction = Vector3.Normalize(tip - origin);
         float fingerLength = Vector3.Distance(origin, tip);
         Vector3 thumbWorld = JointToWorld(thumbTipPose.position);
+
+        // ── STYLUS MODE OVERRIDE ─────────────────────────────────────
+        // When a calibrated StylusTipProvider is assigned, replace the
+        // finger-tip-based origin/tip/direction with the physical pen tip.
+        // The existing raycast-based contact detection, tolerance, and
+        // stroke-buffering logic below works unchanged — it just uses a
+        // pen-derived tip position instead of the index finger.
+        // Gesture reads (thumbWorld, littleTipPose) remain finger-based
+        // so pinky-clear still works while holding a pen.
+        if (stylusTipProvider != null
+            && stylusTipProvider.IsCalibrated
+            && stylusTipProvider.TipWorldPosition.HasValue)
+        {
+            tip = stylusTipProvider.TipWorldPosition.Value;
+            // Ray points downward from slightly above the tip — the writing
+            // plane is horizontal (table), so this ray reliably intersects
+            // the whiteboard collider. fingerLength determines the effective
+            // raycast range (kept small to avoid false hits from far away).
+            origin = tip + Vector3.up * 0.025f;
+            direction = Vector3.down;
+            fingerLength = 0.03f;
+        }
 
         bool hitBoard = false;
 
