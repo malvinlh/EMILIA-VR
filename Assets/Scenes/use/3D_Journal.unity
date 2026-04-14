@@ -2723,8 +2723,8 @@ ParticleSystem:
         m_RotationOrder: 4
     y:
       serializedVersion: 2
-      minMaxState: 3
-      scalar: 1.8
+      minMaxState: 0
+      scalar: 0
       minScalar: 0.08
       maxCurve:
         serializedVersion: 2
@@ -8328,6 +8328,11 @@ RectTransform:
   m_AnchoredPosition: {x: 13.22, y: 2.4}
   m_SizeDelta: {x: 1920, y: 1080}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!20 &313394966 stripped
+Camera:
+  m_CorrespondingSourceObject: {fileID: 657184242118504724, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
+  m_PrefabInstance: {fileID: 3000000012}
+  m_PrefabAsset: {fileID: 0}
 --- !u!64 &328028020
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -13194,6 +13199,9 @@ MonoBehaviour:
   instructionDistance: 1
   instructionHeight: 0.2
   fontSize: 0.3
+  showDiagnostics: 1
+  diagMarkerRadius: 0.008
+  diagLogInterval: 0.5
 --- !u!1 &992886154
 GameObject:
   m_ObjectHideFlags: 0
@@ -19720,7 +19728,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1854335302}
+  - {fileID: 1766843414}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -21927,6 +21935,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1672689254}
   - component: {fileID: 1672689253}
+  - component: {fileID: 1672689255}
+  - component: {fileID: 1672689256}
   m_Layer: 0
   m_Name: StylusTipProvider
   m_TagString: Untagged
@@ -21947,6 +21957,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StylusTipProvider
   wristTracker: {fileID: 259868253}
+  cvDetector: {fileID: 1672689256}
   tipFilterMinCutoff: 2
   tipFilterBeta: 0.05
   tipFilterDCutoff: 1
@@ -21969,6 +21980,46 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1672689255
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1672689252}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d598304018e66874b9b5a8ede26e6ef7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StylusVisualProp
+  tipProvider: {fileID: 1672689253}
+  wristTracker: {fileID: 259868253}
+  shaftRadius: 0.005
+  shaftStartFromWrist: 0.02
+  shaftColor: {r: 0.15, g: 0.15, b: 0.18, a: 1}
+  tipRadius: 0.0045
+  tipColor: {r: 0.95, g: 0.25, b: 0.25, a: 1}
+  minConfidence: 0.1
+--- !u!114 &1672689256
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1672689252}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c23f9e9f779bc33468f9f12f8c2fe953, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GreenBandDetector
+  arCameraManager: {fileID: 3000000019}
+  targetHz: 20
+  downscale: 2
+  hsvLower: {x: 35, y: 80, z: 60}
+  hsvUpper: {x: 85, y: 255, z: 255}
+  minContourArea: 20
+  confidenceFullArea: 400
+  logDetections: 1
 --- !u!1 &1706509597
 GameObject:
   m_ObjectHideFlags: 0
@@ -23606,8 +23657,8 @@ ParticleSystem:
         m_RotationOrder: 4
     y:
       serializedVersion: 2
-      minMaxState: 3
-      scalar: 0.35
+      minMaxState: 0
+      scalar: 0
       minScalar: 0
       maxCurve:
         serializedVersion: 2
@@ -27395,6 +27446,44 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -1281081761838074489, guid: c095a54adb5785f47b958774c44efb18, type: 3}
+--- !u!21 &1766843414
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!64 &1769620411
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -27755,44 +27844,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 3013761297348002220, guid: 09ddc7060fca0974baa89c6df1640f0e, type: 3}
---- !u!21 &1854335302
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1855969944
 GameObject:
   m_ObjectHideFlags: 0
@@ -30339,6 +30390,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 657184242118504722, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3000000014}
+    - targetCorrespondingSourceObject: {fileID: 657184242118504722, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 3000000019}
     - targetCorrespondingSourceObject: {fileID: 6355494128053973299, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3000000018}
@@ -30487,6 +30541,25 @@ MonoBehaviour:
   enableStrokeDiagnostics: 0
   diagnosticsLogIntervalSeconds: 8
   strokeSplitWarnPerMinute: 24
+--- !u!114 &3000000019
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3000000013}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4966719baa26e4b0e8231a24d9bd491a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.XR.ARFoundation::UnityEngine.XR.ARFoundation.ARCameraManager
+  m_FocusMode: 1
+  m_LightEstimationMode: 0
+  m_AutoFocus: 1
+  m_ImageStabilization: 0
+  m_LightEstimation: 0
+  m_FacingDirection: 1
+  m_RenderMode: 0
 --- !u!1 &3000000021
 GameObject:
   m_ObjectHideFlags: 0
@@ -30953,7 +31026,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   fadeDuration: 0.5
-  mainCamera: {fileID: 0}
+  mainCamera: {fileID: 313394966}
   passthroughUILayer: 31
 --- !u!1 &5000000008
 GameObject:

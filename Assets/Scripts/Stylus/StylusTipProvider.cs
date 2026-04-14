@@ -15,7 +15,9 @@ public class StylusTipProvider : MonoBehaviour
 
     [Header("References")]
     public StylusWristTracker wristTracker;
-    // public GreenBandDetector cvDetector; // reserved for Step 6-7
+    [Tooltip("Optional CV-based green-band detector. If unavailable at runtime, " +
+             "the system falls back to wrist-only tracking.")]
+    public GreenBandDetector cvDetector;
 
     [Header("Smoothing (One Euro)")]
     [Tooltip("Minimum cutoff frequency (Hz). Lower = more smoothing at low speed.")]
@@ -115,15 +117,15 @@ public class StylusTipProvider : MonoBehaviour
         Vector3 fusedPos = wristPos;
         float fusedConf = wristConf;
 
-        // ── CV fusion hook (wired in Step 7) ─────────────────────────
-        // if (cvDetector != null && cvDetector.IsAvailable && HasWritingPlane &&
-        //     cvDetector.TryGetWorldPosition(WritingPlane, out Vector3 cvPos, out float cvConf) &&
-        //     cvConf >= minCvConfidence)
-        // {
-        //     float w = cvBlendWeight * cvConf;
-        //     fusedPos = Vector3.Lerp(wristPos, cvPos, w);
-        //     fusedConf = Mathf.Max(wristConf, cvConf);
-        // }
+        // ── CV fusion: blend in the green-band detection when confident ─
+        if (cvDetector != null && cvDetector.IsAvailable && HasWritingPlane &&
+            cvDetector.TryGetWorldPosition(WritingPlane, out Vector3 cvPos, out float cvConf) &&
+            cvConf >= minCvConfidence)
+        {
+            float w = Mathf.Clamp01(cvBlendWeight * cvConf);
+            fusedPos = Vector3.Lerp(wristPos, cvPos, w);
+            fusedConf = Mathf.Max(wristConf, cvConf);
+        }
 
         // ── Smoothing (One Euro, per axis) ───────────────────────────
         float now = Time.time;

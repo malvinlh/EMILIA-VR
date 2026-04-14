@@ -523,8 +523,13 @@ public class PortalSceneTransition : MonoBehaviour
         var velocity = system.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
-        velocity.radial = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0.01f, 0.05f, motionIntensity));
+        velocity.x = new ParticleSystem.MinMaxCurve(0f);
+        velocity.y = new ParticleSystem.MinMaxCurve(0f);
+        velocity.z = new ParticleSystem.MinMaxCurve(0f);
+        velocity.orbitalX = new ParticleSystem.MinMaxCurve(0f);
         velocity.orbitalY = new ParticleSystem.MinMaxCurve(idleParticleSpinSpeed);
+        velocity.orbitalZ = new ParticleSystem.MinMaxCurve(0f);
+        velocity.radial = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0.01f, 0.05f, motionIntensity));
 
         var noise = system.noise;
         noise.enabled = true;
@@ -583,6 +588,12 @@ public class PortalSceneTransition : MonoBehaviour
         var velocity = system.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
+        velocity.x = new ParticleSystem.MinMaxCurve(0f);
+        velocity.y = new ParticleSystem.MinMaxCurve(0f);
+        velocity.z = new ParticleSystem.MinMaxCurve(0f);
+        velocity.orbitalX = new ParticleSystem.MinMaxCurve(0f);
+        velocity.orbitalY = new ParticleSystem.MinMaxCurve(0f);
+        velocity.orbitalZ = new ParticleSystem.MinMaxCurve(0f);
         velocity.radial = new ParticleSystem.MinMaxCurve(Mathf.Lerp(0.2f, 0.9f, motionIntensity));
 
         var noise = system.noise;
@@ -645,7 +656,9 @@ public class PortalSceneTransition : MonoBehaviour
         var velocity = idleLoopVfx.velocityOverLifetime;
         velocity.enabled = true;
         velocity.space = ParticleSystemSimulationSpace.Local;
+        velocity.orbitalX = new ParticleSystem.MinMaxCurve(0f);
         velocity.orbitalY = new ParticleSystem.MinMaxCurve(Mathf.Lerp(idleParticleSpinSpeed, enterParticleSpinSpeed, spin01));
+        velocity.orbitalZ = new ParticleSystem.MinMaxCurve(0f);
 
         var noise = idleLoopVfx.noise;
         noise.enabled = true;
