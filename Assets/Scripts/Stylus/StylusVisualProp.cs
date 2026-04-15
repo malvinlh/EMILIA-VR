@@ -57,6 +57,19 @@ public class StylusVisualProp : MonoBehaviour
     [Tooltip("Hide the prop when the tip confidence is below this threshold.")]
     public float minConfidence = 0.1f;
 
+    /// <summary>
+    /// External gate. When false, the prop is force-hidden regardless of tracking
+    /// state. Toggled by <see cref="JournalSessionManager"/> to hide the pen during
+    /// non-writing states (review, intro, etc.).
+    /// </summary>
+    public bool PropEnabled { get; private set; } = true;
+
+    public void SetPropEnabled(bool enabled)
+    {
+        PropEnabled = enabled;
+        if (!enabled) SetVisible(false);
+    }
+
     // ── Runtime objects ──────────────────────────────────────────────
     private GameObject root;
     private GameObject shaft;
@@ -79,6 +92,7 @@ public class StylusVisualProp : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (!PropEnabled) { SetVisible(false); return; }
         if (tipProvider == null || wristTracker == null) { SetVisible(false); return; }
         if (!tipProvider.IsCalibrated || !tipProvider.TipWorldPosition.HasValue
             || tipProvider.Confidence < minConfidence) { SetVisible(false); return; }

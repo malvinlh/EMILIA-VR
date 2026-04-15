@@ -82,6 +82,10 @@ public class JournalSessionManager : MonoBehaviour
              "to it after table confirmation, so the tip snaps to the real surface at runtime.")]
     public StylusTipProvider stylusTipProvider;
 
+    [Tooltip("Optional StylusVisualProp. When assigned, the virtual pen is shown only during " +
+             "the Journaling state and hidden during review/intro/other non-writing states.")]
+    public StylusVisualProp stylusVisualProp;
+
     [Tooltip("Skip stylus calibration and use legacy finger-tip tracking. Useful for testing " +
              "without a physical pen or for users who prefer finger drawing.")]
     public bool skipStylusCalibration;
@@ -1049,6 +1053,9 @@ public class JournalSessionManager : MonoBehaviour
             Debug.Log($"[JournalSession] StylusTipProvider writing plane set at Y={surfaceY:F3}m");
         }
 
+        // Show the virtual pen prop only while actually writing.
+        stylusVisualProp?.SetPropEnabled(true);
+
         // Reset pages: title page (0) + first content page (1)
         ScribbleManager.Instance?.ClearAll();
 
@@ -1071,6 +1078,10 @@ public class JournalSessionManager : MonoBehaviour
         if (CurrentState != SessionState.Journaling) return;
 
         CurrentState = SessionState.Ending;
+
+        // Hide the virtual pen as soon as we leave Journaling — review, save, and
+        // transition states should not show the prop.
+        stylusVisualProp?.SetPropEnabled(false);
 
         if (reviewController != null)
         {
