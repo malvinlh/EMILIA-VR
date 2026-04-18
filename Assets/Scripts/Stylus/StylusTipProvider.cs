@@ -28,7 +28,7 @@ public class StylusTipProvider : MonoBehaviour
     [Header("Writing Plane Snap")]
     [Tooltip("When the tip is within this distance (metres) of the writing plane, " +
              "begin blending it toward the plane. Replaces per-pixel depth.")]
-    public float planeSnapDistance = 0.025f;
+    public float planeSnapDistance = 0.01f;
 
     // ── Output ───────────────────────────────────────────────────────
     public Vector3? TipWorldPosition { get; private set; }
