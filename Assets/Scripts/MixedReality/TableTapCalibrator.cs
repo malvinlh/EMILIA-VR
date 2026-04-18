@@ -25,6 +25,10 @@ using TMPro;
 /// once at least one tap has been recorded. A brief cooldown after each
 /// capture prevents the same contact registering twice.
 ///
+/// Optional hardening: when <see cref="requirePinchToCapture"/> is enabled,
+/// the dwell-ready tap is only captured on a pinch rising edge. This reduces
+/// accidental air-dwell captures by requiring explicit user intent.
+///
 /// After all 4 taps land, a Confirm and Redo button float above the rectangle
 /// preview. Either hand's index tip can poke them.
 /// </summary>
@@ -47,6 +51,14 @@ public class TableTapCalibrator : MonoBehaviour
     public float tapCooldownSeconds = 0.55f;
     [Tooltip("Vertical tolerance (metres) between consecutive taps. A tap farther than this from the running mean Y is rejected (likely mid-air dwell).")]
     public float tapYConsensus = 0.025f;
+
+    [Header("Tap Confirmation")]
+    [Tooltip("When enabled, a dwell-ready tap is only captured when a pinch edge is detected.")]
+    public bool requirePinchToCapture = true;
+    [Tooltip("Which hand can trigger pinch capture.")]
+    public PinchCaptureHandMode pinchCaptureHand = PinchCaptureHandMode.OppositeStylusHand;
+    [Tooltip("Thumb-to-middle distance (metres) below which pinch is considered active.")]
+    public float pinchThreshold = 0.025f;
 
     [Header("Rectangle Constraints")]
     [Tooltip("Minimum writing rectangle size in metres (width, depth).")]
@@ -107,6 +119,14 @@ public class TableTapCalibrator : MonoBehaviour
         public float avgTapSurfaceY;
     }
 
+    public enum PinchCaptureHandMode
+    {
+        OppositeStylusHand,
+        Left,
+        Right,
+        Either
+    }
+
     private enum Phase { Inactive, Tapping, AwaitingConfirm }
 
     // ================================================================
@@ -126,6 +146,8 @@ public class TableTapCalibrator : MonoBehaviour
     private bool hasLastTip;
     private Vector3 lastTipPos;
     private float lastTipTime;
+    private bool wasLeftPinched;
+    private bool wasRightPinched;
 
     private float awaitConfirmEnterTime;
 
@@ -188,6 +210,8 @@ public class TableTapCalibrator : MonoBehaviour
         dwellAccum = 0f;
         lastTapTime = -999f;
         hasLastTip = false;
+        wasLeftPinched = false;
+        wasRightPinched = false;
         eyeYAccum = 0f;
         eyeYSamples = 0;
 
@@ -285,13 +309,105 @@ public class TableTapCalibrator : MonoBehaviour
             dwellAccum += Time.deltaTime;
             SetTipColor(ColorTipDwelling);
             if (dwellAccum >= tapDwellSeconds)
-                CaptureTap(tipPos);
+            {
+                if (!requirePinchToCapture)
+                {
+                    CaptureTap(tipPos);
+                }
+                else if (ConsumePinchCaptureEdge())
+                {
+                    CaptureTap(tipPos);
+                }
+            }
         }
         else
         {
             dwellAccum = 0f;
             SetTipColor(ColorTipIdle);
+
+            // Keep pinch edge history up to date so stale pinches don't arm
+            // when we become dwell-ready later.
+            RefreshPinchStateHistory();
         }
+    }
+
+    private bool EnsureHandSubsystem()
+    {
+        if (handSubsystem == null || !handSubsystem.running)
+            handSubsystem = WhiteboardPen.GetHandSubsystem();
+        return handSubsystem != null;
+    }
+
+    private bool ConsumePinchCaptureEdge()
+    {
+        if (!EnsureHandSubsystem()) return false;
+
+        bool leftPinched = GetPinchState(Handedness.Left);
+        bool rightPinched = GetPinchState(Handedness.Right);
+
+        bool leftEdge = leftPinched && !wasLeftPinched;
+        bool rightEdge = rightPinched && !wasRightPinched;
+
+        wasLeftPinched = leftPinched;
+        wasRightPinched = rightPinched;
+
+        switch (pinchCaptureHand)
+        {
+            case PinchCaptureHandMode.Left:
+                return leftEdge;
+
+            case PinchCaptureHandMode.Right:
+                return rightEdge;
+
+            case PinchCaptureHandMode.Either:
+                return leftEdge || rightEdge;
+
+            case PinchCaptureHandMode.OppositeStylusHand:
+            default:
+                if (TryGetStylusHand(out Handedness stylusHand))
+                {
+                    Handedness opposite = stylusHand == Handedness.Right
+                        ? Handedness.Left
+                        : Handedness.Right;
+                    return opposite == Handedness.Left ? leftEdge : rightEdge;
+                }
+                // If stylus hand is unknown, accept either hand to avoid deadlock.
+                return leftEdge || rightEdge;
+        }
+    }
+
+    private void RefreshPinchStateHistory()
+    {
+        if (!EnsureHandSubsystem())
+        {
+            wasLeftPinched = false;
+            wasRightPinched = false;
+            return;
+        }
+
+        wasLeftPinched = GetPinchState(Handedness.Left);
+        wasRightPinched = GetPinchState(Handedness.Right);
+    }
+
+    private bool GetPinchState(Handedness hand)
+    {
+        Vector3 thumb = GetJointTipOr(hand, XRHandJointID.ThumbTip);
+        Vector3 middle = GetJointTipOr(hand, XRHandJointID.MiddleTip);
+
+        if (thumb.x >= 1e5f || middle.x >= 1e5f)
+            return false;
+
+        return Vector3.Distance(thumb, middle) < pinchThreshold;
+    }
+
+    private bool TryGetStylusHand(out Handedness hand)
+    {
+        hand = Handedness.Right;
+        if (stylusTipProvider == null || stylusTipProvider.wristTracker == null)
+            return false;
+
+        hand = stylusTipProvider.wristTracker.handedness;
+        return true;
     }
 
     private float RunningMeanY()
@@ -343,9 +459,7 @@ public class TableTapCalibrator : MonoBehaviour
         SetButtonColor(redoButtonMat, armed ? ColorRedo : ColorBtnDisabled);
         if (!armed) return;
 
-        if (handSubsystem == null || !handSubsystem.running)
-            handSubsystem = WhiteboardPen.GetHandSubsystem();
-        if (handSubsystem == null) return;
+        if (!EnsureHandSubsystem()) return;
 
         Vector3 leftTip = GetIndexTipOr(Handedness.Left);
         Vector3 rightTip = GetIndexTipOr(Handedness.Right);
@@ -373,10 +487,17 @@ public class TableTapCalibrator : MonoBehaviour
 
     private Vector3 GetIndexTipOr(Handedness hand)
     {
+        return GetJointTipOr(hand, XRHandJointID.IndexTip);
+    }
+
+    private Vector3 GetJointTipOr(Handedness hand, XRHandJointID jointId)
+    {
+        if (!EnsureHandSubsystem()) return new Vector3(1e6f, 1e6f, 1e6f);
+
         XRHand xrHand = hand == Handedness.Left ? handSubsystem.leftHand : handSubsystem.rightHand;
         if (!xrHand.isTracked) return new Vector3(1e6f, 1e6f, 1e6f);
 
-        XRHandJoint joint = xrHand.GetJoint(XRHandJointID.IndexTip);
+        XRHandJoint joint = xrHand.GetJoint(jointId);
         if (!joint.TryGetPose(out Pose pose)) return new Vector3(1e6f, 1e6f, 1e6f);
 
         // Convert session → world via the camera offset transform.
@@ -485,7 +606,11 @@ public class TableTapCalibrator : MonoBehaviour
         int next = taps.Count; // 0..3
         if (next >= RequiredTaps) return;
         string label = TapLabels[next];
-        SetInstruction($"Tap the {label} corner.\n({taps.Count}/{RequiredTaps})");
+
+        if (requirePinchToCapture)
+            SetInstruction($"Tap the {label} corner, hold still, then pinch to capture.\n({taps.Count}/{RequiredTaps})");
+        else
+            SetInstruction($"Tap the {label} corner.\n({taps.Count}/{RequiredTaps})");
     }
 
     private void SetInstructionForConfirm()
