@@ -4,23 +4,35 @@ using UnityEngine.XR.Hands;
 using TMPro;
 
 /// <summary>
-/// Calibration UI for the DIY stylus. Runs during the StylusCalibration
-/// session state, before table detection.
+/// DIY stylus calibration via "touch the fingertip" — the user brings the
+/// physical pen tip to their opposite hand's index fingertip, then pinches
+/// their opposite thumb to middle finger to capture the sample. The pinch is
+/// the explicit "capture now" signal: the system cannot observe the pen tip's
+/// world position on its own (no pen sensors, no CV), so the user closes the
+/// loop with a gesture they can time precisely against the physical contact
+/// they feel.
 ///
-/// Flow:
-///   1. A green target sphere appears ~35cm ahead at comfortable height.
-///   2. Instruction: "Align the pen tip with the green dot, then press Confirm."
-///   3. User touches pen tip to the target visually and presses the Confirm
-///      button with the non-stylus hand (default: left index tip).
-///   4. On Confirm: reads wrist pose once and computes wrist-to-target offset.
-///      No proximity approximation — the user decides when alignment is done.
-///   5. Target turns gold → "Calibrated! Press Next to continue."
-///   6. User presses the Next button to advance to table detection.
+/// Flow (per <see cref="BeginCalibration"/>):
+///   1. A small sphere renders at the opposite hand's index fingertip and
+///      follows it every frame.
+///   2. Instruction: "Place pen tip on the sphere. Pinch opposite thumb +
+///      middle to capture. Vary wrist angle. 0/N".
+///   3. Capture trigger per sample: opposite-hand ThumbTip-to-MiddleTip gap
+///      crosses below <see cref="pinchThreshold"/> on a rising edge, AND the
+///      stylus wrist is nearly still (linear speed &lt;
+///      <see cref="linearVelocityThreshold"/> m/s), AND we are past the
+///      inter-sample cooldown.
+///   4. After capture: short cooldown + colour flash. User releases the
+///      pinch, varies wrist pose, re-pinches for the next sample.
+///   5. After <see cref="samplesRequired"/> captures, the wrist tracker
+///      computes the least-squares offset and the RMS residual. If residual
+///      exceeds <see cref="residualWarnThreshold"/>, the user is asked to redo.
+///   6. On success, the Next button appears — poke with either hand's index
+///      tip to advance.
 ///
-/// Why Confirm instead of auto-proximity? The stylus tip extends past the
-/// index finger tip by a variable amount depending on grip. Auto-detecting
-/// proximity via IndexTip fires at the wrong moment. The user is the only one
-/// who can see whether the pen tip is on the dot.
+/// The opposite hand's index finger stays extended throughout, holding the
+/// target. Only the thumb and middle finger move when pinching, so the
+/// target position is not disturbed at the exact moment of capture.
 /// </summary>
 public class StylusCalibrationController : MonoBehaviour
 {
@@ -33,25 +45,33 @@ public class StylusCalibrationController : MonoBehaviour
     public StylusWristTracker wristTracker;
 
     [Header("Hands")]
-    [Tooltip("Which hand holds the stylus. The OTHER hand presses Confirm/Next.")]
+    [Tooltip("Which hand holds the stylus. The opposite hand carries the contact target.")]
     public Handedness stylusHand = Handedness.Right;
 
-    [Header("Target Placement")]
-    [Tooltip("Distance (m) forward from the user's head where the target appears.")]
-    public float targetForwardDistance = 0.40f;
-    [Tooltip("Vertical offset (m) below eye level for the target.")]
-    public float targetBelowEye = 0.20f;
-    [Tooltip("Radius (m) of the target sphere.")]
-    public float targetRadius = 0.018f;
+    [Header("Sampling")]
+    [Tooltip("Number of samples required before the solve runs.")]
+    [Range(3, 10)] public int samplesRequired = 5;
+    [Tooltip("Opposite-hand thumb-to-middle distance (metres) that registers as a pinch. A rising edge below this value fires a capture.")]
+    public float pinchThreshold = 0.025f;
+    [Tooltip("Wrist linear speed threshold (m/s). Pinches fired while the stylus hand is moving faster than this are ignored — prevents captures during mid-motion.")]
+    public float linearVelocityThreshold = 0.05f;
+    [Tooltip("Minimum delay (seconds) between captured samples — prevents a single pinch registering twice.")]
+    public float captureCooldownSeconds = 0.6f;
+    [Tooltip("Residual warn threshold (metres). If the solved RMS residual exceeds this, the user is prompted to retry.")]
+    public float residualWarnThreshold = 0.008f;
 
-    [Header("Buttons")]
-    [Tooltip("Forward distance for Confirm / Next buttons.")]
+    [Header("Target Sphere")]
+    [Tooltip("Radius (m) of the target sphere that rides on the opposite index fingertip.")]
+    public float targetRadius = 0.010f;
+
+    [Header("Next Button")]
+    [Tooltip("Forward distance for the Next button after calibration succeeds.")]
     public float buttonForward = 0.50f;
-    [Tooltip("Vertical offset below eye level for buttons.")]
+    [Tooltip("Vertical offset below eye level for the Next button.")]
     public float buttonBelowEye = 0.05f;
-    [Tooltip("Horizontal offset to the non-stylus side.")]
+    [Tooltip("Horizontal offset from centre — positive goes toward the stylus side so the opposite hand can poke it.")]
     public float buttonSideOffset = 0.18f;
-    [Tooltip("Proximity (m) at which an index-tip poke triggers a button.")]
+    [Tooltip("Proximity (m) at which an index-tip poke triggers the Next button.")]
     public float buttonPokeDistance = 0.030f;
     [Tooltip("Cooldown after calibration before Next becomes pokeable.")]
     public float nextArmDelay = 0.6f;
@@ -62,10 +82,7 @@ public class StylusCalibrationController : MonoBehaviour
     public float fontSize = 0.28f;
 
     [Header("Diagnostics")]
-    [Tooltip("Show a red marker at the non-stylus index tip so you can see where the " +
-             "poke will land relative to the buttons.")]
-    public bool showPokeMarker = true;
-    [Tooltip("Log button arm/poke events.")]
+    [Tooltip("Log sample captures, dwell state, and solve results.")]
     public bool logEvents = true;
 
     // ================================================================
@@ -83,22 +100,22 @@ public class StylusCalibrationController : MonoBehaviour
     private bool calibrationDone;
     private float calibrationDoneTime;
 
-    // Confirm button armed state — short delay after appearing to avoid
-    // accidental poke from the hand that just entered frame.
-    private bool confirmArmed;
-    private float confirmArmTime;
-    private float confirmArmDelay = 0.5f;
+    // Pinch edge-detection state.
+    private bool wasPinched;
+    private float lastCaptureTime;
+
+    // Velocity tracking for the stylus wrist (linear only; used as a sanity
+    // gate so a pinch fired mid-motion doesn't register a bad sample).
+    private bool hasLastWristPose;
+    private Vector3 lastWristPos;
+    private float lastPoseTime;
 
     // ================================================================
-    // VISUAL ELEMENTS (runtime-created)
+    // VISUALS (runtime-created)
     // ================================================================
 
     private GameObject targetSphere;
     private Material targetMaterial;
-
-    private GameObject confirmButton;
-    private Material confirmMaterial;
-    private TextMeshPro confirmLabel;
 
     private GameObject nextButton;
     private Material nextMaterial;
@@ -107,20 +124,14 @@ public class StylusCalibrationController : MonoBehaviour
     private TextMeshPro instructionText;
     private GameObject instructionObj;
 
-    // Diagnostics
-    private GameObject pokeMarker;
-    private Material pokeMarkerMaterial;
-
     private int passthroughLayer = 31;
-    private Vector3 targetWorldPos;
-    private Vector3 confirmButtonPos;
     private Vector3 nextButtonPos;
 
-    private static readonly Color ColorTargetIdle   = new Color(0.20f, 0.90f, 0.30f, 0.85f);
-    private static readonly Color ColorTargetDone   = new Color(1.00f, 0.85f, 0.20f, 1.00f);
-    private static readonly Color ColorBtnIdle      = new Color(0.25f, 0.55f, 0.95f, 0.85f);
-    private static readonly Color ColorBtnArmed     = new Color(0.20f, 0.80f, 1.00f, 0.95f);
-    private static readonly Color ColorBtnDisabled  = new Color(0.40f, 0.40f, 0.45f, 0.60f);
+    private static readonly Color ColorTargetIdle = new Color(0.20f, 0.90f, 0.30f, 0.85f);
+    private static readonly Color ColorTargetCaptured = new Color(0.30f, 0.85f, 1.00f, 1.00f); // post-capture flash
+    private static readonly Color ColorTargetDone = new Color(1.00f, 0.85f, 0.20f, 1.00f);
+    private static readonly Color ColorBtnArmed = new Color(0.20f, 0.80f, 1.00f, 0.95f);
+    private static readonly Color ColorBtnDisabled = new Color(0.40f, 0.40f, 0.45f, 0.60f);
 
     // ================================================================
     // PUBLIC API
@@ -132,24 +143,25 @@ public class StylusCalibrationController : MonoBehaviour
             passthroughLayer = passthroughManager.GetPassthroughUILayer();
 
         EnsureVisuals();
-        PositionVisualsInFrontOfUser();
 
         isActive = true;
         calibrationDone = false;
-        confirmArmed = false;
-        confirmArmTime = Time.time + confirmArmDelay;
+        // Treat the starting state as "pinched" so the user must first release
+        // before the next pinch registers as a rising edge. Prevents a spurious
+        // capture if the user was already pinching when the state entered.
+        wasPinched = true;
+        lastCaptureTime = -999f;
+        hasLastWristPose = false;
 
         if (wristTracker != null)
+        {
             wristTracker.ClearCalibration();
+            wristTracker.ClearSamples();
+        }
 
         SetTargetColor(ColorTargetIdle);
-        SetInstruction("Align the pen tip with\nthe green dot, then\npress Confirm.");
+        UpdateInstructionForProgress();
 
-        if (confirmButton != null)
-        {
-            confirmButton.SetActive(true);
-            SetButtonColor(confirmMaterial, ColorBtnDisabled);
-        }
         if (nextButton != null) nextButton.SetActive(false);
 
         if (logEvents) Debug.Log("[StylusCalibration] BeginCalibration.");
@@ -159,10 +171,8 @@ public class StylusCalibrationController : MonoBehaviour
     {
         isActive = false;
         if (targetSphere   != null) targetSphere.SetActive(false);
-        if (confirmButton  != null) confirmButton.SetActive(false);
         if (nextButton     != null) nextButton.SetActive(false);
         if (instructionObj != null) instructionObj.SetActive(false);
-        if (pokeMarker     != null) pokeMarker.SetActive(false);
     }
 
     // ================================================================
@@ -173,17 +183,8 @@ public class StylusCalibrationController : MonoBehaviour
     {
         if (!isActive) return;
 
-        // Arm confirm button after short delay.
-        if (!confirmArmed && !calibrationDone && Time.time >= confirmArmTime)
-        {
-            confirmArmed = true;
-            SetButtonColor(confirmMaterial, ColorBtnArmed);
-        }
-
-        UpdatePokeMarker();
-
         if (!calibrationDone)
-            UpdatePreCalibration();
+            UpdateCapturePhase();
         else
             UpdatePostCalibration();
     }
@@ -195,58 +196,158 @@ public class StylusCalibrationController : MonoBehaviour
     }
 
     // ================================================================
-    // PRE-CALIBRATION: wait for Confirm poke
+    // CAPTURE PHASE
     // ================================================================
 
-    private void UpdatePreCalibration()
+    private void UpdateCapturePhase()
     {
-        if (!confirmArmed) return;
+        Handedness oppositeHand = OppositeHand();
 
-        Handedness confirmHand = stylusHand == Handedness.Right ? Handedness.Left : Handedness.Right;
-        if (!TryGetIndexTip(confirmHand, out Vector3 confirmTip)) return;
+        // 1. Target sphere rides on the opposite index fingertip.
+        Vector3 targetPos = Vector3.zero;
+        bool hasTarget = wristTracker != null
+                         && wristTracker.TryGetIndexTipForHand(oppositeHand, out targetPos);
+        if (targetSphere != null)
+        {
+            targetSphere.SetActive(hasTarget);
+            if (hasTarget) targetSphere.transform.position = targetPos;
+        }
+        if (!hasTarget)
+        {
+            SetInstruction("Show your " + (oppositeHand == Handedness.Left ? "left" : "right") +
+                           " hand so the target can appear.");
+            wasPinched = true; // force re-release before the next rising edge counts
+            return;
+        }
 
-        float dist = Vector3.Distance(confirmTip, confirmButtonPos);
-        if (dist <= buttonPokeDistance)
-            DoCalibrate();
+        // 2. Read stylus wrist pose for the stillness sanity gate.
+        if (wristTracker == null ||
+            !wristTracker.TryGetWristPose(out Vector3 wristPos, out _))
+        {
+            SetInstruction("Stylus hand not tracked.\nShow your " +
+                           (stylusHand == Handedness.Left ? "left" : "right") + " hand.");
+            wasPinched = true;
+            hasLastWristPose = false;
+            return;
+        }
+
+        float now = Time.time;
+        float linearSpeed = 0f;
+        if (hasLastWristPose)
+        {
+            float dt = Mathf.Max(now - lastPoseTime, 1e-4f);
+            linearSpeed = (wristPos - lastWristPos).magnitude / dt;
+        }
+        lastWristPos = wristPos;
+        lastPoseTime = now;
+        hasLastWristPose = true;
+
+        // 3. Opposite-hand pinch (thumb-to-middle) is the explicit "capture
+        //    now" signal. The user presses the pen tip to the target, then
+        //    pinches. The index finger stays extended carrying the target,
+        //    so the target position is undisturbed at the capture instant.
+        bool hasPinchReading = wristTracker.TryGetPinchGap(oppositeHand, out float pinchGap);
+        bool isPinchedNow = hasPinchReading && pinchGap < pinchThreshold;
+        bool risingPinch = isPinchedNow && !wasPinched;
+
+        bool stillnessOK = linearSpeed < linearVelocityThreshold;
+        bool onCooldown = (now - lastCaptureTime) < captureCooldownSeconds;
+
+        if (risingPinch && stillnessOK && !onCooldown)
+        {
+            CaptureSample(targetPos);
+        }
+        else if (risingPinch && logEvents)
+        {
+            if (!stillnessOK)
+                Debug.Log($"[StylusCalibration] Pinch ignored — stylus hand moving ({linearSpeed:F2} m/s).");
+            else if (onCooldown)
+                Debug.Log("[StylusCalibration] Pinch ignored — cooldown.");
+        }
+
+        wasPinched = isPinchedNow;
+
+        // 4. Target sphere colour — green by default, blue while in the
+        //    post-capture cooldown to acknowledge the sample visually.
+        SetTargetColor(onCooldown ? ColorTargetCaptured : ColorTargetIdle);
     }
 
-    private void DoCalibrate()
+    private void CaptureSample(Vector3 targetPos)
     {
-        if (wristTracker == null)
+        if (wristTracker == null) return;
+        if (!wristTracker.AccumulateSample(targetPos))
         {
-            SetInstruction("Missing StylusWristTracker.\nCheck inspector.");
-            return;
-        }
-        if (!wristTracker.TryGetWristPose(out Vector3 wristPos, out Quaternion wristRot))
-        {
-            SetInstruction("Stylus hand not tracked.\nShow your hand and try again.");
+            if (logEvents) Debug.LogWarning("[StylusCalibration] AccumulateSample failed (hand lost mid-capture).");
             return;
         }
 
-        // Compute wrist → target offset in wrist-local space.
-        // targetWorldPos is where the pen tip should be (the dot centre).
-        Vector3 offset = Quaternion.Inverse(wristRot) * (targetWorldPos - wristPos);
-        wristTracker.SetWristOffset(offset);
+        lastCaptureTime = Time.time;
+
+        int n = wristTracker.SampleCount;
+        if (logEvents) Debug.Log($"[StylusCalibration] Sample {n}/{samplesRequired} captured at {targetPos}.");
+
+        if (n >= samplesRequired)
+        {
+            Solve();
+        }
+        else
+        {
+            UpdateInstructionForProgress();
+        }
+    }
+
+    private void Solve()
+    {
+        if (wristTracker == null) return;
+        if (!wristTracker.FinalizeOffset(out float rms))
+        {
+            SetInstruction("Calibration failed.\nPlease retry.");
+            wristTracker.ClearSamples();
+            return;
+        }
+
+        bool passedQuality = rms <= residualWarnThreshold;
+        int sampleCount = wristTracker.SampleCount;
+
+        if (logEvents)
+            Debug.Log($"[StylusCalibration] Solve complete. N={sampleCount}, RMS={rms * 1000f:F1}mm, " +
+                      $"passed={passedQuality}");
+
+        // Always write the diagnostic record, regardless of pass/fail.
+        StylusCalibrationStore.Save(stylusHand, wristTracker.CurrentOffset, rms, sampleCount);
+
+        if (!passedQuality)
+        {
+            // Keep the offset (it is the best we have) but ask for a redo.
+            SetInstruction($"Residual {rms * 1000f:F0} mm — quality low.\n" +
+                           "Tap the sphere again from\nmore varied wrist angles.");
+            wristTracker.ClearSamples(); // user will re-sample from scratch
+            return;
+        }
 
         calibrationDone = true;
         calibrationDoneTime = Time.time;
 
         SetTargetColor(ColorTargetDone);
-        SetInstruction("Calibrated!\nPress Next to continue.");
-        SetButtonColor(confirmMaterial, ColorBtnDisabled);
-        if (confirmButton != null) confirmButton.SetActive(false);
+        SetInstruction($"Calibrated! Residual {rms * 1000f:F1} mm.\nPress Next to continue.");
 
+        PositionNextButton();
         if (nextButton != null)
         {
             nextButton.SetActive(true);
             SetButtonColor(nextMaterial, ColorBtnDisabled);
         }
 
-        if (logEvents)
-            Debug.Log($"[StylusCalibration] Calibrated. offset={offset} " +
-                      $"mag={offset.magnitude:F3}m target={targetWorldPos}");
-
         OnCalibrationComplete?.Invoke();
+    }
+
+    private void UpdateInstructionForProgress()
+    {
+        int have = wristTracker != null ? wristTracker.SampleCount : 0;
+        string hand = OppositeHand() == Handedness.Left ? "left" : "right";
+        SetInstruction($"Place pen tip on the sphere.\n" +
+                       $"Pinch {hand} thumb + middle\nto capture. Vary wrist angle.\n" +
+                       $"{have}/{samplesRequired}");
     }
 
     // ================================================================
@@ -257,62 +358,22 @@ public class StylusCalibrationController : MonoBehaviour
     {
         bool nextArmed = Time.time - calibrationDoneTime >= nextArmDelay;
         SetButtonColor(nextMaterial, nextArmed ? ColorBtnArmed : ColorBtnDisabled);
-        if (!nextArmed) return;
+        if (!nextArmed || wristTracker == null) return;
 
-        Handedness confirmHand = stylusHand == Handedness.Right ? Handedness.Left : Handedness.Right;
-        if (!TryGetIndexTip(confirmHand, out Vector3 confirmTip)) return;
+        // Either index tip can poke the Next button.
+        if (!wristTracker.TryGetIndexTipForHand(Handedness.Left, out Vector3 leftTip)) leftTip = new Vector3(1e6f, 1e6f, 1e6f);
+        if (!wristTracker.TryGetIndexTipForHand(Handedness.Right, out Vector3 rightTip)) rightTip = new Vector3(1e6f, 1e6f, 1e6f);
 
-        float dist = Vector3.Distance(confirmTip, nextButtonPos);
-        if (dist <= buttonPokeDistance)
+        float d = Mathf.Min(
+            Vector3.Distance(leftTip, nextButtonPos),
+            Vector3.Distance(rightTip, nextButtonPos));
+
+        if (d <= buttonPokeDistance)
         {
             if (logEvents) Debug.Log("[StylusCalibration] Next pressed.");
             isActive = false;
             OnNextButtonPressed?.Invoke();
         }
-    }
-
-    // ================================================================
-    // HAND READING
-    // ================================================================
-
-    private bool TryGetIndexTip(Handedness hand, out Vector3 worldPos)
-    {
-        // Temporarily set handedness on wristTracker, read, restore.
-        // Simpler: just use the same subsystem lookup directly.
-        worldPos = Vector3.zero;
-        var subsystem = WhiteboardPen.GetHandSubsystem();
-        if (subsystem == null || !subsystem.running) return false;
-
-        XRHand xrHand = hand == Handedness.Left ? subsystem.leftHand : subsystem.rightHand;
-        if (!xrHand.isTracked) return false;
-
-        XRHandJoint joint = xrHand.GetJoint(XRHandJointID.IndexTip);
-        if (!joint.TryGetPose(out Pose pose)) return false;
-
-        // Session → world via CameraFloorOffsetObject (same as StylusWristTracker).
-        var origin = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
-        Transform offset = (origin != null && origin.CameraFloorOffsetObject != null)
-            ? origin.CameraFloorOffsetObject.transform
-            : (Camera.main != null ? Camera.main.transform.parent : null);
-
-        worldPos = offset != null
-            ? offset.TransformPoint(pose.position)
-            : pose.position;
-        return true;
-    }
-
-    // ================================================================
-    // DIAGNOSTICS
-    // ================================================================
-
-    private void UpdatePokeMarker()
-    {
-        if (!showPokeMarker || pokeMarker == null) return;
-
-        Handedness confirmHand = stylusHand == Handedness.Right ? Handedness.Left : Handedness.Right;
-        bool tracked = TryGetIndexTip(confirmHand, out Vector3 tip);
-        pokeMarker.SetActive(tracked);
-        if (tracked) pokeMarker.transform.position = tip;
     }
 
     // ================================================================
@@ -324,7 +385,7 @@ public class StylusCalibrationController : MonoBehaviour
         if (targetSphere == null)
         {
             targetSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            targetSphere.name = "StylusCalibTarget";
+            targetSphere.name = "StylusCalibFingertipTarget";
             Destroy(targetSphere.GetComponent<Collider>());
             targetSphere.transform.localScale = Vector3.one * (targetRadius * 2f);
             targetMaterial = MakeMat(ColorTargetIdle);
@@ -332,16 +393,9 @@ public class StylusCalibrationController : MonoBehaviour
             PassthroughManager.SetLayerRecursive(targetSphere, passthroughLayer);
         }
 
-        if (confirmButton == null)
-        {
-            confirmButton = MakeButton("StylusCalibConfirm", "Confirm",
-                                       out confirmMaterial, out confirmLabel);
-        }
-
         if (nextButton == null)
         {
-            nextButton = MakeButton("StylusCalibNext", "Next",
-                                    out nextMaterial, out nextLabel);
+            nextButton = MakeButton("StylusCalibNext", "Next", out nextMaterial, out nextLabel);
             nextButton.SetActive(false);
         }
 
@@ -350,7 +404,6 @@ public class StylusCalibrationController : MonoBehaviour
             instructionObj = new GameObject("StylusCalibInstruction");
             instructionObj.layer = passthroughLayer;
 
-            // Background quad
             var bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
             bg.name = "BG";
             bg.transform.SetParent(instructionObj.transform, false);
@@ -368,62 +421,33 @@ public class StylusCalibrationController : MonoBehaviour
             instructionText.textWrappingMode = TextWrappingModes.Normal;
             instructionText.sortingOrder = 1;
         }
-
-        if (showPokeMarker && pokeMarker == null)
-        {
-            pokeMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            pokeMarker.name = "StylusPokeMarker";
-            Destroy(pokeMarker.GetComponent<Collider>());
-            pokeMarker.transform.localScale = Vector3.one * 0.012f;
-            pokeMarkerMaterial = MakeMat(new Color(1f, 0.3f, 0.3f, 0.9f));
-            ApplyMat(pokeMarker, pokeMarkerMaterial);
-            PassthroughManager.SetLayerRecursive(pokeMarker, passthroughLayer);
-            pokeMarker.SetActive(false);
-        }
     }
 
-    private void PositionVisualsInFrontOfUser()
+    private void PositionNextButton()
     {
         Camera cam = Camera.main;
-        if (cam == null) return;
+        if (cam == null || nextButton == null) return;
 
-        Vector3 camPos  = cam.transform.position;
+        Vector3 camPos = cam.transform.position;
         Vector3 forward = cam.transform.forward; forward.y = 0f;
         if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
         forward.Normalize();
 
-        // Side direction: toward the non-stylus hand.
+        // Place the Next button on the STYLUS side so the opposite (free) hand
+        // crosses over minimally — and either hand can still poke it.
         Vector3 side = stylusHand == Handedness.Right
-            ? -cam.transform.right   // left side for left hand
-            : cam.transform.right;
+            ? cam.transform.right
+            : -cam.transform.right;
         side.y = 0f;
         if (side.sqrMagnitude < 0.001f) side = Vector3.right;
         side.Normalize();
 
-        // Target: straight ahead at comfortable arm reach, below eye level.
-        targetWorldPos = camPos + forward * targetForwardDistance + Vector3.down * targetBelowEye;
-        if (targetSphere != null)
-        {
-            targetSphere.transform.position = targetWorldPos;
-            targetSphere.SetActive(true);
-        }
+        nextButtonPos = camPos + forward * buttonForward
+                        + Vector3.down * buttonBelowEye
+                        + side * buttonSideOffset;
 
-        // Confirm & Next buttons: to the non-stylus side.
-        confirmButtonPos = camPos + forward * buttonForward
-                           + Vector3.down * buttonBelowEye
-                           + side * buttonSideOffset;
-        nextButtonPos    = confirmButtonPos; // same slot; only one is active at a time
-
-        if (confirmButton != null)
-        {
-            confirmButton.transform.position = confirmButtonPos;
-            confirmButton.transform.rotation = Quaternion.LookRotation(forward);
-        }
-        if (nextButton != null)
-        {
-            nextButton.transform.position = nextButtonPos;
-            nextButton.transform.rotation = Quaternion.LookRotation(forward);
-        }
+        nextButton.transform.position = nextButtonPos;
+        nextButton.transform.rotation = Quaternion.LookRotation(forward);
     }
 
     private void BillboardInstruction()
@@ -457,6 +481,9 @@ public class StylusCalibrationController : MonoBehaviour
         if (mat != null) mat.color = c;
     }
 
+    private Handedness OppositeHand() =>
+        stylusHand == Handedness.Right ? Handedness.Left : Handedness.Right;
+
     // ================================================================
     // HELPERS
     // ================================================================
@@ -468,7 +495,7 @@ public class StylusCalibrationController : MonoBehaviour
         btn.name = objName;
         Destroy(btn.GetComponent<Collider>());
         btn.transform.localScale = new Vector3(0.12f, 0.055f, 0.02f);
-        mat = MakeMat(ColorBtnIdle);
+        mat = MakeMat(ColorBtnArmed);
         ApplyMat(btn, mat);
         PassthroughManager.SetLayerRecursive(btn, passthroughLayer);
 
@@ -481,7 +508,6 @@ public class StylusCalibrationController : MonoBehaviour
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
         tmp.rectTransform.sizeDelta = new Vector2(0.14f, 0.07f);
-        // Compensate for non-uniform button scale so text isn't stretched.
         labelObj.transform.localScale = new Vector3(
             1f / 0.12f * 0.10f,
             1f / 0.055f * 0.045f,
@@ -511,20 +537,16 @@ public class StylusCalibrationController : MonoBehaviour
         var r = go.GetComponent<Renderer>();
         if (r == null) return;
         r.material = mat;
-        r.shadowCastingMode  = UnityEngine.Rendering.ShadowCastingMode.Off;
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         r.receiveShadows = false;
     }
 
     private void OnDestroy()
     {
         if (targetSphere    != null) Destroy(targetSphere);
-        if (confirmButton   != null) Destroy(confirmButton);
         if (nextButton      != null) Destroy(nextButton);
         if (instructionObj  != null) Destroy(instructionObj);
-        if (pokeMarker      != null) Destroy(pokeMarker);
-        if (targetMaterial      != null) Destroy(targetMaterial);
-        if (confirmMaterial     != null) Destroy(confirmMaterial);
-        if (nextMaterial        != null) Destroy(nextMaterial);
-        if (pokeMarkerMaterial  != null) Destroy(pokeMarkerMaterial);
+        if (targetMaterial  != null) Destroy(targetMaterial);
+        if (nextMaterial    != null) Destroy(nextMaterial);
     }
 }

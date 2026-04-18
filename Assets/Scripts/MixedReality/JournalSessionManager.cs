@@ -4,24 +4,19 @@ using System.Collections.Generic;
 using System.Globalization;
 using EMILIA.Data;
 using UnityEngine;
-using UnityEngine.XR.ARFoundation;
-using UnityEngine.XR.Hands;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion;
 using TMPro;
-#if UNITY_ANDROID
-using UnityEngine.Android;
-#endif
 
 /// <summary>
 /// Orchestrates the Mixed Reality journaling flow:
-///   Idle → Passthrough → PlaneDiscovery → HandConfirmation → Preview → TransitionToVR → Journaling
+///   Idle → Passthrough → StylusCalibration → TablePlacement → Preview → TransitionToVR → Journaling
 ///
-/// UX inspired by Meta Quest 3 AR Surface Keyboard:
+/// Flow (4-tap, stylus-driven):
 ///   1. Press start button → fade to passthrough (real world visible)
-///   2. AR planes highlight candidate tables; user places both hands flat → surface confirmed
-///   3. Whiteboard spawns on real table surface (visible in passthrough)
+///   2. Stylus calibration: touch-the-fingertip multi-sample solve
+///   3. Table placement: user taps 4 corners of writing area with calibrated pen
 ///   4. Brief preview → fade back to VR
-///   5. Player is teleported to SeatPoint; virtual table offset adjusted to match real-world distance
+///   5. Player is teleported to SeatPoint; virtual table offset adjusted to match real-world eye-above-table
 ///   6. Spatial anchor resists tracking drift
 ///   7. Mid-session re-calibration available via RequestReCalibration()
 ///
@@ -32,11 +27,9 @@ public class JournalSessionManager : MonoBehaviour
     public enum SessionState
     {
         Idle,
-        RequestingPermission,
         Passthrough,
         StylusCalibration,
-        PlaneDiscovery,
-        HandConfirmation,
+        TablePlacement,
         Preview,
         TransitionToVR,
         Journaling,
@@ -46,8 +39,7 @@ public class JournalSessionManager : MonoBehaviour
 
     [Header("References")]
     public PassthroughManager passthroughManager;
-    public ARTableDetector arTableDetector;
-    public CalibrationGuide calibrationGuide;
+    public TableTapCalibrator tableTapCalibrator;
     public AlignmentAnchor alignmentAnchor;
     public WhiteboardUtils whiteboardUtils;
     public JournalStartButton startButton;
@@ -57,15 +49,7 @@ public class JournalSessionManager : MonoBehaviour
              "before actually ending so the user can keep or release the journal.")]
     public JournalReviewController reviewController;
 
-    [Header("AR Managers")]
-    [Tooltip("ARPlaneManager for table detection. Enabled only during detection.")]
-    public ARPlaneManager arPlaneManager;
-
     [Header("Detection Mode")]
-    [Tooltip("Skip AR plane scanning entirely. Uses hand-only detection like the " +
-             "Quest 3 AR Surface Keyboard — instant dot grid feedback from palm positions. " +
-             "Enable this for faster, lighter calibration without Scene Model dependency.")]
-    public bool skipPlaneDetection;
     [Tooltip("Editor / testing only. Skip all MR calibration and jump directly to the " +
              "Journaling state on Start. Useful for testing the journal UI and review flow " +
              "with XR Device Simulator without building to the headset.")]
@@ -74,8 +58,8 @@ public class JournalSessionManager : MonoBehaviour
     [Header("Stylus Calibration")]
     [Tooltip("Optional stylus calibration controller. When assigned, a stylus calibration " +
              "step runs after passthrough entry and before table detection. The user holds " +
-             "their physical pen and touches the tip to a virtual target to compute the " +
-             "wrist-to-tip offset used by the StylusTipProvider at runtime.")]
+             "their physical pen and touches the tip to their opposite index fingertip to " +
+             "compute the wrist-to-tip offset used by the StylusTipProvider at runtime.")]
     public StylusCalibrationController stylusCalibrationController;
 
     [Tooltip("Optional StylusTipProvider. When assigned, the detected writing plane is passed " +
@@ -87,7 +71,8 @@ public class JournalSessionManager : MonoBehaviour
     public StylusVisualProp stylusVisualProp;
 
     [Tooltip("Skip stylus calibration and use legacy finger-tip tracking. Useful for testing " +
-             "without a physical pen or for users who prefer finger drawing.")]
+             "without a physical pen or for users who prefer finger drawing. When true, the " +
+             "4-tap flow uses the index fingertip as the tap source instead of the pen tip.")]
     public bool skipStylusCalibration;
 
     [Header("Scene Objects")]
@@ -97,12 +82,6 @@ public class JournalSessionManager : MonoBehaviour
     public Transform journalTable;
     [Tooltip("The Chair child.")]
     public Transform chair;
-
-    [Header("Table Placement")]
-    [Tooltip("Vertical bias applied to the detected table Y position (metres). " +
-             "Negative values lower the whiteboard. Palm thickness sits ~2–3 cm above " +
-             "the physical surface, so a small negative value corrects that overshoot.")]
-    public float tableHeightBias = 0f;
 
     [Header("SeatPoint Calibration")]
     [Tooltip("The SeatPoint transform where the player will be teleported after calibration. " +
@@ -190,7 +169,7 @@ public class JournalSessionManager : MonoBehaviour
     public float seatXZResidualWarnThreshold = 0.02f;
 
     [Header("UI")]
-    [Tooltip("World-space TextMeshPro for instruction prompts (fallback if CalibrationGuide is null). Created at runtime if null.")]
+    [Tooltip("World-space TextMeshPro for instruction prompts. Created at runtime if null.")]
     public TextMeshPro instructionText;
 
     [Header("Timing")]
@@ -222,12 +201,10 @@ public class JournalSessionManager : MonoBehaviour
     private Vector3 originalTableLocalPosition;
     private float detectionTimeoutTimer;
     private bool hasTimedOut;
-    private ARTableDetector.DetectedTable pendingTable;
+    private TableTapCalibrator.DetectedTable pendingTable;
     private bool calibrationDataValid;
-    private bool scenePermissionGranted;
     private string _sessionCreatedAtIso;    // ISO timestamp for DB (UTC+7)
     private string _sessionCreatedAtDisplay; // formatted timestamp for title-page label
-    private XRHandSubsystem handSubsystem;
     private List<LocomotionProvider> disabledLocomotionProviders = new List<LocomotionProvider>();
     private float originalXROriginY;
     private float capturedRealEyeHeight;
@@ -258,23 +235,6 @@ public class JournalSessionManager : MonoBehaviour
         if (startButton != null)
             startButton.OnButtonPressed += OnStartButtonPressed;
 
-        if (arTableDetector != null)
-        {
-            arTableDetector.OnTableConfirmed += OnTableConfirmed;
-            arTableDetector.OnConfirmationLost += OnConfirmationLost;
-            arTableDetector.enabled = false;
-        }
-
-        // Disable AR plane manager until needed (saves performance)
-        if (arPlaneManager != null)
-            arPlaneManager.enabled = false;
-
-        // Setup fallback instruction text if CalibrationGuide is not assigned
-        if (calibrationGuide == null && instructionText == null)
-            CreateInstructionText();
-
-        // Always own the instruction text so CalibrationGuide's internal event
-        // handlers (OnProgress / OnConfirmed) cannot overwrite our messages.
         if (instructionText == null)
             CreateInstructionText();
 
@@ -298,8 +258,7 @@ public class JournalSessionManager : MonoBehaviour
     private void Update()
     {
         // Timeout guard for detection phases
-        if (CurrentState == SessionState.PlaneDiscovery
-            || CurrentState == SessionState.HandConfirmation)
+        if (CurrentState == SessionState.TablePlacement)
         {
             if (hasTimedOut) return;
 
@@ -310,153 +269,11 @@ public class JournalSessionManager : MonoBehaviour
                 Debug.Log("[JournalSession] Detection timed out — using fallback spawn.");
                 FallbackSpawn();
             }
-
-            // Drive CalibrationGuide palm indicators from hand tracking data
-            if (calibrationGuide != null && arTableDetector != null)
-                UpdateCalibrationPalmIndicators();
         }
 
         // Keep instruction text facing user and at arm's length during passthrough
         if (instructionText != null && instructionText.gameObject.activeSelf)
             UpdateInstructionPosition();
-    }
-
-    /// <summary>
-    /// Reads hand tracking state and forwards it to CalibrationGuide so
-    /// palm indicator spheres appear during detection.
-    /// </summary>
-    private void UpdateCalibrationPalmIndicators()
-    {
-        if (handSubsystem == null || !handSubsystem.running)
-        {
-            handSubsystem = WhiteboardPen.GetHandSubsystem();
-            if (handSubsystem == null) return;
-        }
-
-        XRHand leftHand = handSubsystem.leftHand;
-        XRHand rightHand = handSubsystem.rightHand;
-
-        bool leftTracked = leftHand.isTracked;
-        bool rightTracked = rightHand.isTracked;
-
-        bool leftFlat = false;
-        bool rightFlat = false;
-        Vector3 leftPos = Vector3.zero;
-        Vector3 rightPos = Vector3.zero;
-
-        if (leftTracked)
-            leftFlat = arTableDetector.IsPalmFlat(leftHand, out leftPos);
-        if (rightTracked)
-            rightFlat = arTableDetector.IsPalmFlat(rightHand, out rightPos);
-
-        calibrationGuide.UpdatePalmIndicators(
-            leftTracked, leftPos, leftFlat,
-            rightTracked, rightPos, rightFlat);
-    }
-
-    // ================================================================
-    // ANDROID RUNTIME PERMISSION
-    // ================================================================
-
-    /// <summary>
-    /// Request com.oculus.permission.USE_SCENE at runtime.
-    /// Without this, ARPlaneManager cannot detect planes on Meta Quest.
-    /// </summary>
-    private void RequestScenePermissionThenProceed()
-    {
-#if UNITY_ANDROID && !UNITY_EDITOR
-        const string SCENE_PERMISSION = "com.oculus.permission.USE_SCENE";
-
-        if (Permission.HasUserAuthorizedPermission(SCENE_PERMISSION))
-        {
-            Debug.Log("[JournalSession] USE_SCENE permission already granted.");
-            scenePermissionGranted = true;
-            ProceedToPassthrough();
-            return;
-        }
-
-        Debug.Log("[JournalSession] Requesting USE_SCENE permission...");
-        CurrentState = SessionState.RequestingPermission;
-
-        var callbacks = new PermissionCallbacks();
-        callbacks.PermissionGranted += (perm) =>
-        {
-            Debug.Log($"[JournalSession] Permission granted: {perm}");
-            scenePermissionGranted = true;
-            ProceedToPassthrough();
-        };
-        callbacks.PermissionDenied += (perm) =>
-        {
-            Debug.LogWarning($"[JournalSession] Permission denied: {perm}. " +
-                             "Plane detection will be unavailable — using hand-only fallback.");
-            scenePermissionGranted = false;
-            ProceedToPassthrough();
-        };
-
-        Permission.RequestUserPermissions(new[] { SCENE_PERMISSION }, callbacks);
-#else
-        // In Editor or non-Android, skip permission
-        scenePermissionGranted = true;
-        ProceedToPassthrough();
-#endif
-    }
-
-    private void ProceedToPassthrough()
-    {
-        CurrentState = SessionState.Passthrough;
-
-        bool willCalibrateStylus = !skipStylusCalibration && stylusCalibrationController != null;
-
-        ShowInstruction(willCalibrateStylus
-            ? "Hold your pen and prepare to calibrate\nwhen the target appears."
-            : "Find a flat surface and place both hands\nwith palms facing downward.");
-
-        if (passthroughManager != null)
-            passthroughManager.EnterPassthrough(() =>
-            {
-                if (willCalibrateStylus) EnterStylusCalibration();
-                else EnterPlaneDiscovery();
-            });
-        else if (willCalibrateStylus) EnterStylusCalibration();
-        else EnterPlaneDiscovery();
-    }
-
-    // ================================================================
-    // STYLUS CALIBRATION
-    // ================================================================
-
-    private void EnterStylusCalibration()
-    {
-        CurrentState = SessionState.StylusCalibration;
-
-        Debug.Log("[JournalSession] Entered StylusCalibration state.");
-
-        // Hide the session instruction panel — StylusCalibrationController
-        // owns its own instruction text during this phase.
-        HideInstruction();
-
-        stylusCalibrationController.OnCalibrationComplete += OnStylusCalibrationComplete;
-        stylusCalibrationController.OnNextButtonPressed += OnStylusCalibrationNext;
-        stylusCalibrationController.BeginCalibration();
-    }
-
-    private void OnStylusCalibrationComplete()
-    {
-        // The controller updates its own UI; nothing else to do here yet.
-        Debug.Log("[JournalSession] Stylus calibration complete — awaiting Next button.");
-    }
-
-    private void OnStylusCalibrationNext()
-    {
-        if (stylusCalibrationController != null)
-        {
-            stylusCalibrationController.OnCalibrationComplete -= OnStylusCalibrationComplete;
-            stylusCalibrationController.OnNextButtonPressed -= OnStylusCalibrationNext;
-            stylusCalibrationController.Cleanup();
-        }
-
-        Debug.Log("[JournalSession] Transitioning from StylusCalibration to PlaneDiscovery.");
-        EnterPlaneDiscovery();
     }
 
     // ================================================================
@@ -473,114 +290,130 @@ public class JournalSessionManager : MonoBehaviour
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = true;
 
-        // Skip permission request if plane detection is disabled (hand-only mode)
-        if (skipPlaneDetection)
-            ProceedToPassthrough();
-        else
-            RequestScenePermissionThenProceed();
+        ProceedToPassthrough();
     }
 
-    private void EnterPlaneDiscovery()
+    private void ProceedToPassthrough()
     {
-        CurrentState = SessionState.PlaneDiscovery;
+        CurrentState = SessionState.Passthrough;
+
+        bool willCalibrateStylus = !skipStylusCalibration && stylusCalibrationController != null;
+
+        ShowInstruction(willCalibrateStylus
+            ? "Hold your pen and prepare to calibrate\nwhen the target appears."
+            : "Tap the four corners of your writing\narea with your index fingertip.");
+
+        if (passthroughManager != null)
+            passthroughManager.EnterPassthrough(() =>
+            {
+                if (willCalibrateStylus) EnterStylusCalibration();
+                else EnterTablePlacement();
+            });
+        else if (willCalibrateStylus) EnterStylusCalibration();
+        else EnterTablePlacement();
+    }
+
+    // ================================================================
+    // STYLUS CALIBRATION
+    // ================================================================
+
+    private void EnterStylusCalibration()
+    {
+        CurrentState = SessionState.StylusCalibration;
+
+        Debug.Log("[JournalSession] Entered StylusCalibration state.");
+
+        // StylusCalibrationController owns its own instruction text during this phase.
+        HideInstruction();
+
+        stylusCalibrationController.OnCalibrationComplete += OnStylusCalibrationComplete;
+        stylusCalibrationController.OnNextButtonPressed += OnStylusCalibrationNext;
+        stylusCalibrationController.BeginCalibration();
+    }
+
+    private void OnStylusCalibrationComplete()
+    {
+        Debug.Log("[JournalSession] Stylus calibration complete — awaiting Next button.");
+    }
+
+    private void OnStylusCalibrationNext()
+    {
+        if (stylusCalibrationController != null)
+        {
+            stylusCalibrationController.OnCalibrationComplete -= OnStylusCalibrationComplete;
+            stylusCalibrationController.OnNextButtonPressed -= OnStylusCalibrationNext;
+            stylusCalibrationController.Cleanup();
+        }
+
+        Debug.Log("[JournalSession] Transitioning from StylusCalibration to TablePlacement.");
+        EnterTablePlacement();
+    }
+
+    // ================================================================
+    // TABLE PLACEMENT (4-tap)
+    // ================================================================
+
+    private void EnterTablePlacement()
+    {
+        CurrentState = SessionState.TablePlacement;
         hasTimedOut = false;
         detectionTimeoutTimer = 0f;
 
-        Debug.Log("[JournalSession] Entered PlaneDiscovery state.");
+        Debug.Log("[JournalSession] Entered TablePlacement state.");
 
-        // Enable AR plane detection (only if permission was granted AND not skipped)
-        if (!skipPlaneDetection && arPlaneManager != null && scenePermissionGranted)
+        if (tableTapCalibrator == null)
         {
-            arPlaneManager.enabled = true;
-            Debug.Log("[JournalSession] ARPlaneManager enabled (permission granted).");
-        }
-        else if (skipPlaneDetection)
-        {
-            Debug.Log("[JournalSession] Plane detection skipped — using hand-only mode.");
-        }
-        else if (!scenePermissionGranted)
-        {
-            Debug.LogWarning("[JournalSession] ARPlaneManager NOT enabled — USE_SCENE permission denied.");
+            Debug.LogError("[JournalSession] No TableTapCalibrator assigned — cannot place table.");
+            FallbackSpawn();
+            return;
         }
 
-        if (arTableDetector != null)
-        {
-            arTableDetector.ResetState();
-            arTableDetector.enabled = true;
+        tableTapCalibrator.OnTableConfirmed += OnTableConfirmed;
+        tableTapCalibrator.BeginCalibration();
 
-            // Force hand-only fallback immediately when skipping planes
-            if (skipPlaneDetection)
-                arTableDetector.ForceHandOnlyMode();
-        }
-
-        if (calibrationGuide != null)
-        {
-            calibrationGuide.Show();
-            // Suppress CalibrationGuide's own instruction TMP — we own the text.
-            calibrationGuide.HideInstruction();
-        }
-
-        ShowInstruction("Find a flat surface and place both hands\nwith palms facing downward.");
+        ShowInstruction("Tap the four corners of your writing area:\nnear-left, near-right, far-right, far-left.");
     }
 
-    private void OnTableConfirmed(ARTableDetector.DetectedTable table)
+    private void OnTableConfirmed(TableTapCalibrator.DetectedTable table)
     {
-        // Race condition guard: if timeout already fired, ignore detection
         if (hasTimedOut) return;
-        if (CurrentState != SessionState.PlaneDiscovery
-            && CurrentState != SessionState.HandConfirmation) return;
+        if (CurrentState != SessionState.TablePlacement) return;
 
-        // Disable detection systems
-        if (arTableDetector != null)
-            arTableDetector.enabled = false;
-        if (arPlaneManager != null)
-            arPlaneManager.enabled = false;
+        if (tableTapCalibrator != null)
+        {
+            tableTapCalibrator.OnTableConfirmed -= OnTableConfirmed;
+            tableTapCalibrator.Cleanup();
+        }
 
         CurrentState = SessionState.Preview;
 
-        // Capture averaged eye height sampled across the entire hold period.
-        // This is more stable than a single-frame snapshot and is used later
-        // so the VR camera matches the passthrough perspective.
+        // Capture averaged eye height sampled across the tap sequence.
         capturedRealEyeHeight = table.avgEyeY;
 
         Debug.Log($"[JournalSession] Table confirmed at {table.position}, " +
-                  $"size={table.size}, AR={table.sourcePlane != null}. " +
+                  $"size={table.size}, tapSurfaceY={table.avgTapSurfaceY:F3}. " +
                   $"User at {table.userHeadPosition} (capturedEyeY={capturedRealEyeHeight:F2}).");
 
         StartCoroutine(PreviewAndTransition(table));
-    }
-
-    private void OnConfirmationLost()
-    {
-        // Only reset a portion of the timeout so the cumulative time still increases.
-        // If a user repeatedly places/lifts hands, the fallback eventually fires rather
-        // than being deferred forever.
-        detectionTimeoutTimer = Mathf.Max(detectionTimeoutTimer - 2f, 0f);
     }
 
     // ================================================================
     // PREVIEW & TRANSITION
     // ================================================================
 
-    private IEnumerator PreviewAndTransition(ARTableDetector.DetectedTable table)
+    private IEnumerator PreviewAndTransition(TableTapCalibrator.DetectedTable table)
     {
-        // Step 1: Spawn whiteboard on real table in passthrough
         SpawnWhiteboardForPreview(table);
 
         ShowInstruction("Calibrating...");
 
-        // Step 2: Let user see the whiteboard on their real table
         yield return new WaitForSeconds(previewDuration * 0.6f);
 
         ShowInstruction("Done, returning to the game world.");
         yield return new WaitForSeconds(previewDuration * 0.4f);
 
-        // Step 3: Transition to VR
         CurrentState = SessionState.TransitionToVR;
         HideInstruction();
-
-        if (calibrationGuide != null)
-            calibrationGuide.Hide();
 
         if (passthroughManager != null)
         {
@@ -637,7 +470,7 @@ public class JournalSessionManager : MonoBehaviour
     // WHITEBOARD SPAWNING
     // ================================================================
 
-    private void SpawnWhiteboardForPreview(ARTableDetector.DetectedTable table)
+    private void SpawnWhiteboardForPreview(TableTapCalibrator.DetectedTable table)
     {
         pendingTable = table;
         calibrationDataValid = true;
@@ -655,7 +488,7 @@ public class JournalSessionManager : MonoBehaviour
     // VR WORLD ALIGNMENT
     // ================================================================
 
-    private void AlignVRWorldToTable(ARTableDetector.DetectedTable table)
+    private void AlignVRWorldToTable(TableTapCalibrator.DetectedTable table)
     {
         if (journalChairTable == null || journalTable == null) return;
 
@@ -675,7 +508,7 @@ public class JournalSessionManager : MonoBehaviour
         // 2. Position: place parent so JournalTable child ends up at detected position
         Vector3 tableChildLocalPos = journalTable.localPosition;
         Vector3 targetParentPos = table.position - targetParentRot * tableChildLocalPos;
-        targetParentPos.y = table.position.y - tableChildLocalPos.y + tableHeightBias;
+        targetParentPos.y = table.position.y - tableChildLocalPos.y;
 
         journalChairTable.position = targetParentPos;
         journalChairTable.rotation = targetParentRot;
@@ -694,7 +527,7 @@ public class JournalSessionManager : MonoBehaviour
 
                 Quaternion flippedRot = targetParentRot * Quaternion.Euler(0f, 180f, 0f);
                 Vector3 flippedPos = table.position - flippedRot * tableChildLocalPos;
-                flippedPos.y = table.position.y - tableChildLocalPos.y + tableHeightBias;
+                flippedPos.y = table.position.y - tableChildLocalPos.y;
 
                 journalChairTable.position = flippedPos;
                 journalChairTable.rotation = flippedRot;
@@ -733,7 +566,7 @@ public class JournalSessionManager : MonoBehaviour
     /// position and forward direction (yaw). Camera Y is calibrated from passthrough:
     ///   targetEyeY = virtualTableSurfaceY + (realEyeY - realTableY)
     /// This makes the virtual whiteboard appear at the same eye-relative height as the
-    /// real table the user placed their palms on. Scene objects are never moved.
+    /// real table the user tapped. Scene objects are never moved.
     /// Falls back to SeatPoint.y if no calibration data is available (e.g. timeout).
     /// </summary>
     private void TeleportToSeatPoint()
@@ -763,17 +596,13 @@ public class JournalSessionManager : MonoBehaviour
         xrOrigin.position += offset;
 
         // 3. Determine target eye height.
-        //    If passthrough calibration ran: preserve the user's real eye-above-table
-        //    distance so the virtual whiteboard feels at the same height as the real table.
-        //    Otherwise: use SeatPoint's authored eye height as-is.
         float targetEyeY;
         bool hasExpectedEyeAboveTable = false;
         float expectedEyeAboveTable = 0f;
         if (calibrationDataValid)
         {
-            // Use palm-based surface Y rather than AR plane Y — eliminates spatial-mesh
-            // drift and uses the actual contact point the user measured from.
-            float realEyeAboveTable = capturedRealEyeHeight - pendingTable.avgPalmSurfaceY;
+            // Surface Y comes from tap contact points — no palm-thickness bias.
+            float realEyeAboveTable = capturedRealEyeHeight - pendingTable.avgTapSurfaceY;
             realEyeAboveTable = Mathf.Clamp(
                 realEyeAboveTable,
                 Mathf.Min(realEyeAboveTableClamp.x, realEyeAboveTableClamp.y),
@@ -786,7 +615,7 @@ public class JournalSessionManager : MonoBehaviour
             targetEyeY = virtualTableY + realEyeAboveTable + calibrationHeightBias;
 
             Debug.Log($"[JournalSession] Eye-height calibrated: realEyeAboveTable=" +
-                      $"{realEyeAboveTable:F3}m (eye={capturedRealEyeHeight:F3}, palmSurf={pendingTable.avgPalmSurfaceY:F3}), " +
+                      $"{realEyeAboveTable:F3}m (eye={capturedRealEyeHeight:F3}, tapSurf={pendingTable.avgTapSurfaceY:F3}), " +
                       $"virtualTableY={virtualTableY:F3}m, bias={calibrationHeightBias:F3}m, targetEyeY={targetEyeY:F3}m");
         }
         else
@@ -861,15 +690,8 @@ public class JournalSessionManager : MonoBehaviour
     /// <summary>
     /// Moves the configured height adjustment root vertically so the virtual table surface sits
     /// at the same eye-relative height as the real table detected in passthrough.
-    ///
-    /// Formula: targetVirtualTableY = cameraY - (realEyeY - realTableY)
-    ///          deltaY = targetVirtualTableY - currentVirtualTableY
-    ///
-    /// Must be called AFTER TeleportToSeatPoint (so camera Y is set) and
-    /// BEFORE MoveWhiteboardToVRLayer (so the placeholder is at its final Y
-    /// when the whiteboard is placed on it).
     /// </summary>
-    private void AdjustIslandHeight(ARTableDetector.DetectedTable table)
+    private void AdjustIslandHeight(TableTapCalibrator.DetectedTable table)
     {
         Transform adjustmentRoot = ResolveHeightAdjustmentRoot();
         if (adjustmentRoot == null)
@@ -878,17 +700,14 @@ public class JournalSessionManager : MonoBehaviour
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        // How high were the player's eyes above the real table during calibration?
         float realEyeAboveTable = capturedRealEyeHeight - table.position.y;
         realEyeAboveTable = Mathf.Clamp(
             realEyeAboveTable,
             Mathf.Min(eyeAboveTableClamp.x, eyeAboveTableClamp.y),
             Mathf.Max(eyeAboveTableClamp.x, eyeAboveTableClamp.y));
 
-        // Find the virtual table surface Y from the whiteboard placeholder
         float virtualTableSurfaceY = GetVirtualTableSurfaceY();
 
-        // We want: virtualTableSurfaceY == cameraY - realEyeAboveTable
         float targetVirtualTableY = cam.transform.position.y - realEyeAboveTable;
         float deltaY = targetVirtualTableY - virtualTableSurfaceY;
         deltaY = Mathf.Clamp(deltaY, -maxHeightCorrection, maxHeightCorrection);
@@ -934,7 +753,6 @@ public class JournalSessionManager : MonoBehaviour
 
     private float GetVirtualTableSurfaceY()
     {
-        // Prefer an explicitly assigned writing-surface reference.
         if (tableWritingSurface != null)
         {
             float y = tableWritingSurface.position.y;
@@ -942,8 +760,6 @@ public class JournalSessionManager : MonoBehaviour
             return y;
         }
 
-        // Try WhiteboardPlaceholder first (explicit surface marker), then the
-        // Whiteboard itself (the static writing surface placed in scene).
         string[] autoPaths = new[]
         {
             "JournalChairTable/JournalTable/WhiteboardPlaceholder",
@@ -963,7 +779,6 @@ public class JournalSessionManager : MonoBehaviour
             }
         }
 
-        // Last resort: JournalTable pivot (only correct when pivot is at surface).
         if (journalTable != null)
         {
             float y = journalTable.position.y;
@@ -992,9 +807,9 @@ public class JournalSessionManager : MonoBehaviour
             alignmentAnchor.ReleaseAnchor();
 
         if (passthroughManager != null)
-            passthroughManager.EnterPassthrough(() => EnterPlaneDiscovery());
+            passthroughManager.EnterPassthrough(() => EnterTablePlacement());
         else
-            EnterPlaneDiscovery();
+            EnterTablePlacement();
     }
 
     // ================================================================
@@ -1003,15 +818,13 @@ public class JournalSessionManager : MonoBehaviour
 
     private void FallbackSpawn()
     {
-        if (arTableDetector != null)
-            arTableDetector.enabled = false;
-        if (arPlaneManager != null)
-            arPlaneManager.enabled = false;
+        if (tableTapCalibrator != null)
+        {
+            tableTapCalibrator.OnTableConfirmed -= OnTableConfirmed;
+            tableTapCalibrator.Cleanup();
+        }
 
         HideInstruction();
-
-        if (calibrationGuide != null)
-            calibrationGuide.Hide();
 
         if (passthroughManager != null && passthroughManager.IsPassthroughActive)
             passthroughManager.ExitPassthrough(() => SpawnAtDefaultPosition());
@@ -1043,9 +856,7 @@ public class JournalSessionManager : MonoBehaviour
         reviewController?.EnterJournalingMode();
 
         // Hand the virtual whiteboard surface plane to the stylus tip provider so
-        // it can snap the tip to the writing plane during drawing. The virtual
-        // surface has already been aligned with the real table via teleport +
-        // height adjustment, so this plane matches where the user physically writes.
+        // it can snap the tip to the writing plane during drawing.
         if (stylusTipProvider != null)
         {
             float surfaceY = GetVirtualTableSurfaceY();
@@ -1079,15 +890,11 @@ public class JournalSessionManager : MonoBehaviour
 
         CurrentState = SessionState.Ending;
 
-        // Hide the virtual pen as soon as we leave Journaling — review, save, and
-        // transition states should not show the prop.
+        // Hide the virtual pen as soon as we leave Journaling.
         stylusVisualProp?.SetPropEnabled(false);
 
         if (reviewController != null)
         {
-            // Collect journal content now, while ScribbleManager data is intact.
-            // Apply the same page-0 fallback used in SaveJournalCoroutine so the
-            // sentiment API always receives something meaningful to analyse.
             string jTitle   = ScribbleManager.Instance?.GetTitleText().Trim()   ?? string.Empty;
             string jContent = ScribbleManager.Instance?.GetContentText().Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(jContent) && !string.IsNullOrWhiteSpace(jTitle))
@@ -1105,7 +912,6 @@ public class JournalSessionManager : MonoBehaviour
 
     private IEnumerator EndSessionCoroutine(bool saveJournal = true)
     {
-        // Save before tearing down so ScribbleManager data is still intact.
         if (saveJournal)
             yield return SaveJournalCoroutine();
 
@@ -1120,14 +926,12 @@ public class JournalSessionManager : MonoBehaviour
             alignmentAnchor.ReleaseAnchor();
 
         calibrationDataValid = false;
-        // Scene objects are never moved during a session — only restore the XR Origin.
         RestoreXROriginHeight();
         UnlockLocomotion();
 
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
 
-        // Session teardown is complete; AZKi may return to roaming from review lock/cheering hold.
         reviewController?.OnSessionEnded();
 
         SetButtonVisible(true);
@@ -1139,10 +943,6 @@ public class JournalSessionManager : MonoBehaviour
     // JOURNAL SAVE
     // ================================================================
 
-    /// <summary>
-    /// Collects title + content from ScribbleManager and persists via JournalService.
-    /// Skipped silently if content is empty or ServiceManager is unavailable.
-    /// </summary>
     private IEnumerator SaveJournalCoroutine()
     {
         var sm = ScribbleManager.Instance;
@@ -1151,9 +951,6 @@ public class JournalSessionManager : MonoBehaviour
         string title   = sm.GetTitleText().Trim();
         string content = sm.GetContentText().Trim();
 
-        // Fallback: if the user wrote only on the title page (page 0) and never
-        // navigated to a content page, GetContentText() returns "".
-        // Treat the title-page text as the journal body and auto-derive a title.
         if (string.IsNullOrWhiteSpace(content) && !string.IsNullOrWhiteSpace(title))
         {
             Debug.Log("[JournalSession] No content pages written — using title-page text as journal content.");
@@ -1202,16 +999,10 @@ public class JournalSessionManager : MonoBehaviour
 
         yield return new WaitUntil(() => done);
 
-        // Fire-and-forget sentiment analysis.
-        // Runs in the background so the session-end flow is not stalled by AI inference.
         if (savedJournal != null && ServiceManager.Instance?.SentimentApi != null)
             StartCoroutine(AnalyzeAndSaveSentiment(savedJournal.Id, content));
     }
 
-    /// <summary>
-    /// Calls the /sentiment API and persists the result (tone + AI reason) to the journal row.
-    /// Non-blocking relative to EndSessionCoroutine — started as a fire-and-forget coroutine.
-    /// </summary>
     private IEnumerator AnalyzeAndSaveSentiment(string journalId, string content)
     {
         bool done = false;
@@ -1239,7 +1030,6 @@ public class JournalSessionManager : MonoBehaviour
 
     private static readonly char[] s_wordSplitChars = new char[] { ' ' };
 
-    /// <summary>Derives a short title from the first N words of content.</summary>
     private static string DeriveTitleFromContent(string content, int maxWords = 3, int maxChars = 60)
     {
         if (string.IsNullOrWhiteSpace(content)) return "Untitled";
@@ -1265,23 +1055,16 @@ public class JournalSessionManager : MonoBehaviour
 
         StopAllCoroutines();
 
-        // Cancel any in-progress PassthroughManager transition so the screen
-        // doesn't get stuck mid-fade-to-black.
         if (passthroughManager != null)
             passthroughManager.CancelTransition();
 
-        if (arTableDetector != null)
+        if (tableTapCalibrator != null)
         {
-            arTableDetector.enabled = false;
-            arTableDetector.ResetState();
+            tableTapCalibrator.OnTableConfirmed -= OnTableConfirmed;
+            tableTapCalibrator.Cleanup();
         }
-        if (arPlaneManager != null)
-            arPlaneManager.enabled = false;
 
         HideInstruction();
-
-        if (calibrationGuide != null)
-            calibrationGuide.Hide();
 
         if (stylusCalibrationController != null)
         {
@@ -1308,7 +1091,6 @@ public class JournalSessionManager : MonoBehaviour
     {
         calibrationDataValid = false;
         SetWhiteboardUIActive(false);
-        // Scene objects are never moved during a session — only restore the XR Origin.
         RestoreXROriginHeight();
         UnlockLocomotion();
 
@@ -1323,11 +1105,6 @@ public class JournalSessionManager : MonoBehaviour
     // LOCOMOTION LOCK
     // ================================================================
 
-    /// <summary>
-    /// Disables all LocomotionProvider components (move, turn, teleport)
-    /// so the player cannot move with controllers during journaling.
-    /// Physical head movement (looking around) is unaffected.
-    /// </summary>
     private void LockLocomotion()
     {
         disabledLocomotionProviders.Clear();
@@ -1346,15 +1123,8 @@ public class JournalSessionManager : MonoBehaviour
             Debug.Log($"[JournalSession] Locomotion locked — disabled {disabledLocomotionProviders.Count} provider(s).");
     }
 
-    /// <summary>
-    /// Called by JournalReviewController mid-review to allow the player to walk
-    /// to the bottle rack or ocean edge after the Keep/Discard choice is made.
-    /// </summary>
     public void AllowLocomotion() => UnlockLocomotion();
 
-    /// <summary>
-    /// Re-enables all locomotion providers that were disabled by LockLocomotion().
-    /// </summary>
     private void UnlockLocomotion()
     {
         foreach (var provider in disabledLocomotionProviders)
@@ -1369,9 +1139,6 @@ public class JournalSessionManager : MonoBehaviour
         disabledLocomotionProviders.Clear();
     }
 
-    /// <summary>
-    /// Restores the XR Origin's Y position to what it was before seated adjustment.
-    /// </summary>
     private void RestoreXROriginHeight()
     {
         if (xrOrigin != null)
@@ -1406,14 +1173,11 @@ public class JournalSessionManager : MonoBehaviour
     }
 
     // ================================================================
-    // INSTRUCTION UI (fallback when CalibrationGuide is null)
+    // INSTRUCTION UI
     // ================================================================
 
     private void ShowInstruction(string message)
     {
-        // Always use our own world-space TMP so CalibrationGuide's internal
-        // event handlers (OnConfirmationProgress / OnTableConfirmed) cannot
-        // overwrite the message we set.
         if (instructionText == null)
             CreateInstructionText();
         if (instructionText == null) return;
@@ -1471,11 +1235,8 @@ public class JournalSessionManager : MonoBehaviour
         if (startButton != null)
             startButton.OnButtonPressed -= OnStartButtonPressed;
 
-        if (arTableDetector != null)
-        {
-            arTableDetector.OnTableConfirmed -= OnTableConfirmed;
-            arTableDetector.OnConfirmationLost -= OnConfirmationLost;
-        }
+        if (tableTapCalibrator != null)
+            tableTapCalibrator.OnTableConfirmed -= OnTableConfirmed;
 
         if (passthroughManager != null)
             passthroughManager.OnPassthroughExited -= OnceAfterPassthroughExit;

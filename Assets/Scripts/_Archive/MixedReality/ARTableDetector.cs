@@ -1,3 +1,10 @@
+// ARCHIVED 2026-04-18: replaced by TableTapCalibrator (4-tap rectangle).
+// ARPlaneManager is slow and unreliable on Quest 3 without MRUK, and palm-flat
+// detection requires per-user height-bias tuning because the palm joint sits
+// 12–30 mm above the surface. Tapping the four corners with the already-
+// calibrated stylus measures surface Y directly with no bias.
+// Re-enable by defining EMILIA_LEGACY_TABLE_DETECTION.
+#if EMILIA_LEGACY_TABLE_DETECTION
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -683,3 +690,4 @@ public class ARTableDetector : MonoBehaviour
         Debug.Log("[ARTableDetector] Forced into hand-only mode (plane detection skipped).");
     }
 }
+#endif // EMILIA_LEGACY_TABLE_DETECTION

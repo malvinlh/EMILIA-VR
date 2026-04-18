@@ -9552,6 +9552,44 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -1137624454243228069, guid: 51a87c43f535fb94ab6db2e7caba3f9f, type: 3}
+--- !u!21 &536212193
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &540040053
 GameObject:
   m_ObjectHideFlags: 0
@@ -12504,6 +12542,69 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 866289904}
   m_CullTransparentMesh: 1
+--- !u!1 &866369389
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 866369390}
+  - component: {fileID: 866369391}
+  m_Layer: 0
+  m_Name: TableTapCalibrator
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &866369390
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 866369389}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &866369391
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 866369389}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eba7f98f178dd604cb663ba98a06fe83, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TableTapCalibrator
+  stylusTipProvider: {fileID: 1672689253}
+  passthroughManager: {fileID: 5000000007}
+  tapStillnessVelocity: 0.03
+  tapDwellSeconds: 0.22
+  tapCooldownSeconds: 0.55
+  tapYConsensus: 0.025
+  minSize: {x: 0.3, y: 0.2}
+  maxSize: {x: 1.2, y: 0.8}
+  unevenWarnSpan: 0.015
+  buttonHeightAboveRect: 0.22
+  buttonSpacing: 0.18
+  buttonPokeDistance: 0.03
+  buttonArmDelay: 0.4
+  tipIndicatorRadius: 0.012
+  tapMarkerRadius: 0.01
+  instructionForward: 0.9
+  instructionHeight: 0.18
+  fontSize: 0.28
+  logEvents: 1
 --- !u!64 &869365583
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -13186,8 +13287,11 @@ MonoBehaviour:
   passthroughManager: {fileID: 5000000007}
   wristTracker: {fileID: 259868253}
   stylusHand: 2
-  targetForwardDistance: 0.35
-  targetBelowEye: 0.25
+  samplesRequired: 5
+  pinchThreshold: 0.025
+  linearVelocityThreshold: 0.03
+  captureCooldownSeconds: 0.6
+  residualWarnThreshold: 0.008
   targetRadius: 0.015
   buttonForward: 0.5
   buttonBelowEye: 0.05
@@ -13197,7 +13301,6 @@ MonoBehaviour:
   instructionForward: 0.9
   instructionHeight: 0.2
   fontSize: 0.3
-  showPokeMarker: 1
   logEvents: 1
 --- !u!1 &992886154
 GameObject:
@@ -16770,44 +16873,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -4488266975990590275, guid: 61814d276c8af20439a8e6850998a406, type: 3}
---- !u!21 &1256513810
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1261174259
 GameObject:
   m_ObjectHideFlags: 0
@@ -19492,23 +19557,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JournalSessionManager
   passthroughManager: {fileID: 5000000007}
-  arTableDetector: {fileID: 5000000010}
-  calibrationGuide: {fileID: 5000000013}
+  tableTapCalibrator: {fileID: 866369391}
   alignmentAnchor: {fileID: 0}
   whiteboardUtils: {fileID: 3000000008}
   startButton: {fileID: 4000000013}
   reviewController: {fileID: 6000000011}
-  arPlaneManager: {fileID: 0}
-  skipPlaneDetection: 1
   skipToJournalingOnStart: 0
   stylusCalibrationController: {fileID: 990924403}
   stylusTipProvider: {fileID: 1672689253}
-  stylusVisualProp: {fileID: 0}
+  stylusVisualProp: {fileID: 1672689255}
   skipStylusCalibration: 0
   journalChairTable: {fileID: 1456161760}
   journalTable: {fileID: 251825959}
   chair: {fileID: 1371020394}
-  tableHeightBias: 0
   seatPoint: {fileID: 784500238}
   xrOrigin: {fileID: 334391415}
   mainIsland: {fileID: 543450652472430531}
@@ -19764,7 +19825,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1256513810}
+  - {fileID: 536212193}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -21973,6 +22034,7 @@ GameObject:
   - component: {fileID: 1672689253}
   - component: {fileID: 1672689255}
   - component: {fileID: 1672689256}
+  - component: {fileID: 1672689257}
   m_Layer: 0
   m_Name: StylusTipProvider
   m_TagString: Untagged
@@ -21993,14 +22055,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::StylusTipProvider
   wristTracker: {fileID: 259868253}
-  cvDetector: {fileID: 1672689256}
   tipFilterMinCutoff: 2
   tipFilterBeta: 0.05
   tipFilterDCutoff: 1
   smoothingIdleResetSeconds: 0.25
   planeSnapDistance: 0.015
-  cvBlendWeight: 0.3
-  minCvConfidence: 0.4
 --- !u!4 &1672689254
 Transform:
   m_ObjectHideFlags: 0
@@ -22050,14 +22109,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c23f9e9f779bc33468f9f12f8c2fe953, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GreenBandDetector
-  arCameraManager: {fileID: 3000000019}
-  targetHz: 20
-  downscale: 2
-  hsvLower: {x: 35, y: 80, z: 60}
-  hsvUpper: {x: 85, y: 255, z: 255}
-  minContourArea: 20
-  confidenceFullArea: 400
-  logDetections: 1
+--- !u!114 &1672689257
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1672689252}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 852dd68228683e44b981b317d9119550, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StylusWristTracker
+  handedness: 2
 --- !u!1 &1706509597
 GameObject:
   m_ObjectHideFlags: 0
@@ -31072,20 +31136,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f83735f47993772468191b32ed4a12e0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  planeManager: {fileID: 0}
-  xrOrigin: {fileID: 0}
-  minTableHeight: 0.45
-  maxTableHeight: 1.1
-  handPlaneMatchRadius: 0.15
-  palmDownAngleThreshold: 20
-  fingertipYTolerance: 0.03
-  holdDuration: 1.5
-  planeFallbackTimeout: 5
-  fallbackWidthMultiplier: 1.5
-  fallbackDefaultDepth: 0.4
-  minSize: {x: 0.3, y: 0.2}
-  maxSize: {x: 0.8, y: 0.6}
-  fallbackStabilityThreshold: 0.015
 --- !u!1 &5000000011
 GameObject:
   m_ObjectHideFlags: 0
@@ -31131,18 +31181,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4c41aa1f119e9f64d9a3d39176df47f0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  tableDetector: {fileID: 5000000010}
-  passthroughManager: {fileID: 5000000007}
-  palmIndicatorPrefab: {fileID: 2909490306651346934, guid: c69ff3cbb315e2a48803a71e0eb049bb, type: 3}
-  instructionDistance: 1.2
-  instructionHeight: 0.1
-  fontSize: 0.4
-  candidateColor: {r: 1, g: 1, b: 1, a: 0.3}
-  bestCandidateColor: {r: 0.3, g: 0.9, b: 0.4, a: 0.5}
-  palmIdleColor: {r: 0.5, g: 0.5, b: 0.5, a: 0.8}
-  palmFlatColor: {r: 1, g: 0.85, b: 0.2, a: 0.9}
-  palmConfirmingColor: {r: 0.3, g: 0.9, b: 0.3, a: 0.95}
-  dotGrid: {fileID: 5000000014}
 --- !u!114 &5000000014
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -193826,3 +193864,4 @@ SceneRoots:
   - {fileID: 259868254}
   - {fileID: 1672689254}
   - {fileID: 990924402}
+  - {fileID: 866369390}

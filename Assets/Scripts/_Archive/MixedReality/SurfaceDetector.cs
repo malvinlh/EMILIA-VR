@@ -1,3 +1,7 @@
+// ARCHIVED 2026-04-18: replaced by TableTapCalibrator (4-tap stylus-driven flow).
+// The palms-flat approach had a 12-30 mm height bias that required patches and a
+// tiring 1.5 s hold. Re-enable by defining EMILIA_LEGACY_TABLE_DETECTION.
+#if EMILIA_LEGACY_TABLE_DETECTION
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -290,3 +294,4 @@ public class SurfaceDetector : MonoBehaviour
         ResetDetection();
     }
 }
+#endif // EMILIA_LEGACY_TABLE_DETECTION

@@ -2,9 +2,8 @@ using UnityEngine;
 
 /// <summary>
 /// Central coordinator that produces a single world-space pen-tip position
-/// each frame. Combines the wrist-offset tracker (always available) with
-/// optional CV-based correction (future GreenBandDetector). Applies
-/// OneEuroFilter smoothing and optional writing-plane snap.
+/// each frame from the wrist-offset tracker. Applies OneEuroFilter smoothing
+/// and optional writing-plane snap.
 ///
 /// Consumers (e.g., WhiteboardPen) read <see cref="TipWorldPosition"/>.
 /// </summary>
@@ -15,9 +14,6 @@ public class StylusTipProvider : MonoBehaviour
 
     [Header("References")]
     public StylusWristTracker wristTracker;
-    [Tooltip("Optional CV-based green-band detector. If unavailable at runtime, " +
-             "the system falls back to wrist-only tracking.")]
-    public GreenBandDetector cvDetector;
 
     [Header("Smoothing (One Euro)")]
     [Tooltip("Minimum cutoff frequency (Hz). Lower = more smoothing at low speed.")]
@@ -33,10 +29,6 @@ public class StylusTipProvider : MonoBehaviour
     [Tooltip("When the tip is within this distance (metres) of the writing plane, " +
              "begin blending it toward the plane. Replaces per-pixel depth.")]
     public float planeSnapDistance = 0.025f;
-
-    [Header("CV Fusion (reserved)")]
-    [Range(0f, 1f)] public float cvBlendWeight = 0.3f;
-    [Range(0f, 1f)] public float minCvConfidence = 0.4f;
 
     // ── Output ───────────────────────────────────────────────────────
     public Vector3? TipWorldPosition { get; private set; }
@@ -83,7 +75,7 @@ public class StylusTipProvider : MonoBehaviour
 
     /// <summary>
     /// Assign the writing plane used for normal-axis snapping. Typically called
-    /// after ARTableDetector confirms a surface. The plane's normal defines
+    /// after TableTapCalibrator confirms a surface. The plane's normal defines
     /// the "up" direction for the writing surface.
     /// </summary>
     public void SetWritingPlane(Plane plane)
@@ -114,19 +106,6 @@ public class StylusTipProvider : MonoBehaviour
             return;
         }
 
-        Vector3 fusedPos = wristPos;
-        float fusedConf = wristConf;
-
-        // ── CV fusion: blend in the green-band detection when confident ─
-        if (cvDetector != null && cvDetector.IsAvailable && HasWritingPlane &&
-            cvDetector.TryGetWorldPosition(WritingPlane, out Vector3 cvPos, out float cvConf) &&
-            cvConf >= minCvConfidence)
-        {
-            float w = Mathf.Clamp01(cvBlendWeight * cvConf);
-            fusedPos = Vector3.Lerp(wristPos, cvPos, w);
-            fusedConf = Mathf.Max(wristConf, cvConf);
-        }
-
         // ── Smoothing (One Euro, per axis) ───────────────────────────
         float now = Time.time;
         if (now - lastSampleTime > smoothingIdleResetSeconds)
@@ -134,9 +113,9 @@ public class StylusTipProvider : MonoBehaviour
         lastSampleTime = now;
 
         Vector3 smoothed = new Vector3(
-            filterX.Filter(fusedPos.x, now),
-            filterY.Filter(fusedPos.y, now),
-            filterZ.Filter(fusedPos.z, now));
+            filterX.Filter(wristPos.x, now),
+            filterY.Filter(wristPos.y, now),
+            filterZ.Filter(wristPos.z, now));
 
         // ── Writing plane snap ───────────────────────────────────────
         // Within planeSnapDistance of the surface, lerp the tip onto the plane.
@@ -154,7 +133,7 @@ public class StylusTipProvider : MonoBehaviour
         }
 
         TipWorldPosition = smoothed;
-        Confidence = fusedConf;
+        Confidence = wristConf;
     }
 
     private void ResetFiltersIfIdle()

@@ -1,6 +1,5 @@
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.XR.ARFoundation;
 
 /// <summary>
 /// Editor utility to auto-wire the MR Journaling system in the current scene.
@@ -21,7 +20,6 @@ public static class MRJournalSceneSetup
             return;
         }
 
-        var so = new SerializedObject(sessionMgr);
         int wired = 0;
 
         // PassthroughManager
@@ -31,18 +29,11 @@ public static class MRJournalSceneSetup
             if (pt != null) { sessionMgr.passthroughManager = pt; wired++; }
         }
 
-        // ARTableDetector
-        if (sessionMgr.arTableDetector == null)
+        // TableTapCalibrator
+        if (sessionMgr.tableTapCalibrator == null)
         {
-            var det = Object.FindAnyObjectByType<ARTableDetector>();
-            if (det != null) { sessionMgr.arTableDetector = det; wired++; }
-        }
-
-        // CalibrationGuide
-        if (sessionMgr.calibrationGuide == null)
-        {
-            var cg = Object.FindAnyObjectByType<CalibrationGuide>();
-            if (cg != null) { sessionMgr.calibrationGuide = cg; wired++; }
+            var tc = Object.FindAnyObjectByType<TableTapCalibrator>();
+            if (tc != null) { sessionMgr.tableTapCalibrator = tc; wired++; }
         }
 
         // AlignmentAnchor
@@ -66,11 +57,25 @@ public static class MRJournalSceneSetup
             if (btn != null) { sessionMgr.startButton = btn; wired++; }
         }
 
-        // ARPlaneManager
-        if (sessionMgr.arPlaneManager == null)
+        // StylusCalibrationController
+        if (sessionMgr.stylusCalibrationController == null)
         {
-            var apm = Object.FindAnyObjectByType<ARPlaneManager>();
-            if (apm != null) { sessionMgr.arPlaneManager = apm; wired++; }
+            var scc = Object.FindAnyObjectByType<StylusCalibrationController>();
+            if (scc != null) { sessionMgr.stylusCalibrationController = scc; wired++; }
+        }
+
+        // StylusTipProvider
+        if (sessionMgr.stylusTipProvider == null)
+        {
+            var stp = Object.FindAnyObjectByType<StylusTipProvider>();
+            if (stp != null) { sessionMgr.stylusTipProvider = stp; wired++; }
+        }
+
+        // StylusVisualProp
+        if (sessionMgr.stylusVisualProp == null)
+        {
+            var svp = Object.FindAnyObjectByType<StylusVisualProp>();
+            if (svp != null) { sessionMgr.stylusVisualProp = svp; wired++; }
         }
 
         // Scene Objects by name
@@ -105,47 +110,6 @@ public static class MRJournalSceneSetup
             if (go != null) { sessionMgr.xrOrigin = go.transform; wired++; }
         }
 
-        // ── Wire ARTableDetector.xrOrigin ────────────────────────────
-        if (sessionMgr.arTableDetector != null)
-        {
-            var det = sessionMgr.arTableDetector;
-            if (det.xrOrigin == null && sessionMgr.xrOrigin != null)
-            {
-                det.xrOrigin = sessionMgr.xrOrigin;
-                EditorUtility.SetDirty(det);
-                wired++;
-            }
-        }
-
-        // ── Wire CalibrationGuide references ────────────────────────
-        if (sessionMgr.calibrationGuide != null)
-        {
-            var cg = sessionMgr.calibrationGuide;
-            if (cg.tableDetector == null && sessionMgr.arTableDetector != null)
-            {
-                cg.tableDetector = sessionMgr.arTableDetector;
-                EditorUtility.SetDirty(cg);
-                wired++;
-            }
-            if (cg.passthroughManager == null && sessionMgr.passthroughManager != null)
-            {
-                cg.passthroughManager = sessionMgr.passthroughManager;
-                EditorUtility.SetDirty(cg);
-                wired++;
-            }
-
-            // Add SurfaceDotGrid if not present
-            if (cg.dotGrid == null)
-            {
-                var dotGrid = cg.GetComponent<SurfaceDotGrid>();
-                if (dotGrid == null)
-                    dotGrid = cg.gameObject.AddComponent<SurfaceDotGrid>();
-                cg.dotGrid = dotGrid;
-                EditorUtility.SetDirty(cg);
-                wired++;
-            }
-        }
-
         // ── Wire AlignmentAnchor.targetToAlign ──────────────────────
         if (sessionMgr.alignmentAnchor != null)
         {
@@ -163,8 +127,8 @@ public static class MRJournalSceneSetup
 
         Debug.Log($"[MR Setup] Wired {wired} reference(s) on JournalSessionManager. " +
                   "Check inspector to verify. Manual setup still needed:\n" +
-                  "  - Assign whiteboardPlaceholder (Box Collider on virtual table surface)\n" +
-                  "  - useRealEyeHeight is ON by default (captures player's real eye Y at calibration)\n" +
-                  "  - Optionally assign palmIndicatorPrefab on CalibrationGuide");
+                  "  - Assign tableWritingSurface (WhiteboardPlaceholder transform)\n" +
+                  "  - Configure TableTapCalibrator visuals (tapMarkerPrefab, previewRectangle, Confirm/Redo buttons)\n" +
+                  "  - Configure StylusCalibrationController (wristTracker, passthroughManager)");
     }
 }

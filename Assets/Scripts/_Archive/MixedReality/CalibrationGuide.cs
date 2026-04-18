@@ -1,3 +1,6 @@
+// ARCHIVED 2026-04-18: paired with ARTableDetector; replaced by visuals owned
+// by TableTapCalibrator. Re-enable by defining EMILIA_LEGACY_TABLE_DETECTION.
+#if EMILIA_LEGACY_TABLE_DETECTION
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
@@ -566,3 +569,4 @@ public class CalibrationGuide : MonoBehaviour
         }
     }
 }
+#endif // EMILIA_LEGACY_TABLE_DETECTION

@@ -1,3 +1,10 @@
+// ARCHIVED 2026-04-18: CV-based tip correction is infeasible on Quest 3 with
+// our package set — com.unity.xr.meta-openxr 2.4.0 cannot deliver camera CPU
+// pixels via TryAcquireLatestCpuImage, so OpenCV has nothing to chew on.
+// The wrist-only multi-sample calibration now hits sub-centimetre accuracy
+// without it. Re-enable by defining EMILIA_LEGACY_STYLUS_CV if/when a future
+// OpenXR extension exposes camera pixels.
+#if EMILIA_LEGACY_STYLUS_CV
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
@@ -309,3 +316,4 @@ public class GreenBandDetector : MonoBehaviour
         matHierarchy?.Dispose(); matHierarchy = null;
     }
 }
+#endif // EMILIA_LEGACY_STYLUS_CV
