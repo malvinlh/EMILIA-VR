@@ -253,4 +253,34 @@ public class ItemAutoReset : MonoBehaviour
         _originLocalRot = transform.localRotation;
         _outsideTimer   = 0f;
     }
+
+    /// <summary>
+    /// Immediately restores this item to its authored origin transform.
+    /// Useful for scripted phase transitions that need a deterministic reset.
+    /// </summary>
+    public void ResetNow()
+    {
+        StopAllCoroutines();
+        _blinking = false;
+        _outsideTimer = 0f;
+
+        RestoreIgnoredCollisions();
+
+        var rb = GetComponent<Rigidbody>();
+        bool wasKinematic = rb != null && rb.isKinematic;
+
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        transform.SetParent(_originParent, worldPositionStays: false);
+        transform.localPosition = _originLocalPos;
+        transform.localRotation = _originLocalRot;
+
+        if (rb != null)
+            rb.isKinematic = wasKinematic;
+    }
 }

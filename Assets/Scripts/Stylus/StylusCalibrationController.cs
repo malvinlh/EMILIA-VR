@@ -504,7 +504,7 @@ public class StylusCalibrationController : MonoBehaviour
         labelObj.layer = passthroughLayer;
         tmp = labelObj.AddComponent<TextMeshPro>();
         tmp.text = label;
-        tmp.fontSize = 0.5f;
+        tmp.fontSize = 0.25f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
         tmp.rectTransform.sizeDelta = new Vector2(0.14f, 0.07f);

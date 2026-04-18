@@ -1215,7 +1215,7 @@ public class JournalSessionManager : MonoBehaviour
         GameObject textObj = new GameObject("JournalInstruction");
         instructionText = textObj.AddComponent<TextMeshPro>();
 
-        instructionText.fontSize = 0.4f;
+        instructionText.fontSize = 3f;
         instructionText.alignment = TextAlignmentOptions.Center;
         instructionText.color = new Color(0.95f, 0.92f, 0.85f);
         instructionText.rectTransform.sizeDelta = new Vector2(1.2f, 0.4f);
