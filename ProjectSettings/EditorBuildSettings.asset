@@ -15,7 +15,7 @@ EditorBuildSettings:
     path: Assets/Scenes/use/3D_Chat.unity
     guid: 594615e139b2ae84295b8cb7ea1fce00
   - enabled: 1
-    path: Assets/Scenes/use/3D_Journal.unity
+    path: Assets/Scenes/use/3D_Journal_Beach.unity
     guid: 131524dee0d392e4b877668af592d558
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
