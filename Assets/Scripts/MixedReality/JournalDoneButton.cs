@@ -76,6 +76,19 @@ public class JournalDoneButton : MonoBehaviour
     [Tooltip("When true, the progress visual billboards toward the main camera.")]
     [SerializeField] private bool billboardProgressVisual = true;
 
+    [Header("Head-Locked Progress (Comfort)")]
+    [Tooltip("When enabled for scene-authored progress visuals, the UI follows the user's head in a stable HUD-like position.")]
+    [SerializeField] private bool headLockedSceneProgress = true;
+
+    [Tooltip("Optional parent for head-locked progress root. If empty, uses JournalSessionManager.xrOrigin, then camera root.")]
+    [SerializeField] private Transform headLockedProgressParent;
+
+    [Tooltip("Head-relative position in metres (x=right, y=up, z=forward).")]
+    [SerializeField] private Vector3 headLockedOffset = new Vector3(0.18f, -0.10f, 0.65f);
+
+    [Tooltip("Smoothing time while following the user's head.")]
+    [SerializeField] [Range(0.01f, 0.5f)] private float headLockedSmoothTime = 0.1f;
+
     [Tooltip("Offset of the ring from the bottle-hole anchor.")]
     [SerializeField] private Vector3 ringLocalOffset = new Vector3(0f, 0.03f, 0f);
 
@@ -142,6 +155,8 @@ public class JournalDoneButton : MonoBehaviour
     private Image _progressFill;
     private GameObject _progressRoot;
     private bool _ownsProgressRoot;
+    private bool _headLockedParentApplied;
+    private Vector3 _headLockedProgressVelocity;
     private ParticleSystem _suctionParticles;
     private readonly Vector3[] _textCorners = new Vector3[4];
 
@@ -185,6 +200,8 @@ public class JournalDoneButton : MonoBehaviour
         _completionTriggered = false;
         _suctionProgress = 0f;
         _particleAccumulator = 0f;
+        _headLockedProgressVelocity = Vector3.zero;
+        _headLockedParentApplied = false;
         SetProgressVisible(false);
         RestoreTextVisibility();
     }
@@ -508,8 +525,12 @@ public class JournalDoneButton : MonoBehaviour
             ? sceneProgressRoot
             : (_progressCanvas != null ? _progressCanvas.gameObject : fill.gameObject);
         _ownsProgressRoot = false;
+        _headLockedParentApplied = false;
 
         ConfigureSceneProgressFill(_progressFill);
+
+        if (headLockedSceneProgress)
+            EnsureHeadLockedProgressParent();
 
         if (_progressRoot != null)
             _progressRoot.SetActive(false);
@@ -539,6 +560,34 @@ public class JournalDoneButton : MonoBehaviour
         fill.fillOrigin = (int)Image.Origin360.Top;
         fill.fillClockwise = true;
         fill.fillAmount = 0f;
+        fill.raycastTarget = false;
+
+        // Keep authored color unless it's default white, then apply configured ring fill color.
+        if (fill.color.r > 0.99f && fill.color.g > 0.99f && fill.color.b > 0.99f)
+            fill.color = ringFillColor;
+    }
+
+    private void EnsureHeadLockedProgressParent()
+    {
+        if (_headLockedParentApplied || !headLockedSceneProgress || _progressRoot == null || _ownsProgressRoot)
+            return;
+
+        Transform targetParent = headLockedProgressParent;
+
+        if (targetParent == null && JournalSessionManager.Instance != null)
+            targetParent = JournalSessionManager.Instance.xrOrigin;
+
+        Camera cam = Camera.main;
+        if (targetParent == null && cam != null)
+            targetParent = cam.transform.root;
+
+        if (targetParent == null)
+            return;
+
+        if (_progressRoot.transform.parent != targetParent)
+            _progressRoot.transform.SetParent(targetParent, worldPositionStays: true);
+
+        _headLockedParentApplied = true;
     }
 
     private void EnsureRingSprites()
@@ -623,6 +672,36 @@ public class JournalDoneButton : MonoBehaviour
 
         if (_progressRoot != null && !_progressRoot.activeSelf)
             return;
+
+        if (headLockedSceneProgress && !_ownsProgressRoot)
+        {
+            EnsureHeadLockedProgressParent();
+
+            Camera cam = Camera.main;
+            if (cam == null)
+                return;
+
+            Transform camTf = cam.transform;
+            Vector3 targetPosition =
+                camTf.position +
+                camTf.forward * headLockedOffset.z +
+                camTf.up * headLockedOffset.y +
+                camTf.right * headLockedOffset.x;
+
+            float smooth = Mathf.Max(0.01f, headLockedSmoothTime);
+            _progressRect.position = Vector3.SmoothDamp(
+                _progressRect.position,
+                targetPosition,
+                ref _headLockedProgressVelocity,
+                smooth
+            );
+
+            Vector3 toCamera = camTf.position - _progressRect.position;
+            if (toCamera.sqrMagnitude > 0.000001f)
+                _progressRect.rotation = Quaternion.LookRotation(toCamera.normalized, camTf.up);
+
+            return;
+        }
 
         if (autoPositionProgressVisual)
             _progressRect.position = GetRingWorldPosition();
