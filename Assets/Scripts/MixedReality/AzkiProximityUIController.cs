@@ -1,23 +1,31 @@
 using UnityEngine;
 
 /// <summary>
-/// Manages Chat UI visibility and AZKi NPC-style engagement in the Beach scene.
+/// Manages Chat UI visibility and AZKi NPC-style engagement.
 ///
 /// Attach to the AZKi root GameObject (or any persistent scene object).
 ///
-/// Behaviour:
-/// - While the player is outside <see cref="proximityRadius"/>, the Chat UI is hidden and
-///   AZKi roams freely.
-/// - When the player enters the radius: the Chat UI is shown, AZKi pauses, plays Idle, and
+/// Works in two scene configurations:
+///   • Beach  – AZKi uses <see cref="AzkiIslandRoamingController"/> for free roaming.
+///   • Bedroom – AZKi uses <see cref="AzkiChatWaypointPatrolController"/> for standing-point patrol.
+///
+/// The controller auto-detects which movement component is present at Start() and
+/// routes proximity-engagement calls accordingly. No scene-name checks are needed.
+///
+/// Behaviour (same in both scenes):
+/// - While the player is outside <see cref="proximityRadius"/>, Chat UI is hidden and
+///   AZKi moves normally.
+/// - When the player enters the radius: Chat UI is shown, AZKi pauses, plays Idle, and
 ///   continuously faces the player.
-/// - While in proximity AND a chat response is visible in the dialogue panel, AZKi plays her
-///   Talk animation. When the response is dismissed she returns to Idle.
-/// - When the player leaves the radius: the Chat UI is hidden and AZKi resumes roaming.
+/// - While in proximity AND a chat response is visible, AZKi plays Talk.
+///   When the response is dismissed she returns to Idle.
+/// - When the player leaves the radius: Chat UI is hidden and AZKi resumes movement.
 ///
 /// Wire references in the Inspector:
-/// - <see cref="chatUIRoot"/>      – ChatUIRoot GameObject (parent of all chat panels)
-/// - <see cref="roamingController"/> – AzkiIslandRoamingController on the AZKi root
-/// - <see cref="dialoguePanel"/>   – VRDialoguePanel in the scene
+/// - <see cref="chatUIRoot"/>        – ChatUIRoot GameObject (parent of all chat panels)
+/// - <see cref="roamingController"/> – AzkiIslandRoamingController (Beach scene, auto-found if empty)
+/// - <see cref="patrolController"/>  – AzkiChatWaypointPatrolController (Bedroom scene, auto-found if empty)
+/// - <see cref="dialoguePanel"/>     – VRDialoguePanel in the scene
 /// </summary>
 [DisallowMultipleComponent]
 public class AzkiProximityUIController : MonoBehaviour
@@ -30,9 +38,12 @@ public class AzkiProximityUIController : MonoBehaviour
     [Min(0.1f)]
     [SerializeField] private float proximityRadius = 3f;
 
-    [Header("AZKi")]
-    [Tooltip("AzkiIslandRoamingController on the AZKi root. Auto-found if empty.")]
+    [Header("AZKi – Movement Controllers")]
+    [Tooltip("AzkiIslandRoamingController on the AZKi root (Beach scene). Auto-found if empty.")]
     [SerializeField] private AzkiIslandRoamingController roamingController;
+
+    [Tooltip("AzkiChatWaypointPatrolController on the AZKi root (Bedroom scene). Auto-found if empty.")]
+    [SerializeField] private AzkiChatWaypointPatrolController patrolController;
 
     [Header("Dialogue")]
     [Tooltip("VRDialoguePanel in the scene. Auto-found if empty.")]
@@ -50,11 +61,17 @@ public class AzkiProximityUIController : MonoBehaviour
         // Make sure Chat UI starts hidden.
         SetChatUIVisible(false);
 
-        // Auto-resolve references.
+        // Auto-resolve the roaming controller (Beach scene).
         if (roamingController == null)
             roamingController = GetComponentInParent<AzkiIslandRoamingController>();
         if (roamingController == null)
             roamingController = FindFirstObjectByType<AzkiIslandRoamingController>();
+
+        // Auto-resolve the patrol controller (Bedroom scene).
+        if (patrolController == null)
+            patrolController = GetComponentInParent<AzkiChatWaypointPatrolController>();
+        if (patrolController == null)
+            patrolController = FindFirstObjectByType<AzkiChatWaypointPatrolController>();
 
         if (dialoguePanel == null)
             dialoguePanel = FindFirstObjectByType<VRDialoguePanel>();
@@ -65,7 +82,7 @@ public class AzkiProximityUIController : MonoBehaviour
 
             // Sync immediately if the panel is already showing something.
             if (_playerInProximity && dialoguePanel.IsAssistantResponseVisible)
-                roamingController?.PlayTalkWhileEngaged();
+                CallPlayTalkWhileEngaged();
         }
     }
 
@@ -95,30 +112,65 @@ public class AzkiProximityUIController : MonoBehaviour
     {
         _playerInProximity = true;
         SetChatUIVisible(true);
-        roamingController?.EnterProximityEngagement(player);
+        CallEnterProximityEngagement(player);
 
         // If a response is already visible, go straight to Talk.
         if (dialoguePanel != null && dialoguePanel.IsAssistantResponseVisible)
-            roamingController?.PlayTalkWhileEngaged();
+            CallPlayTalkWhileEngaged();
     }
 
     private void OnPlayerExitProximity()
     {
         _playerInProximity = false;
         SetChatUIVisible(false);
-        roamingController?.ExitProximityEngagement();
+        CallExitProximityEngagement();
     }
 
     // ── Dialogue panel events ────────────────────────────────────────────
 
     private void OnDialogueVisibilityChanged(bool isVisible)
     {
-        if (!_playerInProximity || roamingController == null) return;
+        if (!_playerInProximity) return;
 
         if (isVisible)
-            roamingController.PlayTalkWhileEngaged();
+            CallPlayTalkWhileEngaged();
         else
+            CallReturnToIdleWhileEngaged();
+    }
+
+    // ── Controller-agnostic routing ───────────────────────────────────────
+
+    /// <summary>Routes to whichever controller is active in this scene.</summary>
+    private void CallEnterProximityEngagement(Transform player)
+    {
+        if (roamingController != null)
+            roamingController.EnterProximityEngagement(player);
+        else if (patrolController != null)
+            patrolController.EnterProximityEngagement(player);
+    }
+
+    private void CallExitProximityEngagement()
+    {
+        if (roamingController != null)
+            roamingController.ExitProximityEngagement();
+        else if (patrolController != null)
+            patrolController.ExitProximityEngagement();
+    }
+
+    private void CallPlayTalkWhileEngaged()
+    {
+        if (roamingController != null)
+            roamingController.PlayTalkWhileEngaged();
+        else if (patrolController != null)
+            patrolController.PlayTalkWhileEngaged();
+    }
+
+    private void CallReturnToIdleWhileEngaged()
+    {
+        if (roamingController != null)
             roamingController.ReturnToIdleWhileEngaged();
+        else if (patrolController != null)
+            patrolController.ReturnToIdleWhileEngaged();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

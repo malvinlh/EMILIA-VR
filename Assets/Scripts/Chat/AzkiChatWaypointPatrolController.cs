@@ -151,6 +151,10 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     private bool _talkLoopStarted;
     private float _preTalkDeadlineTime;
 
+    // Proximity-engagement state (mirrors AzkiIslandRoamingController's API)
+    private bool _isInProximityEngagement;
+    private Transform _engagementTarget;
+
     private int _stopsSinceIdleB = int.MaxValue;
     private AnimState _currentAnimState = AnimState.Idle;
     private float _nextAnimSwitchTime;
@@ -238,6 +242,13 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
             return;
         }
 
+        // Proximity engagement: freeze patrol and face the player.
+        if (_isInProximityEngagement)
+        {
+            HandleProximityEngagement();
+            return;
+        }
+
         if (_agent == null || !_agent.enabled || !_agent.isOnNavMesh)
         {
             EnforceAnimation(AnimState.Idle, force: false);
@@ -260,6 +271,97 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         if (isMoving)
             EnforceAnimation(AnimState.Walk, force: false);
     }
+
+    // ── Proximity Engagement (mirrors AzkiIslandRoamingController API) ──────
+
+    /// <summary>
+    /// Pauses patrol at the current position, plays Idle, and continuously
+    /// faces <paramref name="player"/> until <see cref="ExitProximityEngagement"/> is called.
+    /// </summary>
+    public void EnterProximityEngagement(Transform player)
+    {
+        _isInProximityEngagement = true;
+        _engagementTarget = player;
+
+        // Cancel any active talk so the agent stops cleanly.
+        if (_talkActive)
+        {
+            _talkActive = false;
+            _isAligningBeforeTalk = false;
+            _talkLoopStarted = false;
+        }
+
+        if (_agent != null && _agent.enabled)
+        {
+            if (_agent.isOnNavMesh)
+            {
+                _agent.isStopped = true;
+                _agent.ResetPath();
+            }
+            _agent.updateRotation = false;
+        }
+
+        _isStopping = false;
+        EnforceAnimation(AnimState.Idle, force: true);
+    }
+
+    /// <summary>
+    /// Exits proximity engagement and resumes normal patrol.
+    /// </summary>
+    public void ExitProximityEngagement()
+    {
+        _isInProximityEngagement = false;
+        _engagementTarget = null;
+
+        if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
+            _agent.updateRotation = true;
+
+        BeginStopWindow();
+    }
+
+    /// <summary>
+    /// While in proximity engagement, switches AZKi to Talk loop
+    /// (e.g. when a chat response is displayed).
+    /// </summary>
+    public void PlayTalkWhileEngaged()
+    {
+        if (!_isInProximityEngagement) return;
+        SetTalkActive(true);
+    }
+
+    /// <summary>
+    /// While in proximity engagement, returns AZKi to Idle
+    /// (e.g. when dialogue is dismissed).
+    /// </summary>
+    public void ReturnToIdleWhileEngaged()
+    {
+        if (!_isInProximityEngagement) return;
+        SetTalkActive(false);
+    }
+
+    private void HandleProximityEngagement()
+    {
+        // Keep the agent frozen.
+        if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
+            _agent.isStopped = true;
+
+        // Continuously face the player.
+        if (_engagementTarget != null)
+        {
+            Vector3 toTarget = _engagementTarget.position - transform.position;
+            toTarget.y = 0f;
+            if (toTarget.sqrMagnitude > 0.0001f)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+                transform.rotation = Quaternion.RotateTowards(
+                    transform.rotation, targetRot, stopTurnSpeed * Time.deltaTime);
+            }
+        }
+
+        EnforceAnimation(AnimState.Idle, force: false);
+    }
+
+    // ── Dialogue panel binding ────────────────────────────────────────────
 
     public void SetDialoguePanel(VRDialoguePanel panel)
     {
