@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using EMILIA.Data;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Orchestrates the VR chat experience in the 3D_Chat scene.
@@ -28,7 +29,11 @@ public class VRChatBridge : MonoBehaviour
     [SerializeField] private VRDialoguePanel _dialoguePanel;
 
     [Header("AZKi")]
+    [Tooltip("Used in 3D_Journal_Bedroom scene.")]
     [SerializeField] private AzkiChatWaypointPatrolController _azkiPatrol;
+
+    [Tooltip("Used in 3D_Journal_Beach scene.")]
+    [SerializeField] private AzkiIslandRoamingController _azkiRoaming;
 
     [Header("Audio Recording")]
     [SerializeField] private RecordAudio _recorder;
@@ -740,11 +745,86 @@ public class VRChatBridge : MonoBehaviour
         return $"{_userId}_cv{nextIdx:00}";
     }
 
+    /// <summary>
+    /// Scene name used by the Beach scene (checked via Contains so it is
+    /// robust to path prefixes Unity may include in the loaded scene name).
+    /// </summary>
+    private const string BeachSceneName   = "3D_Journal_Beach";
+    private const string BedroomSceneName = "3D_Journal_Bedroom";
+
     private void EnsureAzkiPatrol()
     {
         if (_dialoguePanel == null)
             _dialoguePanel = FindFirstObjectByType<VRDialoguePanel>();
 
+        string currentScene = SceneManager.GetActiveScene().name;
+
+        if (currentScene.Contains(BeachSceneName))
+        {
+            // ── Beach scene: use AzkiIslandRoamingController ──────────────
+            EnsureAzkiRoaming();
+        }
+        else
+        {
+            // ── Bedroom (and any other) scene: use AzkiChatWaypointPatrolController ──
+            EnsureAzkiWaypointPatrol();
+        }
+    }
+
+    // ── Beach-scene helper ────────────────────────────────────────────────
+
+    private void EnsureAzkiRoaming()
+    {
+        if (_azkiRoaming == null)
+            _azkiRoaming = FindFirstObjectByType<AzkiIslandRoamingController>();
+
+        if (_azkiRoaming == null)
+        {
+            // Try to find AZKi host and attach the controller.
+            GameObject azkiHost = FindPreferredAzkiHostObject();
+            if (azkiHost != null)
+                _azkiRoaming = azkiHost.AddComponent<AzkiIslandRoamingController>();
+        }
+
+        // Wire dialogue-panel events so the roaming controller reacts to
+        // AZKi speaking (Talk animation) and going silent (resume roaming).
+        if (_azkiRoaming != null && _dialoguePanel != null)
+            WireRoamingControllerToPanel(_azkiRoaming);
+    }
+
+    /// <summary>
+    /// Subscribes AzkiIslandRoamingController to the dialogue panel's
+    /// visibility event so it mirrors what AzkiChatWaypointPatrolController
+    /// does via SetDialoguePanel in the Bedroom scene.
+    /// </summary>
+    private void WireRoamingControllerToPanel(AzkiIslandRoamingController roaming)
+    {
+        // Unsubscribe first to avoid duplicate registrations on re-calls.
+        _dialoguePanel.OnAssistantResponseVisibilityChanged -= OnBeachDialogueVisibilityChanged;
+        _dialoguePanel.OnAssistantResponseVisibilityChanged += OnBeachDialogueVisibilityChanged;
+
+        // Sync immediately to the current panel state.
+        bool isVisible = _dialoguePanel.IsAssistantResponseVisible;
+        if (isVisible)
+            roaming.PlayTalkLoop();
+        else
+            roaming.ResumeRoaming();
+    }
+
+    private void OnBeachDialogueVisibilityChanged(bool isVisible)
+    {
+        if (_azkiRoaming == null) return;
+
+        if (isVisible)
+            _azkiRoaming.PlayTalkLoop();
+        else
+            _azkiRoaming.ResumeRoaming();
+    }
+
+    // ── Bedroom-scene helper (existing logic, extracted for clarity) ──────
+
+    private void EnsureAzkiWaypointPatrol()
+    {
         GameObject azkiHost = FindPreferredAzkiHostObject();
         if (azkiHost != null)
         {
