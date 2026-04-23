@@ -97,6 +97,11 @@ public class AzkiIslandRoamingController : MonoBehaviour
     [Range(0.01f, 2f)]
     [SerializeField] private float movingVelocityThreshold = 0.12f;
 
+    [Header("Proximity Engagement")]
+    [Tooltip("Rotation speed (deg/s) when turning to face the player during NPC engagement.")]
+    [Min(1f)]
+    [SerializeField] private float proximityTurnSpeed = 540f;
+
     private enum PatrolAnimation
     {
         Idle,
@@ -138,6 +143,10 @@ public class AzkiIslandRoamingController : MonoBehaviour
     private bool _isCheeringPoseHeld;
     private float _defaultAnimatorSpeed = 1f;
 
+    // Proximity-engagement state (NPC idle-and-face-player mode)
+    private bool _isInProximityEngagement;
+    private Transform _engagementTarget;
+
     private int _idleHash;
     private int _idleBHash;
     private int _walkHash;
@@ -174,6 +183,13 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
     private void Update()
     {
+        // Proximity engagement takes priority over all other patrol states.
+        if (_isInProximityEngagement)
+        {
+            HandleProximityEngagement();
+            return;
+        }
+
         if (_isLocked)
         {
             HandleLockedMode();
@@ -328,6 +344,117 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
         SetNextDestination();
     }
+
+    // ── Proximity Engagement ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Pauses roaming at the current position, plays Idle, and continuously
+    /// faces <paramref name="player"/> until <see cref="ExitProximityEngagement"/> is called.
+    /// </summary>
+    public void EnterProximityEngagement(Transform player)
+    {
+        InitializeIfNeeded();
+        ReleaseCheeringPoseHold();
+
+        _isInProximityEngagement = true;
+        _isLocked  = false;
+        _overrideMode = AnimationOverrideMode.None;
+        _engagementTarget = player;
+
+        if (_gravityController != null)
+            _gravityController.enabled = false;
+
+        if (_agent != null)
+        {
+            if (!_agent.enabled) _agent.enabled = true;
+            if (_agent.isOnNavMesh)
+            {
+                _agent.isStopped = true;
+                _agent.ResetPath();
+                _agent.velocity = Vector3.zero;
+            }
+            _agent.updateRotation = false;
+        }
+
+        EnforceAnimation(PatrolAnimation.Idle, force: true);
+    }
+
+    /// <summary>
+    /// Exits proximity engagement and resumes normal roaming.
+    /// </summary>
+    public void ExitProximityEngagement()
+    {
+        _isInProximityEngagement = false;
+        _engagementTarget = null;
+        _overrideMode = AnimationOverrideMode.None;
+        ResumeRoaming();
+    }
+
+    /// <summary>
+    /// While in proximity engagement, switches AZKi to Talk loop
+    /// (e.g. when a chat response is displayed).
+    /// </summary>
+    public void PlayTalkWhileEngaged()
+    {
+        if (!_isInProximityEngagement) return;
+        _overrideMode = AnimationOverrideMode.TalkLoop;
+        EnforceAnimation(PatrolAnimation.Talk, force: true);
+    }
+
+    /// <summary>
+    /// While in proximity engagement, returns AZKi to Idle
+    /// (e.g. when dialogue is dismissed).
+    /// </summary>
+    public void ReturnToIdleWhileEngaged()
+    {
+        if (!_isInProximityEngagement) return;
+        _overrideMode = AnimationOverrideMode.None;
+        EnforceAnimation(PatrolAnimation.Idle, force: true);
+    }
+
+    private void HandleProximityEngagement()
+    {
+        // Keep the NavMesh agent stopped.
+        if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
+        {
+            if (!_agent.isStopped)
+            {
+                _agent.isStopped = true;
+                _agent.velocity  = Vector3.zero;
+            }
+        }
+
+        // Continuously face the player.
+        if (_engagementTarget != null)
+        {
+            Vector3 toTarget = _engagementTarget.position - transform.position;
+            toTarget.y = 0f;
+            if (toTarget.sqrMagnitude > 0.0001f)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(toTarget.normalized, Vector3.up);
+                transform.rotation = Quaternion.RotateTowards(
+                    transform.rotation, targetRot, proximityTurnSpeed * Time.deltaTime);
+            }
+        }
+
+        // Drive Talk or Idle animation.
+        if (_overrideMode == AnimationOverrideMode.TalkLoop)
+        {
+            EnforceAnimation(PatrolAnimation.Talk, force: false);
+            if (_animator != null && !_animator.IsInTransition(0))
+            {
+                var info = _animator.GetCurrentAnimatorStateInfo(0);
+                if (StateMatches(info, _talkHash, _talkShortHash) && info.normalizedTime >= 1f)
+                    _animator.Play(_talkHash, 0, 0f);
+            }
+        }
+        else
+        {
+            EnforceAnimation(PatrolAnimation.Idle, force: false);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Captures the scene-authored AZKi pose used during review standby.
