@@ -17,6 +17,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/use/3D_Journal_Beach.unity
     guid: 131524dee0d392e4b877668af592d558
+  - enabled: 0
+    path: Assets/Scenes/use/3D_Journal_Bedroom.unity
+    guid: 76fe6899694f6fb46a19e90aad631aca
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
     com.unity.xr.arfoundation.simulation_settings: {fileID: 11400000, guid: 12ce517d4990ce841994808bf5c4f998, type: 2}

@@ -53,6 +53,7 @@ public class AzkiProximityUIController : MonoBehaviour
 
     private bool      _playerInProximity;
     private Transform _playerTransform;
+    private bool      _wasJournaling;   // tracks last journaling state so we can react on change
 
     // ── Unity lifecycle ──────────────────────────────────────────────────
 
@@ -94,6 +95,25 @@ public class AzkiProximityUIController : MonoBehaviour
 
     private void Update()
     {
+        // ── Journaling guard ────────────────────────────────────────────
+        // During a journal session the proximity Chat UI must be invisible and
+        // AZKi must not enter engagement mode. If the player was already engaged
+        // when the session starts, we force-exit engagement and hide the UI.
+        bool isJournaling = IsJournalingActive();
+        if (isJournaling != _wasJournaling)
+        {
+            _wasJournaling = isJournaling;
+            if (isJournaling && _playerInProximity)
+            {
+                // Session just started while player was in range — exit gracefully.
+                _playerInProximity = false;
+                SetChatUIVisible(false);
+                roamingController?.ExitProximityEngagement();
+            }
+        }
+        if (isJournaling) return; // suppress proximity detection entirely during journal
+
+        // ── Normal proximity detection ──────────────────────────────────
         Transform player = ResolvePlayerTransform();
         if (player == null) return;
 
@@ -174,6 +194,15 @@ public class AzkiProximityUIController : MonoBehaviour
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────
+
+    /// <summary>Returns true while a journaling or ending session is active.</summary>
+    private static bool IsJournalingActive()
+    {
+        var mgr = JournalSessionManager.Instance;
+        if (mgr == null) return false;
+        return mgr.CurrentState == JournalSessionManager.SessionState.Journaling
+            || mgr.CurrentState == JournalSessionManager.SessionState.Ending;
+    }
 
     private void SetChatUIVisible(bool visible)
     {

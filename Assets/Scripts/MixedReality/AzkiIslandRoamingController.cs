@@ -303,6 +303,12 @@ public class AzkiIslandRoamingController : MonoBehaviour
     }
 
     /// <summary>
+    /// True once the cheering animation has played fully and AZKi is holding the final pose.
+    /// Poll this to know when it is safe to resume roaming after a cheering one-shot.
+    /// </summary>
+    public bool IsCheeringPoseHeld => _isCheeringPoseHeld;
+
+    /// <summary>
     /// Enables roaming behavior. If needed, builds a runtime NavMesh first.
     /// </summary>
     public void ResumeRoaming()

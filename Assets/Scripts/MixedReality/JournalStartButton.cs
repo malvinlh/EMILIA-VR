@@ -261,6 +261,15 @@ public class JournalStartButton : MonoBehaviour
     {
         if (isOnCooldown) return;
 
+        // Block journal start while the chat bridge is awaiting an AI response or
+        // the chat mic is actively recording. This prevents overlapping states.
+        var chatBridge = VRChatBridge.Instance;
+        if (chatBridge != null && !chatBridge.IsChatInputAllowed)
+        {
+            Debug.Log("[JournalStartButton] Press ignored — chat bridge is busy or mic is recording.");
+            return;
+        }
+
         Debug.Log("[JournalStartButton] Button triggered.");
 
         SetColor(pressedColor);

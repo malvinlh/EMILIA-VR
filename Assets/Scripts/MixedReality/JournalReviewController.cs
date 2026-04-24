@@ -810,8 +810,18 @@ public class JournalReviewController : MonoBehaviour
         Debug.Log("[JournalReview] Typewriter done. Waiting 1s...");
         yield return new WaitForSeconds(1f);
 
-        // Fade out dialogue. AZKi keeps the final cheering pose until session teardown completes.
+        // Fade out dialogue. AZKi holds the final cheering pose until locomotion is re-enabled.
         _dialogueFader?.FadeOut();
+
+        // Wait until the cheering animation has played fully and AZKi is holding the
+        // final pose before we hand control back to EndSessionCoroutine (which calls
+        // ResumeAvatarRoaming). Cap the wait at 5 s to guard against edge cases.
+        if (avatarRoamingController != null)
+        {
+            float cheerWaitStart = Time.time;
+            yield return new WaitUntil(() =>
+                avatarRoamingController.IsCheeringPoseHeld || Time.time - cheerWaitStart > 5f);
+        }
 
         // Re-enable the start button area, whiteboard UI, and hide the post-journal bottle.
         ResetSceneGroups();

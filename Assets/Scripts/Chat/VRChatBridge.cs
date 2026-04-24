@@ -44,6 +44,9 @@ public class VRChatBridge : MonoBehaviour
 
     #endregion
 
+    // ── Singleton (convenient for external blocks like JournalStartButton) ──
+    public static VRChatBridge Instance { get; private set; }
+
     #region Constants
 
     private const string PrefKeyNickname     = "Nickname";
@@ -61,6 +64,11 @@ public class VRChatBridge : MonoBehaviour
     private string _currentConversationId;
     private bool   _isReasoningMode;
     private bool   _isAwaitingResponse;
+
+    // Mic double-fire guard (mirrors JournalMicController's pattern)
+    private const float MicClickCooldownSec = 0.25f;
+    private int   _lastMicClickFrame = -1;
+    private float _lastMicClickTime  = -999f;
 
     private readonly Dictionary<string, List<Message>> _messageCache = new();
     private readonly List<string>                      _userConvs    = new();
@@ -93,6 +101,8 @@ public class VRChatBridge : MonoBehaviour
 
     private void Awake()
     {
+        if (Instance != null && Instance != this) { Destroy(this); return; }
+        Instance = this;
         _isReasoningMode = _startInReasoningMode;
         EnsureAzkiPatrol();
     }
@@ -277,11 +287,27 @@ public class VRChatBridge : MonoBehaviour
 
     /// <summary>
     /// Toggles microphone recording on/off. Call from VR control panel.
+    /// Has a per-frame and time-based cooldown to prevent double-fire from VR poke gestures.
     /// </summary>
     public void ToggleMic()
     {
         if (_recorder == null) return;
         if (_isAwaitingResponse) return;
+
+        // Same double-fire guard pattern as JournalMicController.
+        float now = Time.unscaledTime;
+        if (_lastMicClickFrame == Time.frameCount)
+        {
+            Debug.Log("[VRChatBridge] ToggleMic: duplicate click ignored in frame " + Time.frameCount);
+            return;
+        }
+        if (now - _lastMicClickTime < MicClickCooldownSec)
+        {
+            Debug.Log($"[VRChatBridge] ToggleMic: cooldown ({now - _lastMicClickTime:F3}s < {MicClickCooldownSec:F3}s).");
+            return;
+        }
+        _lastMicClickFrame = Time.frameCount;
+        _lastMicClickTime  = now;
 
         if (_recorder.IsRecording)
             _recorder.StopRecording();
@@ -291,6 +317,12 @@ public class VRChatBridge : MonoBehaviour
 
     /// <summary>Whether the microphone is currently recording.</summary>
     public bool IsRecording => _recorder != null && _recorder.IsRecording;
+
+    /// <summary>
+    /// False while the bridge is busy (awaiting AI response) or mic is recording.
+    /// JournalStartButton checks this before allowing a session to start.
+    /// </summary>
+    public bool IsChatInputAllowed => !_isAwaitingResponse && !IsRecording;
 
     #endregion
 
