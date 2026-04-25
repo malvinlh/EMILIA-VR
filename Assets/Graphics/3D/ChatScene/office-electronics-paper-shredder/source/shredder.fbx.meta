@@ -3,7 +3,47 @@ guid: 29c49f77200b62a4ea075559d6634e26
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
-  externalObjects: {}
+  externalObjects:
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Black_Plastic
+    second: {fileID: 2100000, guid: 4a6165f5a304c9d4a9be76a667d3a59a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Black_Plastic_2
+    second: {fileID: 2100000, guid: 93b58339b2397a546a00c406d35cf558, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Chrome
+    second: {fileID: 2100000, guid: 81652faef5df12c45aa4b7ce78557805, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Glass
+    second: {fileID: 2100000, guid: 06cc53c075a4c584385b69d3d8c9c412, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Material.001
+    second: {fileID: 2100000, guid: 234641eda98cac449baf2f443d4cacba, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Metal_Plastic
+    second: {fileID: 2100000, guid: 50fe714698fb3a94b8d2006d71b4b745, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: Shredder
+    second: {fileID: 2100000, guid: 560fcf4a93b99be498be9418bc217422, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
+      name: iMeshh_paper
+    second: {fileID: 2100000, guid: ed276759b365a89489595d28f058d0e4, type: 2}
   materials:
     materialImportMode: 2
     materialName: 0

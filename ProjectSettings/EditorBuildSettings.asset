@@ -16,8 +16,8 @@ EditorBuildSettings:
     guid: 594615e139b2ae84295b8cb7ea1fce00
   - enabled: 0
     path: Assets/Scenes/use/3D_Journal_Beach.unity
-    guid: 131524dee0d392e4b877668af592d558
-  - enabled: 1
+    guid: b7f655e58cd658a43b255be5f4d60c94
+  - enabled: 0
     path: Assets/Scenes/use/3D_Journal_Bedroom.unity
     guid: 76fe6899694f6fb46a19e90aad631aca
   - enabled: 1

@@ -39,6 +39,8 @@ public class ItemAutoReset : MonoBehaviour
     private Quaternion _originLocalRot;
     private XRBaseInteractable _interactable;
     private Collider[] _itemColliders;
+    private IXRSelectInteractor _activeInteractor;
+    private bool _resetSuppressed;
     private float _outsideTimer;
     private bool  _blinking;
 
@@ -63,7 +65,7 @@ public class ItemAutoReset : MonoBehaviour
         _interactable = GetComponent<XRBaseInteractable>()
                      ?? GetComponentInChildren<XRBaseInteractable>(includeInactive: true);
 
-        _itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
+        RebuildItemColliders();
     }
 
     private void OnEnable()
@@ -83,13 +85,17 @@ public class ItemAutoReset : MonoBehaviour
         }
 
         RestoreIgnoredCollisions();
+        _activeInteractor = null;
     }
 
     private void Update()
     {
         // Fallback restore in case release happened through an external path.
         if (_ignoredCollisionPairs.Count > 0 && (_interactable == null || !_interactable.isSelected))
+        {
             RestoreIgnoredCollisions();
+            _activeInteractor = null;
+        }
 
         // If the interactable is disabled the item is locked (e.g. cork sealed to bottle).
         if (_interactable != null && !_interactable.enabled)
@@ -100,6 +106,12 @@ public class ItemAutoReset : MonoBehaviour
 
         // Don't reset while the player is holding the item.
         if (_interactable != null && _interactable.isSelected)
+        {
+            _outsideTimer = 0f;
+            return;
+        }
+
+        if (_resetSuppressed)
         {
             _outsideTimer = 0f;
             return;
@@ -123,20 +135,18 @@ public class ItemAutoReset : MonoBehaviour
 
     private void OnSelectEntered(SelectEnterEventArgs args)
     {
-        if (!ignoreInteractorRigCollisionsWhileHeld) return;
-
-        ApplyIgnoreWithInteractorRig(args.interactorObject);
+        _activeInteractor = args.interactorObject;
+        ReapplyHeldCollisionIgnores();
     }
 
     private void OnSelectExited(SelectExitEventArgs args)
     {
         RestoreIgnoredCollisions();
+        _activeInteractor = null;
     }
 
     private void ApplyIgnoreWithInteractorRig(IXRSelectInteractor interactor)
     {
-        RestoreIgnoredCollisions();
-
         if (interactor == null || _itemColliders == null || _itemColliders.Length == 0)
             return;
 
@@ -164,6 +174,27 @@ public class ItemAutoReset : MonoBehaviour
                 _ignoredCollisionPairs.Add(new IgnoredCollisionPair { item = itemCol, rig = rigCol });
             }
         }
+    }
+
+    private void RebuildItemColliders()
+    {
+        // Child colliders can change at runtime (e.g. the cork becomes part of the bottle
+        // after sealing), so rebuild before applying any held collision ignores.
+        _itemColliders = GetComponentsInChildren<Collider>(includeInactive: true);
+    }
+
+    private void ReapplyHeldCollisionIgnores()
+    {
+        RebuildItemColliders();
+        RestoreIgnoredCollisions();
+
+        if (!ignoreInteractorRigCollisionsWhileHeld
+            || _interactable == null
+            || !_interactable.isSelected
+            || _activeInteractor == null)
+            return;
+
+        ApplyIgnoreWithInteractorRig(_activeInteractor);
     }
 
     private bool IsEligibleCollider(Collider c)
@@ -252,6 +283,25 @@ public class ItemAutoReset : MonoBehaviour
         _originLocalPos = transform.localPosition;
         _originLocalRot = transform.localRotation;
         _outsideTimer   = 0f;
+    }
+
+    /// <summary>
+    /// Rebuilds the current descendant collider list and reapplies held collision ignores.
+    /// Call this after runtime hierarchy changes while the item is already selected.
+    /// </summary>
+    public void RefreshHeldCollisionIgnores()
+    {
+        ReapplyHeldCollisionIgnores();
+    }
+
+    /// <summary>
+    /// Temporarily suspends blink-back without disabling the component so held
+    /// collision ignores keep working while the item is still grabbable.
+    /// </summary>
+    public void SetResetSuppressed(bool suppressed)
+    {
+        _resetSuppressed = suppressed;
+        _outsideTimer = 0f;
     }
 
     /// <summary>

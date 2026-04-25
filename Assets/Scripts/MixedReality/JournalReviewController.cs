@@ -675,13 +675,14 @@ public class JournalReviewController : MonoBehaviour
             _state = ReviewState.WaitingForBottle;
             Debug.Log($"[JournalReview] Cork sealed — state → WaitingForBottle. bottleRoot={bottleRoot?.name ?? "NULL"}");
 
-            // Disable auto-reset so the bottle can reach the sea without being
-            // blinked back to its origin mid-flight.
+            // Suppress auto-reset so the bottle can reach the sea without being
+            // blinked back to its origin mid-flight, while keeping held collision
+            // ignores active if the player is still holding it.
             if (bottleRoot != null)
             {
                 var autoReset = bottleRoot.GetComponent<ItemAutoReset>();
                 if (autoReset != null)
-                    autoReset.enabled = false; // suppress until next session
+                    autoReset.SetResetSuppressed(true);
             }
 
             // Creative terminal guard: proactively kill the rack trigger so it cannot
@@ -988,7 +989,10 @@ public class JournalReviewController : MonoBehaviour
         // previous discard path where WaitingForBottle disabled it).
         var autoReset = bottleRoot.GetComponent<ItemAutoReset>();
         if (autoReset != null)
+        {
             autoReset.enabled = true;
+            autoReset.SetResetSuppressed(false);
+        }
 
         // Restore the rack proximity trigger for the next session — it was disabled
         // either at KEEP completion or at DISCARD path entry.

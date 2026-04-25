@@ -222,6 +222,10 @@ public class CorkSnapZone : MonoBehaviour
         corkTf.SetParent(anchor, worldPositionStays: true);
         corkTf.SetPositionAndRotation(sealedWorldPos, sealedWorldRot);
 
+        // If the bottle is already being held when the cork seals, refresh the held
+        // collision ignore pairs so the newly attached cork colliders also ignore the rig.
+        GetComponent<ItemAutoReset>()?.RefreshHeldCollisionIgnores();
+
         OnCorkSealed?.Invoke();
     }
 }
