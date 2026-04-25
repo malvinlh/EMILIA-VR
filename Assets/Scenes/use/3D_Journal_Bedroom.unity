@@ -22584,7 +22584,7 @@ MonoBehaviour:
   micDevice: 
   sampleRate: 44100
   maxLengthSec: 3599
-  micButton: {fileID: 269536596}
+  micButton: {fileID: 0}
   micCanvasGroup: {fileID: 0}
   blinkMinAlpha: 0.45
   blinkMaxAlpha: 1
