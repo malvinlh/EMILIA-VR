@@ -74,6 +74,10 @@ public class JournalReviewController : MonoBehaviour
     [Tooltip("Whiteboard UI GameObject (separate from preNDuringJournalGroup). " +
              "Disabled when entering review/post-journal phases; re-enabled when session resets.")]
     public GameObject whiteboardUIGroup;
+    [Tooltip("VintageMicrophone prop — disabled during cork/post-journal phase, re-enabled on session reset.")]
+    public GameObject vintageMicrophone;
+    [Tooltip("BottlePreDuring prop — disabled during cork/post-journal phase, re-enabled on session reset.")]
+    public GameObject bottlePreDuringProp;
 
     [Header("Cork")]
     [Tooltip("CorkSnapZone script on the PostJournal bottle neck child trigger collider.")]
@@ -616,6 +620,8 @@ public class JournalReviewController : MonoBehaviour
         // Hide the whiteboard UI groups.
         if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(false);
         if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(false);
+        if (vintageMicrophone      != null) vintageMicrophone.SetActive(false);
+        if (bottlePreDuringProp    != null) bottlePreDuringProp.SetActive(false);
 
         // Re-enable all bottle (and sealed cork) components so everything is visible/grabbable.
         EnableBottleComponents();
@@ -855,6 +861,8 @@ public class JournalReviewController : MonoBehaviour
         Debug.Log("[JournalReview] ResetSceneGroups — PreNDuringJournal ON, WhiteboardUI ON.");
         if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(true);
         if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(true);
+        if (vintageMicrophone      != null) vintageMicrophone.SetActive(true);
+        if (bottlePreDuringProp    != null) bottlePreDuringProp.SetActive(true);
 
         // Reposition the bottle to its authored origin so it is ready for the next session.
         // Components remain disabled (DisableBottleComponents was called at disposal);
