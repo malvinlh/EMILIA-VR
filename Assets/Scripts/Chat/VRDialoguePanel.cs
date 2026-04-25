@@ -55,6 +55,7 @@ public class VRDialoguePanel : MonoBehaviour
     private bool _waitingForAdvance;
     private string _fullParsedText;
     private bool _isAssistantResponseVisible;
+    private bool _isPresentationVisible;
 
     /// <summary>Fired when the last page finishes typewriter reveal.</summary>
     public event Action OnContentFullyDisplayed;
@@ -66,10 +67,21 @@ public class VRDialoguePanel : MonoBehaviour
     public event Action<bool> OnAssistantResponseVisibilityChanged;
 
     /// <summary>
+    /// Fired when any chat presentation becomes visible or fully hidden.
+    /// True during typing, response display, and fade-out.
+    /// </summary>
+    public event Action<bool> OnPresentationVisibilityChanged;
+
+    /// <summary>
     /// True while the panel is displaying assistant response content.
     /// This excludes typing-indicator mode.
     /// </summary>
     public bool IsAssistantResponseVisible => _isAssistantResponseVisible;
+
+    /// <summary>
+    /// True while any chat presentation is visible, including typing and fade-out.
+    /// </summary>
+    public bool IsPresentationVisible => _isPresentationVisible;
 
     private struct PageSpan
     {
@@ -101,8 +113,13 @@ public class VRDialoguePanel : MonoBehaviour
 
     private void Update()
     {
-        if (_isAssistantResponseVisible && _fader != null && _fader.IsHidden)
+        if (_fader == null || !_fader.IsHidden)
+            return;
+
+        if (_isAssistantResponseVisible)
             SetAssistantResponseVisible(false);
+        if (_isPresentationVisible)
+            SetPresentationVisible(false);
     }
 
     #endregion
@@ -116,6 +133,7 @@ public class VRDialoguePanel : MonoBehaviour
     {
         StopAllEffects();
         SetAssistantResponseVisible(true);
+        SetPresentationVisible(true);
 
         if (_quotePanel != null) _quotePanel.SetActive(false);
 
@@ -134,6 +152,7 @@ public class VRDialoguePanel : MonoBehaviour
     {
         StopAllEffects();
         SetAssistantResponseVisible(true);
+        SetPresentationVisible(true);
 
         bool hasReasoning = !string.IsNullOrWhiteSpace(reasoning);
 
@@ -162,6 +181,7 @@ public class VRDialoguePanel : MonoBehaviour
     {
         StopAllEffects();
         SetAssistantResponseVisible(false);
+        SetPresentationVisible(true);
 
         if (_quotePanel != null) _quotePanel.SetActive(false);
         HidePaginationUI();
@@ -177,7 +197,10 @@ public class VRDialoguePanel : MonoBehaviour
     {
         StopAllEffects();
         SetAssistantResponseVisible(false);
-        _fader.FadeOut();
+        if (_fader == null || _fader.IsHidden)
+            SetPresentationVisible(false);
+
+        _fader?.FadeOut();
     }
 
     /// <summary>
@@ -418,6 +441,15 @@ public class VRDialoguePanel : MonoBehaviour
 
         _isAssistantResponseVisible = visible;
         OnAssistantResponseVisibilityChanged?.Invoke(visible);
+    }
+
+    private void SetPresentationVisible(bool visible)
+    {
+        if (_isPresentationVisible == visible)
+            return;
+
+        _isPresentationVisible = visible;
+        OnPresentationVisibilityChanged?.Invoke(visible);
     }
 
     #endregion

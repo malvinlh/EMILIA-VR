@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Samples.SpatialKeyboard;
 
 /// <summary>
@@ -11,9 +12,9 @@ using UnityEngine.XR.Interaction.Toolkit.Samples.SpatialKeyboard;
 /// chat bridge either by pressing Enter on the keyboard or by poking the Send button.
 ///
 /// The <see cref="XRKeyboardDisplay"/> on this same GameObject handles the
-/// InputField ↔ Keyboard bridge automatically.
+/// InputField and keyboard bridge automatically.
 ///
-/// <b>Testing only</b> — disable this component (or deactivate the GameObject)
+/// <b>Testing only</b> - disable this component (or deactivate the GameObject)
 /// to remove keyboard input in production builds.
 /// </summary>
 public class VRKeyboardInput : MonoBehaviour
@@ -24,6 +25,7 @@ public class VRKeyboardInput : MonoBehaviour
     [Header("Input")]
     [SerializeField] private TMP_InputField _inputField;
     [SerializeField] private Button _sendButton;
+    [SerializeField] private XRSimpleInteractable _sendPoke;
 
     [Header("Keyboard Display")]
     [Tooltip("The XRKeyboardDisplay on this object. If null, auto-resolved via GetComponent.")]
@@ -33,6 +35,9 @@ public class VRKeyboardInput : MonoBehaviour
     {
         if (_keyboardDisplay == null)
             _keyboardDisplay = GetComponentInChildren<XRKeyboardDisplay>();
+
+        if (_sendPoke == null && _sendButton != null)
+            _sendPoke = _sendButton.GetComponent<XRSimpleInteractable>();
     }
 
     private void OnEnable()
@@ -42,6 +47,11 @@ public class VRKeyboardInput : MonoBehaviour
 
         if (_sendButton != null)
             _sendButton.onClick.AddListener(OnSendClicked);
+
+        if (_chatBridge != null)
+            _chatBridge.OnControlInputLockChanged += UpdateInputLockUI;
+
+        UpdateInputLockUI(_chatBridge != null && _chatBridge.IsControlInputLocked);
     }
 
     private void OnDisable()
@@ -51,6 +61,9 @@ public class VRKeyboardInput : MonoBehaviour
 
         if (_sendButton != null)
             _sendButton.onClick.RemoveListener(OnSendClicked);
+
+        if (_chatBridge != null)
+            _chatBridge.OnControlInputLockChanged -= UpdateInputLockUI;
     }
 
     private void OnKeyboardSubmit(string text)
@@ -68,10 +81,23 @@ public class VRKeyboardInput : MonoBehaviour
     {
         if (_chatBridge == null || string.IsNullOrWhiteSpace(text)) return;
 
-        _chatBridge.SendTextMessage(text);
+        if (!_chatBridge.SendTextMessage(text))
+            return;
 
-        // Clear input field after sending
+        // Clear input field after a successful send.
         if (_inputField != null)
             _inputField.text = string.Empty;
+    }
+
+    private void UpdateInputLockUI(bool isLocked)
+    {
+        if (_sendButton != null)
+            _sendButton.interactable = !isLocked;
+
+        if (_sendPoke != null)
+            _sendPoke.enabled = !isLocked;
+
+        if (_inputField != null)
+            _inputField.interactable = !isLocked;
     }
 }

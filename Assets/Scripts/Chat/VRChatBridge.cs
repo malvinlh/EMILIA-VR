@@ -64,11 +64,14 @@ public class VRChatBridge : MonoBehaviour
     private string _currentConversationId;
     private bool   _isReasoningMode;
     private bool   _isAwaitingResponse;
+    private bool   _isControlInputLocked;
 
     // Mic double-fire guard (mirrors JournalMicController's pattern)
     private const float MicClickCooldownSec = 0.25f;
     private int   _lastMicClickFrame = -1;
     private float _lastMicClickTime  = -999f;
+    private float _recordingStartTime = -999f;
+    private const float MinRecordingSec = 1.0f;
 
     private readonly Dictionary<string, List<Message>> _messageCache = new();
     private readonly List<string>                      _userConvs    = new();
@@ -91,6 +94,9 @@ public class VRChatBridge : MonoBehaviour
 
     /// <summary>Fired when the microphone recording state changes.</summary>
     public event Action<bool> OnMicStateChanged;
+
+    /// <summary>Fired when VR chat controls should lock or unlock.</summary>
+    public event Action<bool> OnControlInputLockChanged;
 
     /// <summary>Fired when the message list for the active conversation changes.</summary>
     public event Action OnMessagesChanged;
@@ -116,11 +122,19 @@ public class VRChatBridge : MonoBehaviour
 
     private void OnEnable()
     {
+        if (_dialoguePanel == null)
+            _dialoguePanel = FindFirstObjectByType<VRDialoguePanel>();
+
         if (_recorder != null)
         {
             _recorder.OnSaved += OnAudioSaved;
             _recorder.OnMicStateChanged += OnMicStateProxy;
         }
+
+        if (_dialoguePanel != null)
+            _dialoguePanel.OnPresentationVisibilityChanged += OnDialoguePresentationVisibilityChanged;
+
+        RefreshControlInputLock();
     }
 
     private void OnDisable()
@@ -130,6 +144,9 @@ public class VRChatBridge : MonoBehaviour
             _recorder.OnSaved -= OnAudioSaved;
             _recorder.OnMicStateChanged -= OnMicStateProxy;
         }
+
+        if (_dialoguePanel != null)
+            _dialoguePanel.OnPresentationVisibilityChanged -= OnDialoguePresentationVisibilityChanged;
     }
 
     #endregion
@@ -151,6 +168,9 @@ public class VRChatBridge : MonoBehaviour
 
     /// <summary>True while waiting for an AI response.</summary>
     public bool IsBusy => _isAwaitingResponse;
+
+    /// <summary>True while control-panel and keyboard input should be disabled.</summary>
+    public bool IsControlInputLocked => _isControlInputLocked;
 
     /// <summary>The currently active conversation id, or null if none.</summary>
     public string CurrentConversationId => _currentConversationId;
@@ -240,7 +260,7 @@ public class VRChatBridge : MonoBehaviour
     /// </summary>
     public void StartNewChat()
     {
-        if (_isAwaitingResponse) return;
+        if (IsControlInputLocked) return;
 
         _currentConversationId = null;
         _dialoguePanel.Hide();
@@ -277,12 +297,13 @@ public class VRChatBridge : MonoBehaviour
     /// Sends a text message directly (from keyboard, debug console, etc.).
     /// This is the main entry point for non-voice input.
     /// </summary>
-    public void SendTextMessage(string text)
+    public bool SendTextMessage(string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return;
-        if (_isAwaitingResponse) return;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        if (IsControlInputLocked) return false;
 
         StartCoroutine(CoSendText(text.Trim()));
+        return true;
     }
 
     /// <summary>
@@ -292,7 +313,7 @@ public class VRChatBridge : MonoBehaviour
     public void ToggleMic()
     {
         if (_recorder == null) return;
-        if (_isAwaitingResponse) return;
+        if (IsControlInputLocked) return;
 
         // Same double-fire guard pattern as JournalMicController.
         float now = Time.unscaledTime;
@@ -310,7 +331,15 @@ public class VRChatBridge : MonoBehaviour
         _lastMicClickTime  = now;
 
         if (_recorder.IsRecording)
+        {
+            float elapsed = Time.realtimeSinceStartup - _recordingStartTime;
+            if (elapsed < MinRecordingSec)
+            {
+                Debug.Log($"[VRChatBridge] ToggleMic: stop ignored after {elapsed:F2}s (min {MinRecordingSec:F2}s).");
+                return;
+            }
             _recorder.StopRecording();
+        }
         else
             _recorder.StartRecording();
     }
@@ -442,7 +471,18 @@ public class VRChatBridge : MonoBehaviour
 
     #region Audio → Transcribe → Send
 
-    private void OnMicStateProxy(bool isRecording) => OnMicStateChanged?.Invoke(isRecording);
+    private void OnMicStateProxy(bool isRecording)
+    {
+        if (isRecording)
+            _recordingStartTime = Time.realtimeSinceStartup;
+
+        OnMicStateChanged?.Invoke(isRecording);
+    }
+
+    private void OnDialoguePresentationVisibilityChanged(bool _)
+    {
+        RefreshControlInputLock();
+    }
 
     private void OnAudioSaved(string filePath)
     {
@@ -454,7 +494,7 @@ public class VRChatBridge : MonoBehaviour
 
     private IEnumerator TranscribeAndSend(string filePath)
     {
-        _isAwaitingResponse = true;
+        SetAwaitingResponse(true);
         _dialoguePanel.ShowTypingIndicator();
 
         string transcribed = null;
@@ -467,7 +507,7 @@ public class VRChatBridge : MonoBehaviour
         if (string.IsNullOrWhiteSpace(transcribed))
         {
             Debug.Log("[VRChatBridge] Transcription empty; aborting.");
-            _isAwaitingResponse = false;
+            SetAwaitingResponse(false);
             _dialoguePanel.Hide();
             yield break;
         }
@@ -479,7 +519,7 @@ public class VRChatBridge : MonoBehaviour
     /// <summary>Coroutine entry point for SendTextMessage.</summary>
     private IEnumerator CoSendText(string text)
     {
-        _isAwaitingResponse = true;
+        SetAwaitingResponse(true);
         _dialoguePanel.ShowTypingIndicator();
         yield return CoSendTextCore(text);
     }
@@ -515,7 +555,10 @@ public class VRChatBridge : MonoBehaviour
         if (created)
             yield return SendUserMessage(text, convoId);
         else
-            _isAwaitingResponse = false;
+        {
+            SetAwaitingResponse(false);
+            _dialoguePanel.Hide();
+        }
     }
 
     private IEnumerator SendUserMessage(string text, string convoId)
@@ -543,7 +586,8 @@ public class VRChatBridge : MonoBehaviour
 
         if (!inserted)
         {
-            _isAwaitingResponse = false;
+            SetAwaitingResponse(false);
+            _dialoguePanel.Hide();
             yield break;
         }
 
@@ -577,7 +621,7 @@ public class VRChatBridge : MonoBehaviour
         if (!string.IsNullOrEmpty(apiError))
         {
             Debug.LogError($"[VRChatBridge] Chat API error: {apiError}");
-            _isAwaitingResponse = false;
+            SetAwaitingResponse(false);
             _dialoguePanel.Hide();
             yield break;
         }
@@ -596,7 +640,7 @@ public class VRChatBridge : MonoBehaviour
 
         // Display
         _dialoguePanel.ShowText(aiResponse);
-        _isAwaitingResponse = false;
+        SetAwaitingResponse(false);
         OnMessagesChanged?.Invoke();
 
         // Post-response hooks
@@ -623,7 +667,7 @@ public class VRChatBridge : MonoBehaviour
         if (!string.IsNullOrEmpty(apiError) || result == null)
         {
             Debug.LogError($"[VRChatBridge] Agentic API error: {apiError}");
-            _isAwaitingResponse = false;
+            SetAwaitingResponse(false);
             _dialoguePanel.Hide();
             yield break;
         }
@@ -665,7 +709,7 @@ public class VRChatBridge : MonoBehaviour
         // Display
         OnMessagesChanged?.Invoke();
         _dialoguePanel.ShowAgentic(result.reasoning, botText);
-        _isAwaitingResponse = false;
+        SetAwaitingResponse(false);
 
         // Post-response hooks
         TryGenerateTopicOnce(convoId, userMessage, botText);
@@ -943,6 +987,25 @@ public class VRChatBridge : MonoBehaviour
         }
 
         return depth;
+    }
+
+    private void SetAwaitingResponse(bool awaiting)
+    {
+        _isAwaitingResponse = awaiting;
+        RefreshControlInputLock();
+    }
+
+    private void RefreshControlInputLock()
+    {
+        bool shouldLock =
+            _isAwaitingResponse ||
+            (_dialoguePanel != null && _dialoguePanel.IsPresentationVisible);
+
+        if (_isControlInputLocked == shouldLock)
+            return;
+
+        _isControlInputLocked = shouldLock;
+        OnControlInputLockChanged?.Invoke(shouldLock);
     }
 
     #endregion

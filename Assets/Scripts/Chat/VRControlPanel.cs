@@ -1,7 +1,6 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
@@ -30,7 +29,7 @@ public class VRControlPanel : MonoBehaviour
     #region Inspector
 
     [Header("References")]
-    [SerializeField] private VRChatBridge   _chatBridge;
+    [SerializeField] private VRChatBridge _chatBridge;
     [SerializeField] private VRHistoryPanel _historyPanel;
 
     [Header("Buttons")]
@@ -38,7 +37,7 @@ public class VRControlPanel : MonoBehaviour
     [SerializeField] private Button _reasoningToggleButton;
     [SerializeField] private Button _historyButton;
 
-    [Header("Poke Targets (optional — for hand poke support)")]
+    [Header("Poke Targets (optional - for hand poke support)")]
     [SerializeField] private XRSimpleInteractable _newChatPoke;
     [SerializeField] private XRSimpleInteractable _reasoningPoke;
     [SerializeField] private XRSimpleInteractable _historyPoke;
@@ -47,7 +46,7 @@ public class VRControlPanel : MonoBehaviour
     [Header("Mic Button")]
     [SerializeField] private Button _micButton;
     [SerializeField] private TMP_Text _micLabel;
-    [SerializeField] private Color _micIdleColor     = new(0.55f, 0.65f, 0.75f, 1f);
+    [SerializeField] private Color _micIdleColor = new(0.55f, 0.65f, 0.75f, 1f);
     [SerializeField] private Color _micRecordingColor = new(0.9f, 0.25f, 0.25f, 1f);
 
     [Header("UI Elements")]
@@ -58,8 +57,8 @@ public class VRControlPanel : MonoBehaviour
     [SerializeField] private Image _reasoningIndicator;
 
     [Header("Colors")]
-    [SerializeField] private Color _standardColor  = new(0.55f, 0.65f, 0.75f, 1f);
-    [SerializeField] private Color _reasoningColor  = new(0.45f, 0.65f, 0.95f, 1f);
+    [SerializeField] private Color _standardColor = new(0.55f, 0.65f, 0.75f, 1f);
+    [SerializeField] private Color _reasoningColor = new(0.45f, 0.65f, 0.95f, 1f);
 
     #endregion
 
@@ -95,11 +94,13 @@ public class VRControlPanel : MonoBehaviour
         if (_chatBridge != null)
         {
             _chatBridge.OnReasoningModeChanged += UpdateReasoningUI;
-            _chatBridge.OnMicStateChanged      += UpdateMicUI;
+            _chatBridge.OnMicStateChanged += UpdateMicUI;
+            _chatBridge.OnControlInputLockChanged += UpdateControlLockUI;
         }
 
         UpdateReasoningUI(_chatBridge != null && _chatBridge.IsReasoningMode);
         UpdateMicUI(_chatBridge != null && _chatBridge.IsRecording);
+        UpdateControlLockUI(_chatBridge != null && _chatBridge.IsControlInputLocked);
     }
 
     private void OnDisable()
@@ -107,7 +108,8 @@ public class VRControlPanel : MonoBehaviour
         if (_chatBridge != null)
         {
             _chatBridge.OnReasoningModeChanged -= UpdateReasoningUI;
-            _chatBridge.OnMicStateChanged      -= UpdateMicUI;
+            _chatBridge.OnMicStateChanged -= UpdateMicUI;
+            _chatBridge.OnControlInputLockChanged -= UpdateControlLockUI;
         }
     }
 
@@ -117,25 +119,26 @@ public class VRControlPanel : MonoBehaviour
 
     private void OnNewChat()
     {
-        if (_chatBridge == null || _chatBridge.IsBusy) return;
+        if (_chatBridge == null || _chatBridge.IsControlInputLocked) return;
         _chatBridge.StartNewChat();
     }
 
     private void OnToggleReasoning()
     {
-        if (_chatBridge == null || _chatBridge.IsBusy) return;
+        if (_chatBridge == null || _chatBridge.IsControlInputLocked) return;
         _chatBridge.ToggleReasoningMode();
     }
 
     private void OnToggleHistory()
     {
+        if (_chatBridge != null && _chatBridge.IsControlInputLocked) return;
         if (_historyPanel == null) return;
         _historyPanel.Toggle();
     }
 
     private void OnToggleMic()
     {
-        if (_chatBridge == null || _chatBridge.IsBusy) return;
+        if (_chatBridge == null || _chatBridge.IsControlInputLocked) return;
         _chatBridge.ToggleMic();
     }
 
@@ -155,7 +158,7 @@ public class VRControlPanel : MonoBehaviour
     private void UpdateMicUI(bool isRecording)
     {
         if (_micLabel != null)
-            _micLabel.text = isRecording ? "● Stop" : "🎤 Mic";
+            _micLabel.text = isRecording ? "Stop" : "Mic";
 
         if (_micButton != null)
         {
@@ -163,6 +166,31 @@ public class VRControlPanel : MonoBehaviour
             if (img != null)
                 img.color = isRecording ? _micRecordingColor : _micIdleColor;
         }
+    }
+
+    private void UpdateControlLockUI(bool isLocked)
+    {
+        SetButtonLocked(_newChatButton, isLocked);
+        SetButtonLocked(_reasoningToggleButton, isLocked);
+        SetButtonLocked(_historyButton, isLocked);
+        SetButtonLocked(_micButton, isLocked);
+
+        SetPokeLocked(_newChatPoke, isLocked);
+        SetPokeLocked(_reasoningPoke, isLocked);
+        SetPokeLocked(_historyPoke, isLocked);
+        SetPokeLocked(_micPoke, isLocked);
+    }
+
+    private static void SetButtonLocked(Button button, bool isLocked)
+    {
+        if (button != null)
+            button.interactable = !isLocked;
+    }
+
+    private static void SetPokeLocked(XRSimpleInteractable poke, bool isLocked)
+    {
+        if (poke != null)
+            poke.enabled = !isLocked;
     }
 
     #endregion
