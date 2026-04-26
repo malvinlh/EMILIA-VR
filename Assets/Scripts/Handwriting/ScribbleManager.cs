@@ -502,7 +502,7 @@ public class ScribbleManager : MonoBehaviour
         // ── Update display ───────────────────────────────────────────
         RefreshUI();
 
-        // ── Board-full: prepare the next page where writing should continue ─
+        // ── Board-full: create next page and auto-advance ────────────────
         if (IsBoardFull())
         {
             bool isTitlePage = currentPageIndex < _titlePageCount;
@@ -510,20 +510,17 @@ public class ScribbleManager : MonoBehaviour
 
             if (isLastTitlePage && !_titleBoundaryLocked)
             {
-                // Title overflow: extend the title section right before content.
-                // This works even when content pages already exist after title.
+                // Title overflow: insert a new title page right before content.
                 pages.Insert(_titlePageCount, new PageData());
                 _titlePageCount++;
-                Debug.Log($"{TAG} Title full — created title page {_titlePageCount}. " +
-                          "Press Next to continue title.");
-                RefreshUI(); // keep Next available on title pages
+                Debug.Log($"{TAG} Title full — auto-advancing to title page {_titlePageCount}.");
+                GoToPage(currentPageIndex + 1);
             }
             else if (!isTitlePage && currentPageIndex == pages.Count - 1)
             {
                 pages.Add(new PageData());
-                Debug.Log($"{TAG} Board full — created content page {pages.Count - _titlePageCount}. " +
-                          "Press Next to continue.");
-                RefreshUI(); // show Next for the newly created content page
+                Debug.Log($"{TAG} Content full — auto-advancing to content page {pages.Count - _titlePageCount}.");
+                GoToPage(currentPageIndex + 1);
             }
         }
     }
@@ -648,6 +645,9 @@ public class ScribbleManager : MonoBehaviour
 
         RefreshUI();
         FireTextChanged();
+
+        if (action.type == ActionType.Add)
+            TrimEmptyPages();
     }
 
     private void RecomputeCursor()
@@ -689,6 +689,7 @@ public class ScribbleManager : MonoBehaviour
         FireTextChanged();
 
         Debug.Log($"{TAG} Deleted \"{word.text}\" at index {index}.");
+        TrimEmptyPages();
     }
 
     // ==================================================================
@@ -711,6 +712,7 @@ public class ScribbleManager : MonoBehaviour
         FireTextChanged();
 
         Debug.Log($"{TAG} ClearCurrentPage — removed {count} word(s).");
+        TrimEmptyPages();
     }
 
     /// <summary>Clear all pages and reset to title page + one blank content page.</summary>
@@ -796,6 +798,7 @@ public class ScribbleManager : MonoBehaviour
         FireTextChanged();
 
         Debug.Log($"{TAG} DeleteWordRange [{startWordIndex}..{endWordIndex}] — {count} word(s) removed.");
+        TrimEmptyPages();
     }
 
     /// <summary>
@@ -915,6 +918,39 @@ public class ScribbleManager : MonoBehaviour
     // ==================================================================
     // INTERNAL HELPERS
     // ==================================================================
+
+    /// <summary>
+    /// Removes the current page if it is empty and is not the sole page of its
+    /// type (title or content), then navigates to the preceding page.
+    /// Called after any word-removal operation (delete, undo, clear).
+    /// </summary>
+    private void TrimEmptyPages()
+    {
+        if (CurrentPage.words.Count > 0) return;
+
+        bool isTitlePage = currentPageIndex < _titlePageCount;
+        bool canRemove   = isTitlePage
+            ? _titlePageCount > 1
+            : pages.Count - _titlePageCount > 1;
+
+        if (!canRemove) return;
+
+        int removeIdx = currentPageIndex;
+        pages.RemoveAt(removeIdx);
+        if (isTitlePage) _titlePageCount--;
+
+        currentPageIndex = Mathf.Clamp(removeIdx - 1, 0, pages.Count - 1);
+        _insertCursor    = -1;
+
+        if (whiteboard != null) whiteboard.ClearToBackground();
+        InitializeLayout();
+        RecomputeCursor();
+        RefreshUI();
+        FireTextChanged();
+
+        Debug.Log($"{TAG} Removed empty {(isTitlePage ? "title" : "content")} page. " +
+                  $"Now on page {currentPageIndex + 1}/{pages.Count}.");
+    }
 
     private void RefreshUI()
     {
