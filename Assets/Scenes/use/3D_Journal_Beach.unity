@@ -7022,7 +7022,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -9.62
+      value: -1.32
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalPosition.y
@@ -7030,7 +7030,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 4.96
+      value: -0.61
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_LocalRotation.w
@@ -19218,6 +19218,44 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -4579528852842207708, guid: 51a87c43f535fb94ab6db2e7caba3f9f, type: 3}
+--- !u!21 &1378282188
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1384290652
 GameObject:
   m_ObjectHideFlags: 0
@@ -19654,6 +19692,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 2890342160622333325, guid: 51a87c43f535fb94ab6db2e7caba3f9f, type: 3}
+--- !u!1 &1404106333
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1404106334}
+  m_Layer: 0
+  m_Name: AZKiReviewStandPoint
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1404106334
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1404106333}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.6427876, z: 0, w: 0.7660445}
+  m_LocalPosition: {x: -9.62, y: 1.97, z: 4.96}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 1
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 80, z: 0}
 --- !u!1001 &1446149845
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -20166,7 +20235,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1759005971}
+  - {fileID: 1378282188}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -27914,44 +27983,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.0010545539, y: 0.0005439072, z: 0.0018487385}
   m_Center: {x: 3.7252902e-11, y: -0.0000050309673, z: 0.0009936824}
---- !u!21 &1759005971
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!64 &1762368308
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -32107,9 +32138,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::JournalReviewController
   avatarRoot: {fileID: 195504141}
   avatarRoamingController: {fileID: 0}
+  _waypointController: {fileID: 0}
   startAvatarRoamingOnAwake: 1
   dialoguePanelGO: {fileID: 6000000008}
   standPoint: {fileID: 1263642082}
+  reviewAvatarStandPoint: {fileID: 1404106334}
   journalChairTable: {fileID: 1456161760}
   bottleRoot: {fileID: 1286493192}
   wineRack: {fileID: 6000000012}
@@ -32123,6 +32156,8 @@ MonoBehaviour:
   - {fileID: 6574632737274784373}
   _placeholderColliders: []
   _rackDetector: {fileID: 6000000014}
+  _shredderDetector: {fileID: 0}
+  _mode: 0
   plugSfxSource: {fileID: 1671912534}
   _debugStateLogs: 0
 --- !u!4 &6000000012 stripped
@@ -194466,6 +194501,7 @@ SceneRoots:
   - {fileID: 3000000012}
   - {fileID: 6000000010}
   - {fileID: 1372208763}
+  - {fileID: 1404106334}
   - {fileID: 6000000006}
   - {fileID: 195504140}
   - {fileID: 2065372731}

@@ -122,6 +122,10 @@ public class ScribbleManager : MonoBehaviour
     private Action<WhiteboardPen.StrokeMetadata> onStrokesFlushedDelegate;
     private Action                              onBoardClearedDelegate;
 
+    // ── Canvas scale captured before first SetupCanvas() call ────────────
+    private Vector3 _initialCanvasScale;
+    private Vector2 _initialCanvasSizeDelta;
+
     private const string TAG = "[ScribbleManager]";
 
     // ==================================================================
@@ -183,6 +187,14 @@ public class ScribbleManager : MonoBehaviour
         LockTextOrientation();
 
         // ── Canvas setup via WhiteboardPageManager ───────────────────
+        // Capture the authored scale before SetupCanvas overwrites it with a
+        // lossyScale-derived value that may not match the bedroom's authored size.
+        var captureRect = WhiteboardPageManager.Instance?.CanvasRect;
+        if (captureRect != null)
+        {
+            _initialCanvasScale     = captureRect.localScale;
+            _initialCanvasSizeDelta = captureRect.sizeDelta;
+        }
         SetupCanvas();
 
         // ── Layout ───────────────────────────────────────────────────
@@ -842,6 +854,24 @@ public class ScribbleManager : MonoBehaviour
     /// Does NOT clear whiteboard ink — active strokes remain until the recognition timer fires.
     /// Called by JournalMicController after Gemini speech-to-text.
     /// </summary>
+    /// <summary>
+    /// Re-locks canvas orientation and position using the current camera direction,
+    /// then restores the authored scale. Call after TeleportToSeatPoint so the canvas
+    /// is oriented relative to the player's final seated position, not their spawn point.
+    /// </summary>
+    public void RelockOrientation()
+    {
+        if (whiteboard == null) return;
+        LockTextOrientation();
+        SetupCanvas();
+        var rt = WhiteboardPageManager.Instance?.CanvasRect;
+        if (rt != null && _initialCanvasScale != Vector3.zero)
+        {
+            rt.localScale = _initialCanvasScale;
+            rt.sizeDelta  = _initialCanvasSizeDelta;
+        }
+    }
+
     public void AddVoiceText(string text)
     {
         if (string.IsNullOrWhiteSpace(text)) return;

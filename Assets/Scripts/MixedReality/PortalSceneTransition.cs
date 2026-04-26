@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -41,6 +42,10 @@ public class PortalSceneTransition : MonoBehaviour
 
     [Tooltip("How long the ring should spin up before transition load starts.")]
     [SerializeField] [Range(0f, 10f)] private float enterSpinDuration = 2.8f;
+
+    [Header("Teleport Dwell")]
+    [Tooltip("How long the player must remain inside the portal before teleport starts.")]
+    [SerializeField] [Range(0f, 10f)] private float requiredStayDuration = 3.0f;
 
     [Header("Who Can Trigger")]
     [Tooltip("Primary tag used to detect the player collider or camera.")]
@@ -142,6 +147,8 @@ public class PortalSceneTransition : MonoBehaviour
     private MaterialPropertyBlock propertyBlock;
     private Material particleRuntimeMaterial;
     private float currentParticleSpin01;
+    private readonly HashSet<int> activePlayerTriggerIds = new HashSet<int>();
+    private float currentStayTimer;
 
     private void Reset()
     {
@@ -196,6 +203,12 @@ public class PortalSceneTransition : MonoBehaviour
 
     private void Update()
     {
+        UpdateTeleportDwell();
+        UpdateSyncedParticleSpin();
+    }
+
+    private void UpdateSyncedParticleSpin()
+    {
         if (!synchronizeParticlesWithRing || idleLoopVfx == null)
             return;
 
@@ -222,7 +235,41 @@ public class PortalSceneTransition : MonoBehaviour
         if (!IsPlayerTrigger(other)) return;
         if (requireForwardEntry && !IsEnteringFromFront(other)) return;
 
-        StartCoroutine(TransitionRoutine());
+        activePlayerTriggerIds.Add(other.GetInstanceID());
+
+        if (requiredStayDuration <= 0f)
+            StartCoroutine(TransitionRoutine());
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (other == null)
+            return;
+
+        if (activePlayerTriggerIds.Remove(other.GetInstanceID()) && activePlayerTriggerIds.Count == 0)
+            ResetTeleportDwell();
+    }
+
+    private void UpdateTeleportDwell()
+    {
+        if (isTransitioning)
+            return;
+
+        if (activePlayerTriggerIds.Count == 0)
+            return;
+
+        float dt = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+        if (dt <= 0f)
+            return;
+
+        currentStayTimer += dt;
+        if (currentStayTimer >= requiredStayDuration)
+            StartCoroutine(TransitionRoutine());
+    }
+
+    private void ResetTeleportDwell()
+    {
+        currentStayTimer = 0f;
     }
 
     private bool IsPlayerTrigger(Collider other)
@@ -903,6 +950,8 @@ public class PortalSceneTransition : MonoBehaviour
     private IEnumerator TransitionRoutine()
     {
         isTransitioning = true;
+        activePlayerTriggerIds.Clear();
+        ResetTeleportDwell();
 
         onTransitionStarted?.Invoke();
 
@@ -937,6 +986,12 @@ public class PortalSceneTransition : MonoBehaviour
         }
 
         yield return LoadTargetScene();
+    }
+
+    private void OnDisable()
+    {
+        activePlayerTriggerIds.Clear();
+        ResetTeleportDwell();
     }
 
     private IEnumerator FadeCanvas(float from, float to, float duration)

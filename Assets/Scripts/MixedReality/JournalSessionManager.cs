@@ -855,6 +855,11 @@ public class JournalSessionManager : MonoBehaviour
         // During writing, keep AZKi hidden and non-locomoting until review begins.
         reviewController?.EnterJournalingMode();
 
+        // Re-lock canvas orientation now that the player is at SeatPoint facing the
+        // whiteboard. LockTextOrientation() at Start() uses the camera's initial
+        // position which may differ from the seated position (e.g. bedroom).
+        ScribbleManager.Instance?.RelockOrientation();
+
         // Hand the virtual whiteboard surface plane to the stylus tip provider so
         // it can snap the tip to the writing plane during drawing.
         if (stylusTipProvider != null)

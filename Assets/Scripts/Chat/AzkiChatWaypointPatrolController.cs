@@ -111,7 +111,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     [SerializeField] private string walkStateName = "Base Layer.Walk";
 
-    [SerializeField] private string talkStateName = "Base Layer.Talk";
+    [SerializeField] private string talkStateName     = "Base Layer.Talk";
+    [SerializeField] private string cheeringStateName = "Base Layer.Cheering";
 
     [Range(0f, 0.5f)]
     [SerializeField] private float stateCrossFadeSeconds = 0.12f;
@@ -163,10 +164,17 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     private int _idleBHash;
     private int _walkHash;
     private int _talkHash;
+    private int _cheeringHash;
     private int _idleShortHash;
     private int _idleBShortHash;
     private int _walkShortHash;
     private int _talkShortHash;
+    private int _cheeringShortHash;
+
+    // ── Journal review lock ───────────────────────────────────────────────
+    private bool _journalLocked;
+    private bool _isCheeringPoseHeld;
+    private bool _isCheeringPlaying;
 
     private void Awake()
     {
@@ -234,6 +242,12 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     private void Update()
     {
+        if (_journalLocked)
+        {
+            if (_isCheeringPlaying) CheckCheeringComplete();
+            return;
+        }
+
         SyncTalkStateFromPanel();
 
         if (_talkActive)
@@ -387,6 +401,75 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     private void OnAssistantResponseVisibilityChanged(bool isVisible)
     {
         SetTalkActive(isVisible);
+    }
+
+    // ── JournalReviewController integration ─────────────────────────────────
+    // Match the call surface of AzkiIslandRoamingController so JRC dispatches
+    // to either controller type without knowing which scene it is in.
+
+    public void LockAtAuthoredPose()
+    {
+        _journalLocked      = true;
+        _isCheeringPoseHeld = false;
+        _isCheeringPlaying  = false;
+        _talkActive = false;
+        _isStopping = false;
+        _isAligningBeforeTalk = false;
+        _talkLoopStarted = false;
+        if (_agent != null)
+        {
+            if (_agent.isOnNavMesh) { _agent.isStopped = true; _agent.ResetPath(); }
+            _agent.updateRotation = false;
+        }
+        EnforceAnimation(AnimState.Idle, force: true);
+    }
+
+    public void ResumeRoaming()
+    {
+        _journalLocked = false;
+        if (_animator != null) _animator.speed = 1f;
+        _talkActive = false;
+        _isAligningBeforeTalk = false;
+        _talkLoopStarted = false;
+        if (_agent != null) _agent.updateRotation = true;
+        if (!EnsureAgentOnNavMesh()) { EnforceAnimation(AnimState.Idle, force: true); return; }
+        BeginStopWindow();
+    }
+
+    public void PlayTalkLoop()
+    {
+        LockAtAuthoredPose();
+        _talkActive = true;
+        _talkLoopStarted = false;
+        _isAligningBeforeTalk = false;
+        StartTalkLoop();
+    }
+
+    public void PlayCheeringOneShot()
+    {
+        _isCheeringPoseHeld = false;
+        _isCheeringPlaying  = true;
+        if (_animator != null)
+        {
+            _animator.speed = 1f;
+            _animator.CrossFadeInFixedTime(_cheeringHash, 0.12f, 0);
+        }
+    }
+
+    public bool IsCheeringPoseHeld => _isCheeringPoseHeld;
+
+    private void CheckCheeringComplete()
+    {
+        if (_animator == null || !_isCheeringPlaying) return;
+        var info = _animator.GetCurrentAnimatorStateInfo(0);
+        bool inCheer = info.shortNameHash == _cheeringShortHash
+                    || info.fullPathHash  == _cheeringHash;
+        if (inCheer && info.normalizedTime >= 0.99f && !_animator.IsInTransition(0))
+        {
+            _isCheeringPoseHeld = true;
+            _isCheeringPlaying  = false;
+            _animator.speed     = 0f;
+        }
     }
 
     private void SyncTalkStateFromPanel()
@@ -985,7 +1068,9 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         _idleShortHash = HashShortStateName(idleStateName);
         _idleBShortHash = HashShortStateName(idleBStateName);
         _walkShortHash = HashShortStateName(walkStateName);
-        _talkShortHash = HashShortStateName(talkStateName);
+        _talkShortHash     = HashShortStateName(talkStateName);
+        _cheeringHash      = Animator.StringToHash(cheeringStateName);
+        _cheeringShortHash = HashShortStateName(cheeringStateName);
     }
 
     private void EnforceAnimation(AnimState targetState, bool force)

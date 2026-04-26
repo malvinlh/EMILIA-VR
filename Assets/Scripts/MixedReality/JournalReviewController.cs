@@ -7,6 +7,9 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 using UnityEngine.XR.Interaction.Toolkit.Interactors;
 using UnityEngine.XR.Interaction.Toolkit.UI;
 
+/// <summary>Determines which post-journal terminal flow to use.</summary>
+public enum ReviewMode { BeachBottle, BedroomPaper }
+
 /// <summary>
 /// Manages the post-journal review flow that runs after the user presses DONE.
 ///
@@ -44,6 +47,8 @@ public class JournalReviewController : MonoBehaviour
     [Header("Avatar Roaming")]
     [Tooltip("Optional roaming controller. If missing, one is auto-added to avatarRoot at runtime.")]
     [SerializeField] private AzkiIslandRoamingController avatarRoamingController;
+    [Tooltip("Bedroom waypoint patrol controller. When set, prevents AzkiIslandRoamingController from being added.")]
+    [SerializeField] private AzkiChatWaypointPatrolController _waypointController;
 
     [Tooltip("Enable AZKi roaming as soon as this scene starts.")]
     [SerializeField] private bool startAvatarRoamingOnAwake = true;
@@ -57,6 +62,12 @@ public class JournalReviewController : MonoBehaviour
              "Place as a child of the environment so it moves with the island. " +
              "If null, only the camera yaw snap runs (no XZ teleport).")]
     public Transform standPoint;
+
+    [Header("AZKi Review Position")]
+    [Tooltip("AZKi is teleported to this transform when review begins (while screen is black). " +
+             "Assign an empty GameObject at the desired review stand position. " +
+             "If null, AZKi appears at its current scene position (legacy behaviour).")]
+    [SerializeField] private Transform reviewAvatarStandPoint;
 
     [Header("Scene Objects")]
     [Tooltip("JournalChairTable Transform — used as Y threshold for the ocean bottle detection.")]
@@ -94,6 +105,12 @@ public class JournalReviewController : MonoBehaviour
     [Tooltip("Wine-rack proximity detector. Its trigger collider is disabled during the discard " +
              "path and after KEEP completion, then re-enabled at each session start.")]
     [SerializeField] private WineRackProximity _rackDetector;
+    [Tooltip("Paper shredder detector (BedroomPaper mode). Armed on release path, disarmed on keep path.")]
+    [SerializeField] private PaperShredder _shredderDetector;
+
+    [Header("Mode")]
+    [Tooltip("BeachBottle = bottle+cork+ocean/rack. BedroomPaper = paper+shredder/rack (no cork).")]
+    [SerializeField] private ReviewMode _mode = ReviewMode.BeachBottle;
 
     [Header("Audio")]
     [Tooltip("AudioSource that plays the cork-plug SFX. May be null — skipped silently if unassigned.")]
@@ -112,11 +129,15 @@ public class JournalReviewController : MonoBehaviour
         WaitingForCork,
         WaitingForBottle,
         WaitingForRack,
+        WaitingForShredder,   // BedroomPaper release path
         Complete
     }
 
     /// <summary>True while the player should carry the sealed bottle to the wine rack.</summary>
     public bool IsWaitingForRack => _state == ReviewState.WaitingForRack;
+
+    /// <summary>True while the player should feed the paper into the shredder (BedroomPaper release).</summary>
+    public bool IsWaitingForShredder => _state == ReviewState.WaitingForShredder;
 
     private ReviewState  _state      = ReviewState.Inactive;
     private bool         _keepChosen;
@@ -309,7 +330,7 @@ public class JournalReviewController : MonoBehaviour
               "— EMILIA";
 
             // During the AI comment panel, AZKi should talk in a loop.
-            avatarRoamingController?.PlayTalkLoop();
+            AvatarTalkLoop();
         ShowDialogue(dialogueText);
 
         // 8. Wait for the typewriter to finish the last page.
@@ -366,22 +387,41 @@ public class JournalReviewController : MonoBehaviour
 
     // ── Avatar ───────────────────────────────────────────────────────────
 
+    // Dispatch to whichever controller is on the avatar (Beach = Island, Bedroom = Waypoint).
+    private void AvatarLock()         { avatarRoamingController?.LockAtAuthoredPose();  _waypointController?.LockAtAuthoredPose(); }
+    private void AvatarTalkLoop()     { avatarRoamingController?.PlayTalkLoop();         _waypointController?.PlayTalkLoop(); }
+    private void AvatarCheerOnce()    { avatarRoamingController?.PlayCheeringOneShot();  _waypointController?.PlayCheeringOneShot(); }
+    private void AvatarResumePatrol() { avatarRoamingController?.ResumeRoaming();        _waypointController?.ResumeRoaming(); }
+
     private void EnableAvatar()
     {
         if (avatarRoot == null) return;
 
+        // Teleport to the authored review position while the screen is still black,
+        // so AZKi can start anywhere in the scene for idle and still snap cleanly.
+        if (reviewAvatarStandPoint != null)
+        {
+            avatarRoot.position = reviewAvatarStandPoint.position;
+            avatarRoot.rotation = reviewAvatarStandPoint.rotation;
+        }
+
         avatarRoot.gameObject.SetActive(true);
         EnsureAvatarRoamingController();
-        avatarRoamingController?.LockAtAuthoredPose();
+        AvatarLock();
     }
 
     private void EnsureAvatarRoamingController()
     {
         if (avatarRoot == null) return;
 
+        // Bedroom: waypoint controller already drives the avatar — do not add the island roamer.
+        if (_waypointController == null)
+            _waypointController = avatarRoot.GetComponent<AzkiChatWaypointPatrolController>();
+        if (_waypointController != null) return;
+
+        // Beach fallback: free-roam on NavMesh.
         if (avatarRoamingController == null)
             avatarRoamingController = avatarRoot.GetComponent<AzkiIslandRoamingController>();
-
         if (avatarRoamingController == null)
             avatarRoamingController = avatarRoot.gameObject.AddComponent<AzkiIslandRoamingController>();
     }
@@ -392,7 +432,7 @@ public class JournalReviewController : MonoBehaviour
 
         avatarRoot.gameObject.SetActive(true);
         EnsureAvatarRoamingController();
-        avatarRoamingController?.ResumeRoaming();
+        AvatarResumePatrol();
     }
 
     // ── Dialogue ─────────────────────────────────────────────────────────
@@ -452,19 +492,27 @@ public class JournalReviewController : MonoBehaviour
         var root   = new GameObject("JournalChoicePanel");
         var canvas = root.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.WorldSpace;
-        // Canvas rect must match content size — TrackedDeviceGraphicRaycaster bounds-checks
-        // the hit point against this rect before dispatching pointer events.
-        root.GetComponent<RectTransform>().sizeDelta = new Vector2(640f, 300f);
+
+        // Match VRDialoguePanel dimensions so the choice panel looks the same size.
+        Vector2 panelSize  = new Vector2(640f, 300f);
+        float   panelScale = 0.001f;
+        if (dialoguePanelGO != null)
+        {
+            var drt = dialoguePanelGO.GetComponent<RectTransform>();
+            if (drt != null) { panelSize = drt.sizeDelta; panelScale = dialoguePanelGO.transform.localScale.x; }
+        }
+
+        root.GetComponent<RectTransform>().sizeDelta = panelSize;
         root.AddComponent<CanvasScaler>();
         root.AddComponent<TrackedDeviceGraphicRaycaster>(); // XRI-compatible raycaster
-        root.transform.localScale = Vector3.one * 0.001f;
+        root.transform.localScale = Vector3.one * panelScale;
 
         // ── Background panel ──────────────────────────────────────────
         var bg    = new GameObject("Background");
         bg.transform.SetParent(root.transform, false);
         var bgImg = bg.AddComponent<Image>();
         bgImg.color = s_PanelBg;
-        bg.GetComponent<RectTransform>().sizeDelta = new Vector2(640f, 300f);
+        bg.GetComponent<RectTransform>().sizeDelta = panelSize;
 
         // ── Top accent bar (mauve, like the VRDialoguePanel border) ───
         var bar    = new GameObject("AccentBar");
@@ -557,22 +605,24 @@ public class JournalReviewController : MonoBehaviour
     // CHOICE HANDLERS
     // ================================================================
 
-    /// <summary>User wants to keep (save) the journal → cork → bottle rack path.</summary>
+    /// <summary>User wants to keep (save) the journal.</summary>
     private void OnKeepChosen()
     {
         if (_state != ReviewState.ShowingChoice) return;
         _keepChosen = true;
         HideChoicePanel();
-        BeginCorkPhase();
+        if (_mode == ReviewMode.BedroomPaper) BeginPaperPhase();
+        else BeginCorkPhase();
     }
 
-    /// <summary>User wants to release (discard) the journal → cork → ocean throw path.</summary>
+    /// <summary>User wants to release (discard) the journal.</summary>
     private void OnReleaseChosen()
     {
         if (_state != ReviewState.ShowingChoice) return;
         _keepChosen = false;
         HideChoicePanel();
-        BeginCorkPhase();
+        if (_mode == ReviewMode.BedroomPaper) BeginPaperPhase();
+        else BeginCorkPhase();
     }
 
     // ================================================================
@@ -748,6 +798,89 @@ public class JournalReviewController : MonoBehaviour
     }
 
     // ================================================================
+    // PAPER PHASE (BedroomPaper mode — no cork, branches immediately on choice)
+    // ================================================================
+
+    private void BeginPaperPhase()
+    {
+        Debug.Log($"[JournalReview] BeginPaperPhase — keepChosen={_keepChosen}");
+        LogStateSnapshot("BeginPaperPhase.BeforeRestore");
+
+        RestorePostJournalRoot();
+        if (postJournalGroup != null)
+        {
+            postJournalGroup.SetActive(true);
+            ForceActivateHierarchy(postJournalGroup.transform);
+        }
+
+        EnsureBottleOriginalStored();
+
+        if (bottleRoot != null && _bottleOriginalStored)
+        {
+            if (!bottleRoot.gameObject.activeSelf) bottleRoot.gameObject.SetActive(true);
+            bottleRoot.SetParent(_bottleOriginalParent, worldPositionStays: false);
+            bottleRoot.localPosition = _bottleOriginalLocalPos;
+            bottleRoot.localRotation = _bottleOriginalLocalRot;
+            bottleRoot.localScale    = _bottleOriginalLocalScale;
+            var rb = bottleRoot.GetComponent<Rigidbody>();
+            if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+        }
+
+        if (preNDuringJournalGroup != null) preNDuringJournalGroup.SetActive(false);
+        if (whiteboardUIGroup      != null) whiteboardUIGroup.SetActive(false);
+        if (vintageMicrophone      != null) vintageMicrophone.SetActive(false);
+        if (bottlePreDuringProp    != null) bottlePreDuringProp.SetActive(false);
+
+        EnableBottleComponents();
+        LogStateSnapshot("BeginPaperPhase.AfterEnableComponents");
+
+        if (bottleRoot != null)
+        {
+            var rb = bottleRoot.GetComponent<Rigidbody>();
+            if (rb != null) { rb.isKinematic = false; rb.useGravity = true; }
+            bottleRoot.GetComponent<ItemAutoReset>()?.RefreshOrigin();
+        }
+
+        JournalSessionManager.Instance?.AllowLocomotion();
+
+        if (_keepChosen)
+        {
+            _state = ReviewState.WaitingForRack;
+            _shredderDetector?.Disarm();
+            ShowDialogue("Carry your journal to the bottle rack nearby to keep it safe.");
+        }
+        else
+        {
+            _state = ReviewState.WaitingForShredder;
+            if (_rackDetector != null) _rackDetector.GetComponent<Collider>().enabled = false;
+            _shredderDetector?.Arm();
+            ShowDialogue("When you're ready, feed the paper into the shredder to let it go.");
+        }
+
+        LogStateSnapshot("BeginPaperPhase.Done");
+    }
+
+    // ================================================================
+    // SHREDDER DETECTION (called by PaperShredder — BedroomPaper mode)
+    // ================================================================
+
+    /// <summary>Called by PaperShredder after the pull-in animation completes.</summary>
+    public void HandlePaperShredded()
+    {
+        Debug.Log($"[JournalReview] HandlePaperShredded — state={_state}");
+        if (_state != ReviewState.WaitingForShredder)
+        {
+            Debug.LogWarning($"[JournalReview] HandlePaperShredded ignored — wrong state ({_state}).");
+            return;
+        }
+        if (bottleRoot != null) DisableBottleComponents();
+        _state = ReviewState.Complete;
+        StartCoroutine(BottleDisposedCoroutine(
+            "Letting go takes courage too.\nThe shredder will carry it — and so will you.",
+            saveJournal: false));
+    }
+
+    // ================================================================
     // RACK SELECTION (called by WineRackProximity)
     // ================================================================
 
@@ -795,7 +928,7 @@ public class JournalReviewController : MonoBehaviour
         HideChoicePanel();
 
         // During ending dialogue, AZKi plays a one-shot cheering animation.
-        avatarRoamingController?.PlayCheeringOneShot();
+        AvatarCheerOnce();
 
         // Avatar says something short and calming.
         ShowDialogue(message);
@@ -823,12 +956,11 @@ public class JournalReviewController : MonoBehaviour
         // Wait until the cheering animation has played fully and AZKi is holding the
         // final pose before we hand control back to EndSessionCoroutine (which calls
         // ResumeAvatarRoaming). Cap the wait at 5 s to guard against edge cases.
-        if (avatarRoamingController != null)
-        {
-            float cheerWaitStart = Time.time;
-            yield return new WaitUntil(() =>
-                avatarRoamingController.IsCheeringPoseHeld || Time.time - cheerWaitStart > 5f);
-        }
+        float cheerWaitStart = Time.time;
+        yield return new WaitUntil(() =>
+            ((avatarRoamingController == null || avatarRoamingController.IsCheeringPoseHeld) &&
+             (_waypointController     == null || _waypointController.IsCheeringPoseHeld))
+            || Time.time - cheerWaitStart > 5f);
 
         // Re-enable the start button area, whiteboard UI, and hide the post-journal bottle.
         ResetSceneGroups();
