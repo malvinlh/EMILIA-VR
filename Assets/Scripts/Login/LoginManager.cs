@@ -1,6 +1,7 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.UI;
+using TMPro;
 
 [DisallowMultipleComponent]
 public class LoginManager : MonoBehaviour
@@ -8,6 +9,9 @@ public class LoginManager : MonoBehaviour
     [Header("Input Fields")]
     [SerializeField] private TMP_InputField nicknameInput;
     [SerializeField] private TMP_InputField fullNameInput;
+
+    [Header("Continue Button")]
+    [SerializeField] private Button continueButton;
 
     [Header("Error Text")]
     [SerializeField] private TMP_Text errorTextNickname;
@@ -23,12 +27,26 @@ public class LoginManager : MonoBehaviour
     private const string PrefKeyNickname = "Nickname";
     private const string PrefKeyFullName  = "PlayerFullName";
 
+    // Static fields survive scene loads but reset on app restart.
+    private static bool   _sessionLoggedIn;
+    private static string _sessionNickname;
+    private static string _sessionFullName;
+
     private void Start()
     {
         SetErrorVisible(errorTextNickname, false);
         SetErrorVisible(errorTextFullName, false);
-        if (beachPortalGlass   != null) beachPortalGlass.SetActive(false);
-        if (bedroomPortalGlass != null) bedroomPortalGlass.SetActive(false);
+        beachPortalGlass?.SetActive(false);
+        bedroomPortalGlass?.SetActive(false);
+
+        if (_sessionLoggedIn)
+        {
+            if (nicknameInput != null) { nicknameInput.text = _sessionNickname; nicknameInput.interactable = false; }
+            if (fullNameInput  != null) { fullNameInput.text  = _sessionFullName;  fullNameInput.interactable  = false; }
+            if (continueButton != null)   continueButton.interactable = false;
+            beachPortalGlass?.SetActive(true);
+            bedroomPortalGlass?.SetActive(true);
+        }
     }
 
     public void OnContinueClicked()
@@ -48,14 +66,18 @@ public class LoginManager : MonoBehaviour
         PlayerPrefs.SetString(PrefKeyFullName,  fullName);
         PlayerPrefs.Save();
 
-        if (beachPortalGlass   != null) beachPortalGlass.SetActive(true);
-        if (bedroomPortalGlass != null) bedroomPortalGlass.SetActive(true);
+        _sessionLoggedIn = true;
+        _sessionNickname = nickname;
+        _sessionFullName = fullName;
+
+        beachPortalGlass?.SetActive(true);
+        bedroomPortalGlass?.SetActive(true);
 
         onLoginSuccess?.Invoke();
     }
 
     private static void SetErrorVisible(TMP_Text label, bool visible)
     {
-        if (label != null) label.gameObject.SetActive(visible);
+        label?.gameObject.SetActive(visible);
     }
 }

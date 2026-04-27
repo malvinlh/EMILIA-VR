@@ -12656,7 +12656,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 3
+      value: 4.2
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode
@@ -12672,7 +12672,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2218496723442559053, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 6.593
+      value: 5.767
       objectReference: {fileID: 0}
     - target: {fileID: 2218496723442559053, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_LocalPosition.z
@@ -12712,7 +12712,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6873022368256633593, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_Height
-      value: 4.57
+      value: 8
       objectReference: {fileID: 0}
     - target: {fileID: 6873022368256633593, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_Enabled
@@ -14036,7 +14036,7 @@ Transform:
   m_GameObject: {fileID: 548604255}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -3.462, y: 2.323, z: 4.477}
+  m_LocalPosition: {x: -3.2, y: 2.323, z: 4.42}
   m_LocalScale: {x: 0.661388, y: 0.661388, z: 0.661388}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -16099,6 +16099,44 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -3921035913178257699, guid: 262d1562b31badd4389ea90daefd1628, type: 3}
+--- !u!21 &943421381
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &944999981
 GameObject:
   m_ObjectHideFlags: 0
@@ -16889,44 +16927,6 @@ RectTransform:
   m_AnchoredPosition: {x: -0.6000061, y: 22.301}
   m_SizeDelta: {x: -248.9, y: 604.43}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!21 &1071379603
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!64 &1083103529
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -17249,14 +17249,14 @@ MonoBehaviour:
   stamperTipLocalOffset: {x: 0, y: -0.015, z: 0}
   paperSurface: {fileID: 949426658}
   stampDistance: 0.05
-  stampDuration: 1
+  stampDuration: 2
   rollbackPerSecond: 0.5
   sealColor: {r: 0.75, g: 0.1, b: 0.1, a: 1}
-  sealDiameter: 0.035
+  sealDiameter: 0.05
   sealPunchDuration: 0.25
   sealSurfaceOffset: 0.0015
   stampSfx: {fileID: 2076500235}
-  completionDelay: 0.05
+  completionDelay: 0.45
 --- !u!23 &1139446835
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -20758,7 +20758,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1071379603}
+  - {fileID: 943421381}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -21136,7 +21136,7 @@ MonoBehaviour:
   calibrateUserEyeHeight: 1
   tableWritingSurface: {fileID: 949426658}
   calibrationHeightBias: 0.001
-  realEyeAboveTableClamp: {x: 0.25, y: 1.3}
+  realEyeAboveTableClamp: {x: 0.25, y: 1.7}
   applySceneHeightCorrection: 0
   maxHeightCorrection: 0.45
   eyeAboveTableClamp: {x: 0.5, y: 1.05}
@@ -21696,8 +21696,8 @@ Transform:
   m_GameObject: {fileID: 1821944756}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -9.127, y: 2.721, z: -5.939}
-  m_LocalScale: {x: 3.75, y: 3.75, z: 3.75}
+  m_LocalPosition: {x: -8.75, y: 2.721, z: -5.939}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 2120520869}
