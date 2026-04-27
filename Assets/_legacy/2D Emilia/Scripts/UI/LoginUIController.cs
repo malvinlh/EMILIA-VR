@@ -15,6 +15,9 @@ public class LoginUIController : MonoBehaviour
 {
     #region Inspector Fields
 
+    [Header("Optional Keyboard Control")]
+    [SerializeField] private LoginKeyboardSetup keyboardSetup;
+
     [Header("UI References")]
     [Tooltip("Input field for the user's full name.")]
     [SerializeField] private TMP_InputField fullNameInput;
@@ -108,6 +111,12 @@ public class LoginUIController : MonoBehaviour
         PlayerPrefs.Save();
 
         Debug.Log($"[Login] Saved Nickname: {nickname}");
+
+        if (keyboardSetup != null)
+            keyboardSetup.CloseKeyboard();
+
+        DisableInputUI();
+
         sceneButtonHandler.LoadTargetScene();
     }
 
@@ -165,6 +174,25 @@ public class LoginUIController : MonoBehaviour
     {
         ClearNicknameError();
         ClearFullNameError();
+    }
+
+    private void DisableInputUI()
+    {
+        if (nicknameInput != null)
+            nicknameInput.interactable = false;
+
+        if (fullNameInput != null)
+            fullNameInput.interactable = false;
+
+        if (continueButton != null)
+            continueButton.interactable = false;
+
+        // Also remove focus to be safe
+        if (nicknameInput != null)
+            nicknameInput.DeactivateInputField();
+
+        if (fullNameInput != null)
+            fullNameInput.DeactivateInputField();
     }
 
     private void TryAttachVrHandwritingBridgeIfAvailable()

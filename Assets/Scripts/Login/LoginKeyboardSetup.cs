@@ -86,4 +86,10 @@ public class LoginKeyboardSetup : MonoBehaviour
         display.updateOnKeyPress = true;
         display.inputField = field;
     }
+
+    public void CloseKeyboard()
+    {
+        if (sceneKeyboard != null)
+            sceneKeyboard.Close();
+    }
 }
