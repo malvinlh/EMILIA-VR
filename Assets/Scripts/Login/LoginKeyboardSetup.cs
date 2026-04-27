@@ -33,6 +33,8 @@ public class LoginKeyboardSetup : MonoBehaviour
         EnsureKeyboardDisplay(fullNameInput, sceneKeyboard);
 
         HookFocusHandoff();
+
+        sceneKeyboard.Close();
     }
 
     private void OnDestroy()
