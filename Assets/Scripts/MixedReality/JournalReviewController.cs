@@ -401,8 +401,7 @@ public class JournalReviewController : MonoBehaviour
     {
         if (avatarRoot == null) return;
 
-        // Teleport to the authored review position while the screen is still black,
-        // so AZKi can start anywhere in the scene for idle and still snap cleanly.
+        // 1. Move first
         if (reviewAvatarStandPoint != null)
         {
             avatarRoot.position = reviewAvatarStandPoint.position;
@@ -410,7 +409,15 @@ public class JournalReviewController : MonoBehaviour
         }
 
         avatarRoot.gameObject.SetActive(true);
+
+        // 2. Ensure controller exists BEFORE capture
         EnsureAvatarRoamingController();
+
+        // 3. Now safely capture the new authored pose
+        if (reviewAvatarStandPoint != null)
+            avatarRoamingController?.CaptureAuthoredPose();
+
+        // 4. Lock to it
         AvatarLock();
     }
 
