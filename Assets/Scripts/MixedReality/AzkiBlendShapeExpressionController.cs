@@ -27,21 +27,21 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
     [Header("Blending")]
     [Tooltip("Maximum blend-shape weight change per second.")]
     [Range(10f, 600f)]
-    [SerializeField] private float weightLerpPerSecond = 240f;
+    [SerializeField] private float weightLerpPerSecond = 120f;
 
     [Header("Blink")]
     [SerializeField] private string blinkShapeName = "まばたき";
     [Range(0f, 100f)]
-    [SerializeField] private float blinkClosedWeight = 100f;
-    [SerializeField] private Vector2 blinkIntervalRange = new Vector2(2.2f, 4.4f);
+    [SerializeField] private float blinkClosedWeight = 90f;
+    [SerializeField] private Vector2 blinkIntervalRange = new Vector2(2.5f, 5.0f);
     [Range(0.04f, 0.3f)]
-    [SerializeField] private float blinkDuration = 0.1f;
+    [SerializeField] private float blinkDuration = 0.18f;
 
     [Header("Talking Mouth")]
     [Tooltip("Mouth shapes cycled while in Talk state.")]
-    [SerializeField] private string[] talkMouthShapeNames = new[] { "あ", "い", "う", "え", "お", "ワ", "ワ2", "ちゅ" };
-    [SerializeField] private Vector2 talkMouthIntervalRange = new Vector2(0.06f, 0.14f);
-    [SerializeField] private Vector2 talkMouthWeightRange = new Vector2(35f, 75f);
+    [SerializeField] private string[] talkMouthShapeNames = new[] { "あ", "い", "う", "え", "お", "ワ", "ワ2", "ちゅ", "ω", "▲" };
+    [SerializeField] private Vector2 talkMouthIntervalRange = new Vector2(0.09f, 0.18f);
+    [SerializeField] private Vector2 talkMouthWeightRange = new Vector2(20f, 55f);
 
     private enum FaceState
     {
@@ -200,37 +200,48 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
         {
             case FaceState.Idle:
                 SetTarget("なごみ", 20f);
-                SetTarget("笑い", 10f);
-                SetTarget("口角広", 10f);
-                SetTarget("眉上", 5f);
+                SetTarget("笑い", 18f);
+                SetTarget("口角広", 14f);
+                SetTarget("眉上", 10f);
+                SetTarget("頬染", 18f);
+                SetTarget("キラキラ1", 22f);
                 break;
 
             case FaceState.IdleB:
-                SetTarget("困る", 35f);
-                SetTarget("口角下", 18f);
-                SetTarget("へ", 14f);
-                SetTarget("眉下", 22f);
+                SetTarget("困る", 18f);
+                SetTarget("口角下", 8f);
+                SetTarget("へ", 8f);
+                SetTarget("眉下", 12f);
+                SetTarget("はう", 15f);
+                SetTarget("頬染", 12f);
                 break;
 
             case FaceState.Walk:
-                SetTarget("真面目", 28f);
-                SetTarget("口角縮", 14f);
-                SetTarget("眉前", 10f);
+                SetTarget("真面目", 10f);
+                SetTarget("口角縮", 5f);
+                SetTarget("眉前", 4f);
+                SetTarget("なごみ", 12f);
+                SetTarget("頬染", 8f);
                 break;
 
             case FaceState.Talk:
-                SetTarget("なごみ", 24f);
-                SetTarget("笑い", 12f);
-                SetTarget("口角広", 14f);
+                SetTarget("なごみ", 22f);
+                SetTarget("笑い", 20f);
+                SetTarget("口角広", 16f);
+                SetTarget("頬染", 22f);
+                SetTarget("キラキラ1", 18f);
                 if (!string.IsNullOrEmpty(_activeTalkMouthShape))
                     SetTarget(_activeTalkMouthShape, _activeTalkMouthWeight);
                 break;
 
             case FaceState.Cheering:
-                SetTarget("笑い", 70f);
-                SetTarget("口角広", 24f);
+                SetTarget("笑い", 60f);
+                SetTarget("口角広", 28f);
                 SetTarget("眉上", 32f);
-                SetTarget("びっくり", 18f);
+                SetTarget("びっくり", 8f);
+                SetTarget("頬染", 35f);
+                SetTarget("キラキラ2", 45f);
+                SetTarget("ハート1", 25f);
                 break;
         }
 
@@ -279,8 +290,8 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
         }
 
         float phase = t < 0.5f
-            ? t / 0.5f
-            : 1f - ((t - 0.5f) / 0.5f);
+            ? SmoothStep01(t / 0.5f)
+            : SmoothStep01(1f - ((t - 0.5f) / 0.5f));
 
         _blinkWeight = phase * blinkClosedWeight;
     }
@@ -368,5 +379,11 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
     private static string NormalizeName(string name)
     {
         return name.Trim().Replace(" ", string.Empty);
+    }
+
+    private static float SmoothStep01(float value)
+    {
+        float t = Mathf.Clamp01(value);
+        return t * t * (3f - 2f * t);
     }
 }

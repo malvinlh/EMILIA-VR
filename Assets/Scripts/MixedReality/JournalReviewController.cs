@@ -90,6 +90,10 @@ public class JournalReviewController : MonoBehaviour
     [Tooltip("BottlePreDuring prop — disabled during cork/post-journal phase, re-enabled on session reset.")]
     public GameObject bottlePreDuringProp;
 
+    [Header("Choice Panel")]
+    [Tooltip("Vertical offset for the confirmation panel relative to AZKi. Set per scene in the Inspector.")]
+    [SerializeField] private float choicePanelHeight = 1.2f;
+
     [Header("Cork")]
     [Tooltip("CorkSnapZone script on the PostJournal bottle neck child trigger collider.")]
     public CorkSnapZone bottleNeckZone;
@@ -460,7 +464,7 @@ public class JournalReviewController : MonoBehaviour
             _choicePanel.transform.position =
                 avatarRoot.position
                 + avatarRoot.forward * 0.6f   // slightly in front of avatar
-                + Vector3.up * 1.2f;          // comfortable chest / reading height
+                + Vector3.up * choicePanelHeight;          // comfortable chest / reading height
 
             // Billboard toward the player.
             Camera cam = Camera.main;
