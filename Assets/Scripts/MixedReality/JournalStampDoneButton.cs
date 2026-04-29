@@ -29,13 +29,13 @@ public class JournalStampDoneButton : MonoBehaviour
 
     [Header("Wax Seal")]
     [SerializeField] private Color sealColor = new Color(0.75f, 0.1f, 0.1f, 1f);
-    [SerializeField, Range(0.005f, 0.15f)] private float sealDiameter = 0.035f;
+    [SerializeField, Range(0.005f, 0.5f)] private float sealDiameter = 0.035f;
     [SerializeField, Range(0.05f, 1f)]     private float sealPunchDuration = 0.25f;
     [SerializeField, Range(0.0005f, 0.01f)] private float sealSurfaceOffset = 0.0015f;
     public AudioSource stampSfx;
 
     [Header("Stamp Feedback Circle")]
-    [SerializeField, Range(0.01f, 0.1f)] private float feedbackCircleDiameter = 0.04f;
+    [SerializeField, Range(0.01f, 0.5f)] private float feedbackCircleDiameter = 0.04f;
     [SerializeField, Range(0.2f, 2f)] private float feedbackFadeDuration = 0.5f;
     [SerializeField] private Color feedbackCircleColor = new Color(1f, 0.2f, 0.2f, 1f);
 
