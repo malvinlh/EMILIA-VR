@@ -34,6 +34,11 @@ public class JournalStampDoneButton : MonoBehaviour
     [SerializeField, Range(0.0005f, 0.01f)] private float sealSurfaceOffset = 0.0015f;
     public AudioSource stampSfx;
 
+    [Header("Stamp Feedback Circle")]
+    [SerializeField, Range(0.01f, 0.1f)] private float feedbackCircleDiameter = 0.04f;
+    [SerializeField, Range(0.2f, 2f)] private float feedbackFadeDuration = 0.5f;
+    [SerializeField] private Color feedbackCircleColor = new Color(1f, 0.2f, 0.2f, 1f);
+
     [Header("Completion")]
     [SerializeField, Range(0f, 1f)] private float completionDelay = 0.05f;
 
@@ -50,6 +55,12 @@ public class JournalStampDoneButton : MonoBehaviour
     private Quaternion _originLocalRot;
     private GameObject _spawnedSeal;
     private static Material s_sealMat;
+    private GameObject _feedbackCircle;
+    private Renderer _feedbackCircleRenderer;
+    private Material _feedbackCircleMat;
+    private float _feedbackFadeTimer;
+    private bool _feedbackFading;
+    private Vector3 _lastStampContactPoint;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────
 
@@ -70,11 +81,15 @@ public class JournalStampDoneButton : MonoBehaviour
     {
         _completionTriggered = false;
         _progress = 0f;
+        _feedbackFading = false;
+        _feedbackFadeTimer = 0f;
+        DestroyFeedbackCircle();
     }
 
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        DestroyFeedbackCircle();
     }
 
     // ── Update ─────────────────────────────────────────────────────────────
@@ -106,6 +121,19 @@ public class JournalStampDoneButton : MonoBehaviour
         float speed    = nearPaper ? riseRate : fallRate;
 
         _progress = Mathf.MoveTowards(_progress, target, speed * Time.deltaTime);
+
+        if (nearPaper && _progress > 0f)
+        {
+            _lastStampContactPoint = TipWorld();
+            UpdateFeedbackCircle();
+        }
+        else if (_progress <= 0f)
+        {
+            DestroyFeedbackCircle();
+        }
+
+        if (_feedbackFading)
+            UpdateFeedbackFade();
 
         if (!_completionTriggered && _progress >= 1f)
             StartCoroutine(CompleteAfterStamp());
@@ -139,6 +167,8 @@ public class JournalStampDoneButton : MonoBehaviour
 
         SpawnSeal();
         stampSfx?.Play();
+
+        StartFeedbackFade();
 
         if (completionDelay > 0f) yield return new WaitForSeconds(completionDelay);
 
@@ -244,4 +274,95 @@ public class JournalStampDoneButton : MonoBehaviour
         transform.localRotation = _originLocalRot;
         if (_rb != null) { _rb.linearVelocity = Vector3.zero; _rb.angularVelocity = Vector3.zero; }
     }
+
+    // ── Stamp feedback circle ──────────────────────────────────────────────
+
+    private void UpdateFeedbackCircle()
+    {
+        if (_feedbackFading) return;
+
+        if (_feedbackCircle == null)
+            SpawnFeedbackCircle();
+
+        if (_feedbackCircle == null) return;
+
+        Vector3 paperUp = paperSurface.up;
+        var col = paperSurface.GetComponent<Collider>()
+               ?? paperSurface.GetComponentInChildren<Collider>(true);
+        Vector3 circlePos = col != null
+            ? new Vector3(_lastStampContactPoint.x, col.bounds.max.y, _lastStampContactPoint.z) + paperUp * 0.001f
+            : _lastStampContactPoint + paperUp * 0.001f;
+
+        _feedbackCircle.transform.position = circlePos;
+
+        if (_feedbackCircleRenderer != null && _feedbackCircleMat != null)
+        {
+            Color pulseColor = feedbackCircleColor;
+            pulseColor.a = Mathf.Lerp(0.4f, 1f, _progress);
+            _feedbackCircleMat.color = pulseColor;
+        }
+    }
+
+    private void SpawnFeedbackCircle()
+    {
+        if (_feedbackCircle != null) return;
+        if (paperSurface == null) return;
+
+        var circle = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        circle.name = "StampFeedbackCircle";
+        Destroy(circle.GetComponent<Collider>());
+
+        Vector3 paperUp = paperSurface.up;
+        Quaternion circleRot = Quaternion.LookRotation(paperSurface.forward, paperUp)
+                             * Quaternion.Euler(90f, 0f, 0f);
+        circle.transform.rotation = circleRot;
+        circle.transform.localScale = Vector3.one * feedbackCircleDiameter;
+        circle.transform.SetParent(paperSurface, worldPositionStays: false);
+
+        if (_feedbackCircleMat == null)
+        {
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            _feedbackCircleMat = new Material(shader);
+            _feedbackCircleMat.SetFloat("_Smoothness", 0.9f);
+        }
+
+        _feedbackCircleRenderer = circle.GetComponent<Renderer>();
+        if (_feedbackCircleRenderer != null)
+            _feedbackCircleRenderer.sharedMaterial = _feedbackCircleMat;
+
+        _feedbackCircle = circle;
+    }
+
+    private void StartFeedbackFade()
+    {
+        _feedbackFading = true;
+        _feedbackFadeTimer = 0f;
+    }
+
+    private void UpdateFeedbackFade()
+    {
+        _feedbackFadeTimer += Time.deltaTime;
+        float fadeAlpha = Mathf.Lerp(1f, 0f, _feedbackFadeTimer / feedbackFadeDuration);
+
+        if (_feedbackCircleRenderer != null && _feedbackCircleMat != null)
+        {
+            Color c = feedbackCircleColor;
+            c.a = fadeAlpha;
+            _feedbackCircleMat.color = c;
+        }
+
+        if (_feedbackFadeTimer >= feedbackFadeDuration)
+            DestroyFeedbackCircle();
+    }
+
+    private void DestroyFeedbackCircle()
+    {
+        if (_feedbackCircle != null)
+            Destroy(_feedbackCircle);
+        _feedbackCircle = null;
+        _feedbackCircleRenderer = null;
+        _feedbackFading = false;
+        _feedbackFadeTimer = 0f;
+    }
 }
+
