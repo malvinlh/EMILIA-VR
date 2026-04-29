@@ -711,6 +711,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+--- !u!4 &47319485 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 29c49f77200b62a4ea075559d6634e26, type: 3}
+  m_PrefabInstance: {fileID: 147571772}
+  m_PrefabAsset: {fileID: 0}
 --- !u!64 &47981629
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -13991,7 +13996,7 @@ Transform:
   m_GameObject: {fileID: 548604255}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -3.3, y: 3.2, z: 4.42}
+  m_LocalPosition: {x: -3.4, y: 3.2, z: 4.42}
   m_LocalScale: {x: 0.661388, y: 0.661388, z: 0.661388}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -14783,7 +14788,7 @@ Transform:
   m_GameObject: {fileID: 633193130}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.883, z: 0}
+  m_LocalPosition: {x: 0, y: 0.27, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -15054,44 +15059,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 2438191958617898771, guid: 262d1562b31badd4389ea90daefd1628, type: 3}
---- !u!21 &704407872
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &716956212
 GameObject:
   m_ObjectHideFlags: 0
@@ -18857,7 +18824,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1243332667}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: 0, y: -0.7071068, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 7.13, y: 2.071, z: 5.827}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -18866,7 +18833,7 @@ Transform:
   - {fileID: 633193131}
   - {fileID: 420779238}
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 90, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: -90, z: 0}
 --- !u!1 &1243896013
 GameObject:
   m_ObjectHideFlags: 0
@@ -20843,7 +20810,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 704407872}
+  - {fileID: 1833033215}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -21649,6 +21616,7 @@ MonoBehaviour:
   paperTag: JournalBottle
   slotTop: {fileID: 633193131}
   stripsSpawnOrigin: {fileID: 420779238}
+  shakeTarget: {fileID: 47319485}
   grindSfx: {fileID: 2145940542}
   pullDownDuration: 0.9
   pullDownDistance: 0.25
@@ -21656,6 +21624,9 @@ MonoBehaviour:
   stripSize: {x: 0.02, y: 0.001, z: 0.08}
   stripColor: {r: 1, g: 1, b: 1, a: 1}
   stripLifetime: 4
+  shakePositionAmplitude: 0.008
+  shakeRotationAmplitude: 1
+  shakeFrequency: 18
 --- !u!65 &1785371597
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -21732,7 +21703,7 @@ MonoBehaviour:
   whiteboardUIGroup: {fileID: 78799590}
   vintageMicrophone: {fileID: 1760708232}
   bottlePreDuringProp: {fileID: 0}
-  choicePanelHeight: 4.5
+  choicePanelHeight: 3.5
   bottleNeckZone: {fileID: 0}
   _placeholderRenderers:
   - {fileID: 0}
@@ -21986,6 +21957,44 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -3522889147712810373, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
+--- !u!21 &1833033215
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1853306093
 GameObject:
   m_ObjectHideFlags: 0

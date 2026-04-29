@@ -128,6 +128,8 @@ public static class EmiliaSceneSetup
             return go;
         });
 
+        var shakeTarget = FindChildByName(shredderRoot.transform, "GLTF_SceneRootNode") ?? shredderRoot.transform;
+
         // ── 5. Wire JournalReviewController ───────────────────────────────
         var jrc = Object.FindAnyObjectByType<JournalReviewController>();
         if (jrc != null)
@@ -193,6 +195,7 @@ public static class EmiliaSceneSetup
             wired += SetIfNull(so, "reviewController",  jrc);
             wired += SetIfNull(so, "slotTop",           slotTop);
             wired += SetIfNull(so, "stripsSpawnOrigin", stripsOrigin);
+            wired += SetIfNull(so, "shakeTarget",       shakeTarget);
             so.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(shredderComp);
         }

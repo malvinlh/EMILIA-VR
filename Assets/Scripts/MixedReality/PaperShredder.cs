@@ -21,6 +21,8 @@ public class PaperShredder : MonoBehaviour
     public Transform slotTop;
     [Tooltip("Where shredded strips spawn. Falls back to this transform if null.")]
     public Transform stripsSpawnOrigin;
+    [Tooltip("Visual-only shredder transform to shake during the grind SFX. Falls back to the parent transform if null.")]
+    public Transform shakeTarget;
 
     [Header("Audio")]
     public AudioSource grindSfx;
@@ -34,6 +36,11 @@ public class PaperShredder : MonoBehaviour
     public Vector3 stripSize = new Vector3(0.02f, 0.001f, 0.08f);
     public Color stripColor = Color.white;
     [Range(1f, 8f)] public float stripLifetime = 4f;
+
+    [Header("Shake Feedback")]
+    [Range(0f, 0.03f)] public float shakePositionAmplitude = 0.008f;
+    [Range(0f, 3f)] public float shakeRotationAmplitude = 1.0f;
+    [Range(6f, 40f)] public float shakeFrequency = 18f;
 
     private bool _armed;
     private bool _fired;
@@ -88,7 +95,14 @@ public class PaperShredder : MonoBehaviour
         var rb = paper.GetComponent<Rigidbody>();
         if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
 
-        grindSfx?.Play();
+        float feedbackDuration = ResolveGrindDuration();
+        if (grindSfx != null)
+        {
+            grindSfx.Stop();
+            grindSfx.Play();
+        }
+
+        StartCoroutine(ShakeRoutine(feedbackDuration));
 
         Vector3 startPos   = paper.position;
         Quaternion startRot = paper.rotation;
@@ -99,10 +113,11 @@ public class PaperShredder : MonoBehaviour
             : startPos + Vector3.down * pullDownDistance;
 
         float elapsed = 0f;
-        while (elapsed < pullDownDuration)
+        float pullDuration = feedbackDuration > 0f ? feedbackDuration : pullDownDuration;
+        while (elapsed < pullDuration)
         {
             elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / pullDownDuration);
+            float t = Mathf.Clamp01(elapsed / pullDuration);
             paper.position   = Vector3.Lerp(startPos, targetPos, t);
             paper.rotation   = Quaternion.Slerp(startRot, transform.rotation, t);
             paper.localScale = Vector3.Lerp(startScale, new Vector3(startScale.x, 0f, startScale.z), t);
@@ -144,5 +159,41 @@ public class PaperShredder : MonoBehaviour
 
             Destroy(strip, stripLifetime);
         }
+    }
+
+    private float ResolveGrindDuration()
+    {
+        if (grindSfx == null || grindSfx.clip == null)
+            return pullDownDuration;
+
+        float pitch = Mathf.Abs(grindSfx.pitch);
+        if (pitch < 0.01f) pitch = 0.01f;
+        return grindSfx.clip.length / pitch;
+    }
+
+    private IEnumerator ShakeRoutine(float duration)
+    {
+        Transform target = shakeTarget != null ? shakeTarget : transform.parent;
+        if (target == null || duration <= 0f)
+            yield break;
+
+        Vector3 startLocalPos = target.localPosition;
+        Quaternion startLocalRot = target.localRotation;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float noiseX = Mathf.PerlinNoise(elapsed * shakeFrequency, 0f) * 2f - 1f;
+            float noiseY = Mathf.PerlinNoise(0f, elapsed * shakeFrequency) * 2f - 1f;
+            float noiseZ = Mathf.PerlinNoise(elapsed * shakeFrequency, elapsed * shakeFrequency) * 2f - 1f;
+
+            target.localPosition = startLocalPos + new Vector3(noiseX, noiseY * 0.5f, noiseZ) * shakePositionAmplitude;
+            target.localRotation = startLocalRot * Quaternion.Euler(noiseY * shakeRotationAmplitude, noiseX * shakeRotationAmplitude, noiseZ * shakeRotationAmplitude);
+            yield return null;
+        }
+
+        target.localPosition = startLocalPos;
+        target.localRotation = startLocalRot;
     }
 }
