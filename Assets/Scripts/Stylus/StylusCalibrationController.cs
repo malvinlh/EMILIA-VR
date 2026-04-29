@@ -96,12 +96,17 @@ public class StylusCalibrationController : MonoBehaviour
     // PRESCRIBED POSE INSTRUCTIONS  (length must match samplesRequired)
     // ================================================================
 
-    private static readonly string[] PoseInstructions =
+    private string GetPoseInstruction(int poseIndex)
     {
-        "Hold pen flat on sphere,\nwrist neutral.",
-        "Tilt wrist DOWN ~30°,\nhold pen on sphere.",
-        "Tilt wrist SIDEWAYS ~30°,\nhold pen on sphere.",
-    };
+        string penHand = stylusHand == Handedness.Right ? "right" : "left";
+        switch (poseIndex)
+        {
+            case 0:  return $"Hold pen flat on sphere,\n{penHand} (pen) wrist neutral.";
+            case 1:  return $"Tilt your {penHand} (pen) wrist DOWN ~30°,\nhold pen on sphere.";
+            case 2:  return $"Tilt your {penHand} (pen) wrist SIDEWAYS ~30°,\nhold pen on sphere.";
+            default: return "Hold pen on sphere and pinch to capture.";
+        }
+    }
 
     // ================================================================
     // STATE
@@ -389,8 +394,8 @@ public class StylusCalibrationController : MonoBehaviour
         string hand = OppositeHand() == Handedness.Left ? "left" : "right";
 
         // Pick the instruction for the NEXT pose to capture.
-        int poseIdx = Mathf.Clamp(have, 0, PoseInstructions.Length - 1);
-        string poseText = PoseInstructions[poseIdx];
+        int poseIdx = Mathf.Clamp(have, 0, samplesRequired - 1);
+        string poseText = GetPoseInstruction(poseIdx);
 
         SetInstruction($"{poseText}\n" +
                        $"Pinch {hand} thumb + middle to capture.\n" +
