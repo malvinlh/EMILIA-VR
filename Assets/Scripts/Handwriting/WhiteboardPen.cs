@@ -58,7 +58,7 @@ public class WhiteboardPen : MonoBehaviour
 
     // Extra depth allowed AFTER contact (meters)
     [Tooltip("Extra depth allowed after the finger has contacted the board.")]
-    public float touchTolerance = 0.008f;
+    public float touchTolerance = 0.004f;
 
     [Header("Stability Profile")]
     [Tooltip("Apply recommended runtime minimums for contact continuity and recognition cadence.")]
@@ -67,7 +67,7 @@ public class WhiteboardPen : MonoBehaviour
     [Header("Contact Stability")]
     [Tooltip("Consecutive no-contact frames required before a stroke is considered lifted.")]
     [Range(1, 6)]
-    public int contactLossFramesToEndStroke = 2;
+    public int contactLossFramesToEndStroke = 1;
 
     [Tooltip("Grace window (seconds) to keep contact alive when hand tracking drops briefly.")]
     [Range(0f, 0.2f)]

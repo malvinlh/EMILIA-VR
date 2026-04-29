@@ -275,8 +275,8 @@ MonoBehaviour:
     y: 0
     width: 703
     height: 933
-  m_MinSize: {x: 275, y: 50}
-  m_MaxSize: {x: 4000, y: 4000}
+  m_MinSize: {x: 276, y: 76}
+  m_MaxSize: {x: 4001, y: 4026}
   m_ActualView: {fileID: 21}
   m_Panes:
   - {fileID: 21}
@@ -305,7 +305,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 43
+    y: 0
     width: 1920
     height: 36
   m_SerializedDataModeController:
@@ -674,7 +674,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 79
+    y: 24
     width: 537
     height: 683
   m_SerializedDataModeController:
@@ -692,11 +692,10 @@ MonoBehaviour:
     m_DynamicPanelBehavior: 0
   m_SceneHierarchy:
     m_TreeViewState:
-      scrollPos: {x: 0, y: 26}
-      m_SelectedIDs:
-      - m_Data: 664662
+      scrollPos: {x: 0, y: 0}
+      m_SelectedIDs: []
       m_LastClickedID:
-        m_Data: 664662
+        m_Data: 0
       m_ExpandedIDs:
       - m_Data: -375182
       - m_Data: -365160
@@ -768,8 +767,8 @@ MonoBehaviour:
       - m_Data: 649544
       m_RenameOverlay:
         m_UserAcceptedRename: 0
-        m_Name: ChairPC
-        m_OriginalName: ChairPC
+        m_Name: 
+        m_OriginalName: 
         m_EditFieldRect:
           serializedVersion: 2
           x: 0
@@ -777,10 +776,10 @@ MonoBehaviour:
           width: 0
           height: 0
         m_UserData:
-          m_Data: 638404
+          m_Data: 0
         m_IsWaitingForDelay: 0
         m_IsRenaming: 0
-        m_OriginalEventType: 0
+        m_OriginalEventType: 11
         m_IsRenamingFilename: 0
         m_TrimLeadingAndTrailingWhitespace: 0
         m_ClientGUIView: {fileID: 8}
@@ -812,8 +811,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Scene\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 538
-    y: 79
+    x: 539
+    y: 24
     width: 677
     height: 683
   m_SerializedDataModeController:
@@ -1534,7 +1533,7 @@ MonoBehaviour:
   m_Rotation:
     m_Target: {x: 0.0011674544, y: 0.9285907, z: -0.37132818, w: 0.0018271968}
     speed: 2
-    m_Value: {x: 0.00061040913, y: 0.9285135, z: -0.37129796, w: 0.0004342722}
+    m_Value: {x: 0.0011674544, y: 0.9285907, z: -0.37132818, w: 0.0018271968}
   m_Size:
     m_Target: 1.061675
     speed: 2
@@ -1753,32 +1752,33 @@ MonoBehaviour:
       m_Data: 68114
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 84720
-    - m_Data: 84722
-    - m_Data: 84724
-    - m_Data: 84726
-    - m_Data: 84728
-    - m_Data: 84730
-    - m_Data: 84732
-    - m_Data: 84734
-    - m_Data: 84736
-    - m_Data: 84738
-    - m_Data: 84740
-    - m_Data: 84742
-    - m_Data: 84744
-    - m_Data: 84746
-    - m_Data: 84748
-    - m_Data: 84750
-    - m_Data: 84752
-    - m_Data: 84754
-    - m_Data: 84756
-    - m_Data: 84758
-    - m_Data: 84760
-    - m_Data: 84762
-    - m_Data: 84764
-    - m_Data: 84766
-    - m_Data: 84768
-    - m_Data: 84770
+    - m_Data: 83118
+    - m_Data: 83120
+    - m_Data: 83122
+    - m_Data: 83124
+    - m_Data: 83126
+    - m_Data: 83128
+    - m_Data: 83130
+    - m_Data: 83132
+    - m_Data: 83134
+    - m_Data: 83136
+    - m_Data: 83138
+    - m_Data: 83140
+    - m_Data: 83142
+    - m_Data: 83144
+    - m_Data: 83146
+    - m_Data: 83148
+    - m_Data: 83150
+    - m_Data: 83152
+    - m_Data: 83154
+    - m_Data: 83156
+    - m_Data: 83158
+    - m_Data: 83160
+    - m_Data: 83162
+    - m_Data: 83164
+    - m_Data: 83166
+    - m_Data: 83168
+    - m_Data: 83170
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1811,32 +1811,33 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 84720
-    - m_Data: 84722
-    - m_Data: 84724
-    - m_Data: 84726
-    - m_Data: 84728
-    - m_Data: 84730
-    - m_Data: 84732
-    - m_Data: 84734
-    - m_Data: 84736
-    - m_Data: 84738
-    - m_Data: 84740
-    - m_Data: 84742
-    - m_Data: 84744
-    - m_Data: 84746
-    - m_Data: 84748
-    - m_Data: 84750
-    - m_Data: 84752
-    - m_Data: 84754
-    - m_Data: 84756
-    - m_Data: 84758
-    - m_Data: 84760
-    - m_Data: 84762
-    - m_Data: 84764
-    - m_Data: 84766
-    - m_Data: 84768
-    - m_Data: 84770
+    - m_Data: 83118
+    - m_Data: 83120
+    - m_Data: 83122
+    - m_Data: 83124
+    - m_Data: 83126
+    - m_Data: 83128
+    - m_Data: 83130
+    - m_Data: 83132
+    - m_Data: 83134
+    - m_Data: 83136
+    - m_Data: 83138
+    - m_Data: 83140
+    - m_Data: 83142
+    - m_Data: 83144
+    - m_Data: 83146
+    - m_Data: 83148
+    - m_Data: 83150
+    - m_Data: 83152
+    - m_Data: 83154
+    - m_Data: 83156
+    - m_Data: 83158
+    - m_Data: 83160
+    - m_Data: 83162
+    - m_Data: 83164
+    - m_Data: 83166
+    - m_Data: 83168
+    - m_Data: 83170
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1926,7 +1927,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 788
+    y: 733
     width: 1216
     height: 198
   m_SerializedDataModeController:
@@ -1977,35 +1978,33 @@ MonoBehaviour:
       m_Data: 84754
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 84720
-    - m_Data: 84722
-    - m_Data: 84724
-    - m_Data: 84726
-    - m_Data: 84728
-    - m_Data: 84730
-    - m_Data: 84732
-    - m_Data: 84734
-    - m_Data: 84736
-    - m_Data: 84738
-    - m_Data: 84740
-    - m_Data: 84742
-    - m_Data: 84744
-    - m_Data: 84746
-    - m_Data: 84748
-    - m_Data: 84750
-    - m_Data: 84752
-    - m_Data: 84754
-    - m_Data: 84756
-    - m_Data: 84758
-    - m_Data: 84760
-    - m_Data: 84762
-    - m_Data: 84764
-    - m_Data: 84766
-    - m_Data: 84768
-    - m_Data: 84770
-    - m_Data: 85266
-    - m_Data: 85294
-    - m_Data: 1000000000
+    - m_Data: 83118
+    - m_Data: 83120
+    - m_Data: 83122
+    - m_Data: 83124
+    - m_Data: 83126
+    - m_Data: 83128
+    - m_Data: 83130
+    - m_Data: 83132
+    - m_Data: 83134
+    - m_Data: 83136
+    - m_Data: 83138
+    - m_Data: 83140
+    - m_Data: 83142
+    - m_Data: 83144
+    - m_Data: 83146
+    - m_Data: 83148
+    - m_Data: 83150
+    - m_Data: 83152
+    - m_Data: 83154
+    - m_Data: 83156
+    - m_Data: 83158
+    - m_Data: 83160
+    - m_Data: 83162
+    - m_Data: 83164
+    - m_Data: 83166
+    - m_Data: 83168
+    - m_Data: 83170
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2038,32 +2037,33 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 84720
-    - m_Data: 84722
-    - m_Data: 84724
-    - m_Data: 84726
-    - m_Data: 84728
-    - m_Data: 84730
-    - m_Data: 84732
-    - m_Data: 84734
-    - m_Data: 84736
-    - m_Data: 84738
-    - m_Data: 84740
-    - m_Data: 84742
-    - m_Data: 84744
-    - m_Data: 84746
-    - m_Data: 84748
-    - m_Data: 84750
-    - m_Data: 84752
-    - m_Data: 84754
-    - m_Data: 84756
-    - m_Data: 84758
-    - m_Data: 84760
-    - m_Data: 84762
-    - m_Data: 84764
-    - m_Data: 84766
-    - m_Data: 84768
-    - m_Data: 84770
+    - m_Data: 83118
+    - m_Data: 83120
+    - m_Data: 83122
+    - m_Data: 83124
+    - m_Data: 83126
+    - m_Data: 83128
+    - m_Data: 83130
+    - m_Data: 83132
+    - m_Data: 83134
+    - m_Data: 83136
+    - m_Data: 83138
+    - m_Data: 83140
+    - m_Data: 83142
+    - m_Data: 83144
+    - m_Data: 83146
+    - m_Data: 83148
+    - m_Data: 83150
+    - m_Data: 83152
+    - m_Data: 83154
+    - m_Data: 83156
+    - m_Data: 83158
+    - m_Data: 83160
+    - m_Data: 83162
+    - m_Data: 83164
+    - m_Data: 83166
+    - m_Data: 83168
+    - m_Data: 83170
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2204,34 +2204,33 @@ MonoBehaviour:
       m_Data: 84754
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 84720
-    - m_Data: 84722
-    - m_Data: 84724
-    - m_Data: 84726
-    - m_Data: 84728
-    - m_Data: 84730
-    - m_Data: 84732
-    - m_Data: 84734
-    - m_Data: 84736
-    - m_Data: 84738
-    - m_Data: 84740
-    - m_Data: 84742
-    - m_Data: 84744
-    - m_Data: 84746
-    - m_Data: 84748
-    - m_Data: 84750
-    - m_Data: 84752
-    - m_Data: 84754
-    - m_Data: 84756
-    - m_Data: 84758
-    - m_Data: 84760
-    - m_Data: 84762
-    - m_Data: 84764
-    - m_Data: 84766
-    - m_Data: 84768
-    - m_Data: 84770
-    - m_Data: 85266
-    - m_Data: 1000000000
+    - m_Data: 83118
+    - m_Data: 83120
+    - m_Data: 83122
+    - m_Data: 83124
+    - m_Data: 83126
+    - m_Data: 83128
+    - m_Data: 83130
+    - m_Data: 83132
+    - m_Data: 83134
+    - m_Data: 83136
+    - m_Data: 83138
+    - m_Data: 83140
+    - m_Data: 83142
+    - m_Data: 83144
+    - m_Data: 83146
+    - m_Data: 83148
+    - m_Data: 83150
+    - m_Data: 83152
+    - m_Data: 83154
+    - m_Data: 83156
+    - m_Data: 83158
+    - m_Data: 83160
+    - m_Data: 83162
+    - m_Data: 83164
+    - m_Data: 83166
+    - m_Data: 83168
+    - m_Data: 83170
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2264,32 +2263,33 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 84720
-    - m_Data: 84722
-    - m_Data: 84724
-    - m_Data: 84726
-    - m_Data: 84728
-    - m_Data: 84730
-    - m_Data: 84732
-    - m_Data: 84734
-    - m_Data: 84736
-    - m_Data: 84738
-    - m_Data: 84740
-    - m_Data: 84742
-    - m_Data: 84744
-    - m_Data: 84746
-    - m_Data: 84748
-    - m_Data: 84750
-    - m_Data: 84752
-    - m_Data: 84754
-    - m_Data: 84756
-    - m_Data: 84758
-    - m_Data: 84760
-    - m_Data: 84762
-    - m_Data: 84764
-    - m_Data: 84766
-    - m_Data: 84768
-    - m_Data: 84770
+    - m_Data: 83118
+    - m_Data: 83120
+    - m_Data: 83122
+    - m_Data: 83124
+    - m_Data: 83126
+    - m_Data: 83128
+    - m_Data: 83130
+    - m_Data: 83132
+    - m_Data: 83134
+    - m_Data: 83136
+    - m_Data: 83138
+    - m_Data: 83140
+    - m_Data: 83142
+    - m_Data: 83144
+    - m_Data: 83146
+    - m_Data: 83148
+    - m_Data: 83150
+    - m_Data: 83152
+    - m_Data: 83154
+    - m_Data: 83156
+    - m_Data: 83158
+    - m_Data: 83160
+    - m_Data: 83162
+    - m_Data: 83164
+    - m_Data: 83166
+    - m_Data: 83168
+    - m_Data: 83170
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2322,8 +2322,8 @@ MonoBehaviour:
     m_ExpandedInstanceIDs: []
     m_RenameOverlay:
       m_UserAcceptedRename: 0
-      m_Name: 3D_Journal_Beach
-      m_OriginalName: 3D_Journal_Beach
+      m_Name: 
+      m_OriginalName: 
       m_EditFieldRect:
         serializedVersion: 2
         x: 0
@@ -2331,10 +2331,10 @@ MonoBehaviour:
         width: 0
         height: 0
       m_UserData:
-        m_Data: 88984
+        m_Data: 0
       m_IsWaitingForDelay: 0
       m_IsRenaming: 0
-      m_OriginalEventType: 0
+      m_OriginalEventType: 11
       m_IsRenamingFilename: 1
       m_TrimLeadingAndTrailingWhitespace: 0
       m_ClientGUIView: {fileID: 10}
@@ -2408,8 +2408,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Inspector\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 1217
-    y: 79
+    x: 1218
+    y: 24
     width: 702
     height: 907
   m_SerializedDataModeController:
@@ -2478,4 +2478,4 @@ MonoBehaviour:
     m_DynamicPanelBehavior: 0
   m_LockTracker:
     m_IsLocked: 0
-  m_LastSelectedObjectID: 647008
+  m_LastSelectedObjectID: 0

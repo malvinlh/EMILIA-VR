@@ -29,6 +29,10 @@ public class StylusTipProvider : MonoBehaviour
     [Tooltip("When the tip is within this distance (metres) of the writing plane, " +
              "begin blending it toward the plane. Replaces per-pixel depth.")]
     public float planeSnapDistance = 0.01f;
+    [Tooltip("Upward speed (m/s) at which the snap force fully releases. " +
+             "Lifts faster than this feel instant; slower lifts still feel snapped. " +
+             "Jitter floor is ~0.01–0.02 m/s, so 0.05 is safe.")]
+    public float liftBreakawaySpeed = 0.05f;
 
     // ── Output ───────────────────────────────────────────────────────
     public Vector3? TipWorldPosition { get; private set; }
@@ -47,6 +51,10 @@ public class StylusTipProvider : MonoBehaviour
     private OneEuroFilter filterY;
     private OneEuroFilter filterZ;
     private float lastSampleTime;
+
+    // ── Lift tracking (asymmetric snap) ─────────────────────────────
+    private Vector3 lastSmoothed;
+    private bool hasLastSmoothed;
 
     private void Awake()
     {
@@ -108,8 +116,12 @@ public class StylusTipProvider : MonoBehaviour
 
         // ── Smoothing (One Euro, per axis) ───────────────────────────
         float now = Time.time;
+        float dt = Mathf.Max(now - lastSampleTime, 1e-4f);
         if (now - lastSampleTime > smoothingIdleResetSeconds)
+        {
             BuildFilters();
+            hasLastSmoothed = false;
+        }
         lastSampleTime = now;
 
         Vector3 smoothed = new Vector3(
@@ -117,20 +129,43 @@ public class StylusTipProvider : MonoBehaviour
             filterY.Filter(wristPos.y, now),
             filterZ.Filter(wristPos.z, now));
 
-        // ── Writing plane snap ───────────────────────────────────────
-        // Within planeSnapDistance of the surface, lerp the tip onto the plane.
-        // Blend factor: 0 at the outer edge, 1 when right on the plane (smooth,
-        // no discontinuity). This corrects Z drift without hard-snapping.
+        // ── Writing plane snap (asymmetric) ─────────────────────────
+        // Snap pulls the tip toward the plane when within planeSnapDistance,
+        // but releases when the user is actively lifting — so a natural 3–5 mm
+        // pen-up immediately clears the snap rather than fighting it.
+        //
+        // liftBlend = 1 when stationary or descending, 0 when lifting faster
+        // than liftBreakawaySpeed. Combined with the distance blend this means:
+        //   • Writing / pressing down: full snap, Z drift corrected.
+        //   • Lifting slowly (jitter): snap mostly holds.
+        //   • Lifting deliberately (pen-up): snap releases instantly.
         if (HasWritingPlane)
         {
             float signedDist = WritingPlane.GetDistanceToPoint(smoothed);
             float absDist = Mathf.Abs(signedDist);
             if (absDist < planeSnapDistance)
             {
-                float blend = 1f - (absDist / planeSnapDistance); // 0..1
+                float distBlend = 1f - (absDist / planeSnapDistance);
+
+                // Compute upward speed relative to the plane normal.
+                float liftSpeed = 0f;
+                if (hasLastSmoothed)
+                {
+                    Vector3 velocity = (smoothed - lastSmoothed) / dt;
+                    liftSpeed = Vector3.Dot(velocity, WritingPlane.normal);
+                }
+                // liftBlend → 0 as liftSpeed → liftBreakawaySpeed
+                float liftBlend = liftBreakawaySpeed > 0f
+                    ? 1f - Mathf.Clamp01(liftSpeed / liftBreakawaySpeed)
+                    : 1f;
+
+                float blend = distBlend * liftBlend;
                 smoothed -= WritingPlane.normal * (signedDist * blend);
             }
         }
+
+        lastSmoothed = smoothed;
+        hasLastSmoothed = true;
 
         TipWorldPosition = smoothed;
         Confidence = wristConf;

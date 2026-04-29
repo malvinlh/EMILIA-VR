@@ -345,7 +345,9 @@ public class JournalSessionManager : MonoBehaviour
             stylusCalibrationController.Cleanup();
         }
 
-        Debug.Log("[JournalSession] Transitioning from StylusCalibration to TablePlacement.");
+        var stylusRecord = StylusCalibrationStore.Load();
+        Debug.Log($"[JournalSession] Transitioning to TablePlacement. " +
+                  $"StylusRMS={(stylusRecord != null ? $"{stylusRecord.rmsResidualMeters * 1000f:F1} mm" : "n/a")}");
         EnterTablePlacement();
     }
 
@@ -371,7 +373,7 @@ public class JournalSessionManager : MonoBehaviour
         tableTapCalibrator.OnTableConfirmed += OnTableConfirmed;
         tableTapCalibrator.BeginCalibration();
 
-        ShowInstruction("Tap the four corners of your writing area:\nnear-left, near-right, far-right, far-left.");
+        ShowInstruction("Tap the near-left corner of your writing area,\nthen drag to the far-right corner.");
     }
 
     private void OnTableConfirmed(TableTapCalibrator.DetectedTable table)

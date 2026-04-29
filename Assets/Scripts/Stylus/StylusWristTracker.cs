@@ -294,6 +294,75 @@ public class StylusWristTracker : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Run the closed-form solve on the current accumulator without committing the result.
+    /// Returns false if fewer than 2 samples are present.
+    /// Also returns the maximum pairwise rotational diversity across captured wrist poses.
+    /// </summary>
+    public bool PreviewSolve(out float rmsResidualMeters, out float diversityDeg)
+    {
+        rmsResidualMeters = 0f;
+        diversityDeg = 0f;
+        if (samples.Count < 2) return false;
+
+        Vector3 sum = Vector3.zero;
+        for (int i = 0; i < samples.Count; i++)
+        {
+            var s = samples[i];
+            sum += Quaternion.Inverse(s.wristRot) * (s.targetWorldPos - s.wristPos);
+        }
+        Vector3 offset = sum / samples.Count;
+
+        float sumSq = 0f;
+        for (int i = 0; i < samples.Count; i++)
+        {
+            var s = samples[i];
+            Vector3 predicted = s.wristPos + s.wristRot * offset;
+            sumSq += (predicted - s.targetWorldPos).sqrMagnitude;
+        }
+        rmsResidualMeters = Mathf.Sqrt(sumSq / samples.Count);
+        diversityDeg = ComputeRotationalDiversity();
+        return true;
+    }
+
+    /// <summary>
+    /// Compute the current pen-tip world position using the mean of accumulated
+    /// samples as a preview offset (without committing). Returns false if fewer
+    /// than 2 samples are present or the wrist is not tracked.
+    /// </summary>
+    public bool TryGetPreviewTipPosition(out Vector3 tipWorld)
+    {
+        tipWorld = Vector3.zero;
+        if (samples.Count < 2) return false;
+        if (!TryGetWristPose(out Vector3 wristPos, out Quaternion wristRot)) return false;
+
+        Vector3 sum = Vector3.zero;
+        for (int i = 0; i < samples.Count; i++)
+        {
+            var s = samples[i];
+            sum += Quaternion.Inverse(s.wristRot) * (s.targetWorldPos - s.wristPos);
+        }
+        tipWorld = wristPos + wristRot * (sum / samples.Count);
+        return true;
+    }
+
+    /// <summary>
+    /// Maximum pairwise angular distance (degrees) across all captured wrist
+    /// orientations. Low values mean all samples were taken at the same wrist
+    /// angle — the solve is poorly conditioned.
+    /// </summary>
+    public float ComputeRotationalDiversity()
+    {
+        float maxAngle = 0f;
+        for (int i = 0; i < samples.Count - 1; i++)
+            for (int j = i + 1; j < samples.Count; j++)
+            {
+                float a = Quaternion.Angle(samples[i].wristRot, samples[j].wristRot);
+                if (a > maxAngle) maxAngle = a;
+            }
+        return maxAngle;
+    }
+
     private void ResolveCameraOffsetTransform()
     {
         var xrOriginComp = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();

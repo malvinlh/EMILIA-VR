@@ -5,32 +5,30 @@ using UnityEngine.XR.Hands;
 using TMPro;
 
 /// <summary>
-/// Interactive table calibration via 4-tap rectangle. The already-calibrated
-/// DIY stylus is used to physically tap the four corners of the writing area.
-/// Surface Y, yaw, center, and size are all derived from the taps themselves —
-/// no AR plane detection, no palm-flat gesture, no height-bias fudge factors.
+/// Interactive table calibration — 1 tap + 1 diagonal drag protocol.
 ///
-/// Why this replaces the old ARPlaneManager + palm-flat flow:
-///   • ARPlaneManager is slow (3–10 s indoors) and unreliable on Quest 3
-///     without MRUK, which we cannot install.
-///   • Palm-flat detection reports a Y that is 12–30 mm above the surface
-///     because the palm joint sits above the hand, requiring height-bias
-///     fields that drift between users.
-///   • A tap places the pen tip AT the surface, so the Y we record is the
-///     actual contact Y. Four taps also let us fit yaw and flag unevenness.
+/// Replaces the previous 4-tap rectangle flow with a faster two-gesture sequence:
+///   1. TAP: the user taps the near-left corner of the writing area (dwell + optional
+///      pinch), which locks the surface Y.  A cyan tip-indicator confirms the pen is
+///      on-surface; a faint horizontal ring brightens as the pen approaches surface Y.
+///   2. DRAG: the user slides the pen from the tapped corner diagonally across the
+///      table to the far-right corner.  The drag path is recorded as a polyline at
+///      ~50 Hz.  Dragging ends when the pen lifts &gt; <see cref="dragLiftThresholdM"/>
+///      above surface Y for &gt; <see cref="dragLiftDurationSec"/> seconds.
+///   3. CONFIRM: existing Confirm / Redo buttons appear above the preview rectangle.
 ///
-/// Tap trigger: the stylus tip must be (a) stationary (velocity below
-/// <see cref="tapStillnessVelocity"/>) for <see cref="tapDwellSeconds"/>, and
-/// (b) at a Y consistent with prior taps (within ±<see cref="tapYConsensus"/>)
-/// once at least one tap has been recorded. A brief cooldown after each
-/// capture prevents the same contact registering twice.
+/// Solver (from drag data):
+///   • surfaceY   = first-tap Y (single dwell tap = sub-mm accuracy).
+///   • forward    = direction from first to last drag point (projected to XZ).
+///   • depth      = drag length along the forward axis.
+///   • width      = max perpendicular span of the polyline × 2 when the user
+///                  curves &gt; 3 cm; otherwise depth × defaultTableAspect.x / y.
+///   • centre     = drag centroid at surface Y, offset by half-perpendicular span.
 ///
-/// Optional hardening: when <see cref="requirePinchToCapture"/> is enabled,
-/// the dwell-ready tap is only captured on a pinch rising edge. This reduces
-/// accidental air-dwell captures by requiring explicit user intent.
-///
-/// After all 4 taps land, a Confirm and Redo button float above the rectangle
-/// preview. Either hand's index tip can poke them.
+/// After the solver fires, the 4 computed corners are fed into UpdatePreviewRectangle
+/// so the existing rectangle visualisation works unchanged.  The DetectedTable struct
+/// is identical to what the original 4-tap flow produced, so JournalSessionManager
+/// needs no changes.
 /// </summary>
 public class TableTapCalibrator : MonoBehaviour
 {
@@ -42,15 +40,13 @@ public class TableTapCalibrator : MonoBehaviour
     public StylusTipProvider stylusTipProvider;
     public PassthroughManager passthroughManager;
 
-    [Header("Tap Detection")]
+    [Header("Tap Detection (first corner)")]
     [Tooltip("Stylus tip linear speed (m/s) below which stillness counts toward the dwell timer.")]
     public float tapStillnessVelocity = 0.03f;
     [Tooltip("How long (seconds) the tip must remain stationary to register a tap.")]
     public float tapDwellSeconds = 0.22f;
-    [Tooltip("Cooldown (seconds) after a tap before another can register.")]
-    public float tapCooldownSeconds = 0.55f;
-    [Tooltip("Vertical tolerance (metres) between consecutive taps. A tap farther than this from the running mean Y is rejected (likely mid-air dwell).")]
-    public float tapYConsensus = 0.025f;
+    [Tooltip("Cooldown (seconds) after a tap before drag recording can begin.")]
+    public float tapCooldownSeconds = 0.30f;
 
     [Header("Tap Confirmation")]
     [Tooltip("When enabled, a dwell-ready tap is only captured when a pinch edge is detected.")]
@@ -58,15 +54,28 @@ public class TableTapCalibrator : MonoBehaviour
     [Tooltip("Which hand can trigger pinch capture.")]
     public PinchCaptureHandMode pinchCaptureHand = PinchCaptureHandMode.OppositeStylusHand;
     [Tooltip("Thumb-to-middle distance (metres) below which pinch is considered active.")]
-    public float pinchThreshold = 0.025f;
+    public float pinchThreshold = PinchConstants.Default;
+
+    [Header("Drag Detection")]
+    [Tooltip("How far above surface Y (metres) the tip must rise to count as a 'lift'.")]
+    public float dragLiftThresholdM = 0.010f;
+    [Tooltip("How long (seconds) the pen must be lifted to end the drag.")]
+    public float dragLiftDurationSec = 0.30f;
+    [Tooltip("Interval (seconds) between drag polyline samples (~50 Hz).")]
+    public float dragRecordIntervalSec = 0.020f;
+    [Tooltip("Minimum drag path length (metres) before a lift can end the drag.")]
+    public float minDragLengthM = 0.080f;
+    [Tooltip("Minimum perpendicular deviation (metres) of the drag path before using " +
+             "measured width rather than the aspect-ratio fallback.")]
+    public float minWidthDeviationM = 0.030f;
+    [Tooltip("Default width-to-depth aspect ratio used when the drag path is straight.")]
+    public Vector2 defaultTableAspect = new Vector2(3f, 2f);
 
     [Header("Rectangle Constraints")]
     [Tooltip("Minimum writing rectangle size in metres (width, depth).")]
     public Vector2 minSize = new Vector2(0.30f, 0.20f);
     [Tooltip("Maximum writing rectangle size in metres (width, depth).")]
     public Vector2 maxSize = new Vector2(1.20f, 0.80f);
-    [Tooltip("If the tap Y values span more than this (metres), a warning is shown — the user likely tapped on an object.")]
-    public float unevenWarnSpan = 0.015f;
 
     [Header("Confirm / Redo Buttons")]
     [Tooltip("Height above the rectangle centre where the buttons float.")]
@@ -81,7 +90,7 @@ public class TableTapCalibrator : MonoBehaviour
     [Header("Visuals")]
     [Tooltip("Radius of the pen-tip indicator ring (metres).")]
     public float tipIndicatorRadius = 0.012f;
-    [Tooltip("Radius of an X-marker dropped at each confirmed tap (metres).")]
+    [Tooltip("Radius of the X-marker dropped at the confirmed tap (metres).")]
     public float tapMarkerRadius = 0.010f;
 
     [Header("Instruction Text")]
@@ -103,10 +112,8 @@ public class TableTapCalibrator : MonoBehaviour
     // ================================================================
 
     /// <summary>
-    /// Shape-compatible with the legacy ARTableDetector.DetectedTable so the
+    /// Shape-compatible with the legacy ARTableDetector.DetectedTable so
     /// JournalSessionManager downstream code can consume it unchanged.
-    /// avgTapSurfaceY replaces avgPalmSurfaceY (semantic rename: direct tap Y,
-    /// no palm-thickness offset needed).
     /// </summary>
     public struct DetectedTable
     {
@@ -127,20 +134,15 @@ public class TableTapCalibrator : MonoBehaviour
         Either
     }
 
-    private enum Phase { Inactive, Tapping, AwaitingConfirm }
+    private enum Phase { Inactive, FirstTap, Dragging, AwaitingConfirm }
 
     // ================================================================
     // STATE
     // ================================================================
 
     private Phase phase = Phase.Inactive;
-    private readonly List<Vector3> taps = new List<Vector3>(4);
-    private const int RequiredTaps = 4;
-    private static readonly string[] TapLabels =
-    {
-        "near-left", "near-right", "far-right", "far-left"
-    };
 
+    // First-tap state
     private float dwellAccum;
     private float lastTapTime = -999f;
     private bool hasLastTip;
@@ -148,10 +150,20 @@ public class TableTapCalibrator : MonoBehaviour
     private float lastTipTime;
     private bool wasLeftPinched;
     private bool wasRightPinched;
+    private Vector3 firstTapPos;
 
+    // Drag state
+    private readonly List<Vector3> dragPolyline = new List<Vector3>(256);
+    private float surfaceYLocked;
+    private float dragLiftAccum;
+    private float lastDragRecordTime;
+    private float dragPathLength;
+
+    // Confirm state
     private float awaitConfirmEnterTime;
+    private DetectedTable computedTable;
 
-    // Eye-Y accumulator (averaged across the whole session for comfort calibration).
+    // Eye-Y accumulator
     private float eyeYAccum;
     private int eyeYSamples;
 
@@ -164,11 +176,14 @@ public class TableTapCalibrator : MonoBehaviour
     private GameObject tipIndicator;
     private Material tipIndicatorMat;
 
-    private readonly List<GameObject> tapMarkers = new List<GameObject>(4);
+    private GameObject tapMarker;
     private Material tapMarkerMat;
 
     private LineRenderer previewRectangle;
     private GameObject previewRectangleObj;
+
+    private LineRenderer dragPathRenderer;
+    private GameObject dragPathObj;
 
     private GameObject confirmButton;
     private Material confirmButtonMat;
@@ -185,14 +200,15 @@ public class TableTapCalibrator : MonoBehaviour
 
     private XRHandSubsystem handSubsystem;
 
-    private static readonly Color ColorTipIdle = new Color(0.20f, 0.90f, 0.30f, 0.85f);
-    private static readonly Color ColorTipDwelling = new Color(1.00f, 0.95f, 0.25f, 0.95f);
-    private static readonly Color ColorTapMarker = new Color(0.30f, 0.85f, 1.00f, 0.95f);
-    private static readonly Color ColorPreview = new Color(0.30f, 0.85f, 1.00f, 0.85f);
-    private static readonly Color ColorPreviewUneven = new Color(1.00f, 0.55f, 0.20f, 0.90f);
-    private static readonly Color ColorConfirm = new Color(0.20f, 0.80f, 0.30f, 0.95f);
-    private static readonly Color ColorRedo = new Color(0.85f, 0.40f, 0.40f, 0.95f);
-    private static readonly Color ColorBtnDisabled = new Color(0.40f, 0.40f, 0.45f, 0.60f);
+    private static readonly Color ColorTipIdle      = new Color(0.20f, 0.90f, 0.30f, 0.85f);
+    private static readonly Color ColorTipDwelling  = new Color(1.00f, 0.95f, 0.25f, 0.95f);
+    private static readonly Color ColorTipOnSurface = new Color(0.20f, 0.95f, 0.95f, 0.95f); // cyan = on surface during drag
+    private static readonly Color ColorTapMarker    = new Color(0.30f, 0.85f, 1.00f, 0.95f);
+    private static readonly Color ColorPreview      = new Color(0.30f, 0.85f, 1.00f, 0.85f);
+    private static readonly Color ColorDragPath     = new Color(0.20f, 0.95f, 0.95f, 0.70f);
+    private static readonly Color ColorConfirm      = new Color(0.20f, 0.80f, 0.30f, 0.95f);
+    private static readonly Color ColorRedo         = new Color(0.85f, 0.40f, 0.40f, 0.95f);
+    private static readonly Color ColorBtnDisabled  = new Color(0.40f, 0.40f, 0.45f, 0.60f);
 
     // ================================================================
     // PUBLIC API
@@ -205,34 +221,40 @@ public class TableTapCalibrator : MonoBehaviour
 
         EnsureVisuals();
 
-        phase = Phase.Tapping;
-        taps.Clear();
+        phase = Phase.FirstTap;
         dwellAccum = 0f;
         lastTapTime = -999f;
         hasLastTip = false;
         wasLeftPinched = false;
         wasRightPinched = false;
+        dragPolyline.Clear();
+        dragPathLength = 0f;
+        dragLiftAccum = 0f;
+        lastDragRecordTime = -999f;
         eyeYAccum = 0f;
         eyeYSamples = 0;
 
-        ClearTapMarkers();
+        ClearTapMarker();
         HidePreviewRectangle();
+        HideDragPath();
         if (confirmButton != null) confirmButton.SetActive(false);
-        if (redoButton != null)    redoButton.SetActive(false);
+        if (redoButton    != null) redoButton.SetActive(false);
 
-        SetInstructionForTap();
-        if (logEvents) Debug.Log("[TableTapCalibrator] BeginCalibration — waiting for 4 taps.");
+        SetInstruction("Tap the near-left corner of your writing area.\nHold still" +
+                       (requirePinchToCapture ? ", then pinch to capture." : " to capture."));
+        if (logEvents) Debug.Log("[TableTapCalibrator] BeginCalibration — waiting for first tap + drag.");
     }
 
     public void Cleanup()
     {
         phase = Phase.Inactive;
-        if (tipIndicator     != null) tipIndicator.SetActive(false);
-        if (confirmButton    != null) confirmButton.SetActive(false);
-        if (redoButton       != null) redoButton.SetActive(false);
-        if (instructionObj   != null) instructionObj.SetActive(false);
+        if (tipIndicator        != null) tipIndicator.SetActive(false);
+        if (confirmButton       != null) confirmButton.SetActive(false);
+        if (redoButton          != null) redoButton.SetActive(false);
+        if (instructionObj      != null) instructionObj.SetActive(false);
         if (previewRectangleObj != null) previewRectangleObj.SetActive(false);
-        foreach (var m in tapMarkers) if (m != null) m.SetActive(false);
+        if (dragPathObj         != null) dragPathObj.SetActive(false);
+        if (tapMarker           != null) tapMarker.SetActive(false);
     }
 
     public void ResetState() => BeginCalibration();
@@ -245,7 +267,6 @@ public class TableTapCalibrator : MonoBehaviour
     {
         if (phase == Phase.Inactive) return;
 
-        // Sample eye Y continuously for calibration (small cost).
         Camera cam = Camera.main;
         if (cam != null)
         {
@@ -253,10 +274,12 @@ public class TableTapCalibrator : MonoBehaviour
             eyeYSamples++;
         }
 
-        if (phase == Phase.Tapping)
-            UpdateTappingPhase();
-        else if (phase == Phase.AwaitingConfirm)
-            UpdateAwaitingConfirm();
+        switch (phase)
+        {
+            case Phase.FirstTap:       UpdateFirstTapPhase();   break;
+            case Phase.Dragging:       UpdateDraggingPhase();   break;
+            case Phase.AwaitingConfirm: UpdateAwaitingConfirm(); break;
+        }
     }
 
     private void LateUpdate()
@@ -266,10 +289,10 @@ public class TableTapCalibrator : MonoBehaviour
     }
 
     // ================================================================
-    // TAPPING PHASE
+    // FIRST-TAP PHASE
     // ================================================================
 
-    private void UpdateTappingPhase()
+    private void UpdateFirstTapPhase()
     {
         if (stylusTipProvider == null || !stylusTipProvider.IsCalibrated ||
             !stylusTipProvider.TipWorldPosition.HasValue)
@@ -297,153 +320,250 @@ public class TableTapCalibrator : MonoBehaviour
         hasLastTip = true;
 
         bool onCooldown = (now - lastTapTime) < tapCooldownSeconds;
-        bool yConsistent = true;
-        if (taps.Count > 0)
-        {
-            float meanY = RunningMeanY();
-            yConsistent = Mathf.Abs(tipPos.y - meanY) <= tapYConsensus;
-        }
 
-        if (!onCooldown && linearSpeed < tapStillnessVelocity && yConsistent)
+        if (!onCooldown && linearSpeed < tapStillnessVelocity)
         {
             dwellAccum += Time.deltaTime;
             SetTipColor(ColorTipDwelling);
             if (dwellAccum >= tapDwellSeconds)
             {
                 if (!requirePinchToCapture)
-                {
-                    CaptureTap(tipPos);
-                }
+                    CaptureFirstTap(tipPos);
                 else if (ConsumePinchCaptureEdge())
-                {
-                    CaptureTap(tipPos);
-                }
+                    CaptureFirstTap(tipPos);
             }
         }
         else
         {
             dwellAccum = 0f;
             SetTipColor(ColorTipIdle);
-
-            // Keep pinch edge history up to date so stale pinches don't arm
-            // when we become dwell-ready later.
             RefreshPinchStateHistory();
         }
     }
 
-    private bool EnsureHandSubsystem()
+    private void CaptureFirstTap(Vector3 tipPos)
     {
-        if (handSubsystem == null || !handSubsystem.running)
-            handSubsystem = WhiteboardPen.GetHandSubsystem();
-        return handSubsystem != null;
-    }
-
-    private bool ConsumePinchCaptureEdge()
-    {
-        if (!EnsureHandSubsystem()) return false;
-
-        bool leftPinched = GetPinchState(Handedness.Left);
-        bool rightPinched = GetPinchState(Handedness.Right);
-
-        bool leftEdge = leftPinched && !wasLeftPinched;
-        bool rightEdge = rightPinched && !wasRightPinched;
-
-        wasLeftPinched = leftPinched;
-        wasRightPinched = rightPinched;
-
-        switch (pinchCaptureHand)
-        {
-            case PinchCaptureHandMode.Left:
-                return leftEdge;
-
-            case PinchCaptureHandMode.Right:
-                return rightEdge;
-
-            case PinchCaptureHandMode.Either:
-                return leftEdge || rightEdge;
-
-            case PinchCaptureHandMode.OppositeStylusHand:
-            default:
-                if (TryGetStylusHand(out Handedness stylusHand))
-                {
-                    Handedness opposite = stylusHand == Handedness.Right
-                        ? Handedness.Left
-                        : Handedness.Right;
-                    return opposite == Handedness.Left ? leftEdge : rightEdge;
-                }
-                // If stylus hand is unknown, accept either hand to avoid deadlock.
-                return leftEdge || rightEdge;
-        }
-    }
-
-    private void RefreshPinchStateHistory()
-    {
-        if (!EnsureHandSubsystem())
-        {
-            wasLeftPinched = false;
-            wasRightPinched = false;
-            return;
-        }
-
-        wasLeftPinched = GetPinchState(Handedness.Left);
-        wasRightPinched = GetPinchState(Handedness.Right);
-    }
-
-    private bool GetPinchState(Handedness hand)
-    {
-        Vector3 thumb = GetJointTipOr(hand, XRHandJointID.ThumbTip);
-        Vector3 middle = GetJointTipOr(hand, XRHandJointID.MiddleTip);
-
-        if (thumb.x >= 1e5f || middle.x >= 1e5f)
-            return false;
-
-        return Vector3.Distance(thumb, middle) < pinchThreshold;
-    }
-
-    private bool TryGetStylusHand(out Handedness hand)
-    {
-        hand = Handedness.Right;
-        if (stylusTipProvider == null || stylusTipProvider.wristTracker == null)
-            return false;
-
-        hand = stylusTipProvider.wristTracker.handedness;
-        return true;
-    }
-
-    private float RunningMeanY()
-    {
-        float sum = 0f;
-        for (int i = 0; i < taps.Count; i++) sum += taps[i].y;
-        return sum / taps.Count;
-    }
-
-    private void CaptureTap(Vector3 tipPos)
-    {
-        int idx = taps.Count;
-        taps.Add(tipPos);
+        firstTapPos = tipPos;
+        surfaceYLocked = tipPos.y;
         lastTapTime = Time.time;
         dwellAccum = 0f;
 
-        // Drop a marker
-        EnsureTapMarker(idx).transform.position = tipPos;
-        tapMarkers[idx].SetActive(true);
-
-        if (logEvents) Debug.Log($"[TableTapCalibrator] Tap {idx + 1}/{RequiredTaps} at {tipPos}.");
-
-        UpdatePreviewRectangle();
-
-        if (taps.Count >= RequiredTaps)
+        // Drop a marker at the tapped corner
+        if (tapMarker != null)
         {
-            phase = Phase.AwaitingConfirm;
-            awaitConfirmEnterTime = Time.time;
-            ShowConfirmAndRedo();
-            SetInstructionForConfirm();
+            tapMarker.transform.position = tipPos;
+            tapMarker.SetActive(true);
+        }
+
+        if (logEvents)
+            Debug.Log($"[TableTapCalibrator] First tap at {tipPos}. Surface Y locked = {surfaceYLocked:F3} m.");
+
+        dragPolyline.Clear();
+        dragPathLength = 0f;
+        dragLiftAccum = 0f;
+        lastDragRecordTime = Time.time;
+
+        phase = Phase.Dragging;
+        HideDragPath();
+        dragPathObj.SetActive(true);
+
+        SetInstruction("Now slide the pen across the table\nto the far-right corner.\n" +
+                       "Lift the pen when done.");
+    }
+
+    // ================================================================
+    // DRAGGING PHASE
+    // ================================================================
+
+    private void UpdateDraggingPhase()
+    {
+        if (stylusTipProvider == null || !stylusTipProvider.IsCalibrated ||
+            !stylusTipProvider.TipWorldPosition.HasValue)
+        {
+            SetInstruction("Stylus lost — please show the pen.");
+            return;
+        }
+
+        Vector3 tipPos = stylusTipProvider.TipWorldPosition.Value;
+        tipIndicator.SetActive(true);
+        tipIndicator.transform.position = tipPos;
+
+        float aboveY = tipPos.y - surfaceYLocked;
+        bool onSurface = Mathf.Abs(aboveY) <= dragLiftThresholdM;
+
+        // Tip indicator colour: cyan = on surface, green = off surface
+        SetTipColor(onSurface ? ColorTipOnSurface : ColorTipIdle);
+
+        // Record drag sample at ~50 Hz when tip is on-surface
+        float now = Time.time;
+        if (onSurface && (now - lastDragRecordTime) >= dragRecordIntervalSec)
+        {
+            if (dragPolyline.Count > 0)
+                dragPathLength += Vector3.Distance(
+                    new Vector3(tipPos.x, surfaceYLocked, tipPos.z),
+                    new Vector3(dragPolyline[dragPolyline.Count - 1].x,
+                                surfaceYLocked,
+                                dragPolyline[dragPolyline.Count - 1].z));
+
+            dragPolyline.Add(tipPos);
+            lastDragRecordTime = now;
+            UpdateDragPathVisual();
+        }
+
+        // Update instruction with progress
+        int pts = dragPolyline.Count;
+        bool enoughDrag = dragPathLength >= minDragLengthM;
+        if (pts < 3)
+            SetInstruction("Slide the pen along the table surface\nto the far-right corner.");
+        else
+            SetInstruction($"Dragging... {dragPathLength * 100f:F0} cm covered.\n" +
+                           (enoughDrag ? "Lift the pen to finish." : "Keep going."));
+
+        // Lift detection: pen above surface for dragLiftDurationSec
+        if (aboveY > dragLiftThresholdM)
+        {
+            dragLiftAccum += Time.deltaTime;
+            if (dragLiftAccum >= dragLiftDurationSec && enoughDrag)
+            {
+                FinalizeDrag();
+                return;
+            }
         }
         else
         {
-            SetInstructionForTap();
+            dragLiftAccum = 0f;
         }
     }
+
+    private void UpdateDragPathVisual()
+    {
+        if (dragPathRenderer == null) return;
+        dragPathRenderer.positionCount = dragPolyline.Count;
+        for (int i = 0; i < dragPolyline.Count; i++)
+            dragPathRenderer.SetPosition(i, dragPolyline[i]);
+    }
+
+    private void FinalizeDrag()
+    {
+        if (dragPolyline.Count < 2)
+        {
+            SetInstruction("Drag too short — please try again.");
+            BeginCalibration();
+            return;
+        }
+
+        computedTable = BuildDetectedTableFromDrag();
+        PopulateComputedCornersIntoPreview(computedTable);
+
+        phase = Phase.AwaitingConfirm;
+        awaitConfirmEnterTime = Time.time;
+
+        HideDragPath();
+        UpdatePreviewRectangle();
+        ShowConfirmAndRedo();
+        SetInstructionForConfirm();
+
+        if (logEvents)
+            Debug.Log($"[TableTapCalibrator] Drag complete. Computed table: pos={computedTable.position}, " +
+                      $"size={computedTable.size}, yaw={computedTable.rotation.eulerAngles.y:F1}°, " +
+                      $"surfaceY={computedTable.avgTapSurfaceY:F3} m.");
+    }
+
+    // ================================================================
+    // TABLE SOLVER (drag-based)
+    // ================================================================
+
+    private DetectedTable BuildDetectedTableFromDrag()
+    {
+        Vector3 firstPt = dragPolyline.Count > 0 ? dragPolyline[0] : firstTapPos;
+        Vector3 lastPt  = dragPolyline.Count > 1 ? dragPolyline[dragPolyline.Count - 1] : firstPt;
+
+        // Forward direction: first drag point → last drag point (XZ only).
+        Vector3 fwdXZ = new Vector3(lastPt.x - firstPt.x, 0f, lastPt.z - firstPt.z);
+        if (fwdXZ.sqrMagnitude < 1e-4f)
+        {
+            Camera cam = Camera.main;
+            fwdXZ = cam != null ? cam.transform.forward : Vector3.forward;
+            fwdXZ.y = 0f;
+        }
+        fwdXZ.Normalize();
+
+        // Right direction: 90° CW from forward in XZ plane.
+        Vector3 rightXZ = new Vector3(-fwdXZ.z, 0f, fwdXZ.x);
+
+        // Depth: projected drag length along the forward axis.
+        Vector3 dragDelta = new Vector3(lastPt.x - firstPt.x, 0f, lastPt.z - firstPt.z);
+        float depth = Mathf.Abs(Vector3.Dot(dragDelta, fwdXZ));
+
+        // Width: max perpendicular span of the polyline.
+        float minPerp = 0f, maxPerp = 0f;
+        foreach (Vector3 pt in dragPolyline)
+        {
+            Vector3 offs = new Vector3(pt.x - firstPt.x, 0f, pt.z - firstPt.z);
+            float p = Vector3.Dot(offs, rightXZ);
+            if (p < minPerp) minPerp = p;
+            if (p > maxPerp) maxPerp = p;
+        }
+        float perpSpan = maxPerp - minPerp;
+        float aspectRatio = defaultTableAspect.y > 0f
+            ? defaultTableAspect.x / defaultTableAspect.y
+            : 1.5f;
+        float width = perpSpan >= minWidthDeviationM
+            ? perpSpan
+            : depth * aspectRatio;
+
+        // Centre: centroid offset from firstPt by half depth along forward and
+        // half perpendicular span along right.
+        float centerDepth = depth * 0.5f;
+        float centerPerp  = (minPerp + maxPerp) * 0.5f;
+        Vector3 center = new Vector3(
+            firstPt.x + fwdXZ.x * centerDepth + rightXZ.x * centerPerp,
+            surfaceYLocked,
+            firstPt.z + fwdXZ.z * centerDepth + rightXZ.z * centerPerp);
+
+        Quaternion rotation = Quaternion.LookRotation(fwdXZ, Vector3.up);
+
+        Vector2 size = new Vector2(
+            Mathf.Clamp(width, minSize.x, maxSize.x),
+            Mathf.Clamp(depth, minSize.y, maxSize.y));
+
+        Camera c = Camera.main;
+        Vector3 headPos = c != null ? c.transform.position : Vector3.zero;
+        Vector3 headFwd = c != null ? c.transform.forward : Vector3.forward;
+        float avgEyeY = eyeYSamples > 0 ? eyeYAccum / eyeYSamples : headPos.y;
+
+        return new DetectedTable
+        {
+            position         = center,
+            rotation         = rotation,
+            size             = size,
+            userHeadPosition = headPos,
+            userForward      = headFwd,
+            avgEyeY          = avgEyeY,
+            avgTapSurfaceY   = surfaceYLocked,
+        };
+    }
+
+    // Populate the preview taps list with 4 computed corners so UpdatePreviewRectangle
+    // can draw the rectangle outline without changes.
+    private readonly List<Vector3> previewTaps = new List<Vector3>(4);
+
+    private void PopulateComputedCornersIntoPreview(DetectedTable t)
+    {
+        Vector3 fwd   = t.rotation * Vector3.forward;
+        Vector3 right = t.rotation * Vector3.right;
+        float hw = t.size.x * 0.5f;
+        float hd = t.size.y * 0.5f;
+        float sy = t.avgTapSurfaceY;
+
+        previewTaps.Clear();
+        previewTaps.Add(Y(t.position - right * hw - fwd * hd, sy)); // near-left
+        previewTaps.Add(Y(t.position + right * hw - fwd * hd, sy)); // near-right
+        previewTaps.Add(Y(t.position + right * hw + fwd * hd, sy)); // far-right
+        previewTaps.Add(Y(t.position - right * hw + fwd * hd, sy)); // far-left
+    }
+
+    private static Vector3 Y(Vector3 v, float y) => new Vector3(v.x, y, v.z);
 
     // ================================================================
     // CONFIRM PHASE
@@ -451,17 +571,16 @@ public class TableTapCalibrator : MonoBehaviour
 
     private void UpdateAwaitingConfirm()
     {
-        // Keep preview rectangle updated each frame in case visuals drift.
         UpdatePreviewRectangle();
 
         bool armed = Time.time - awaitConfirmEnterTime >= buttonArmDelay;
         SetButtonColor(confirmButtonMat, armed ? ColorConfirm : ColorBtnDisabled);
-        SetButtonColor(redoButtonMat, armed ? ColorRedo : ColorBtnDisabled);
+        SetButtonColor(redoButtonMat,    armed ? ColorRedo    : ColorBtnDisabled);
         if (!armed) return;
 
         if (!EnsureHandSubsystem()) return;
 
-        Vector3 leftTip = GetIndexTipOr(Handedness.Left);
+        Vector3 leftTip  = GetIndexTipOr(Handedness.Left);
         Vector3 rightTip = GetIndexTipOr(Handedness.Right);
 
         float dConfirm = Mathf.Min(
@@ -481,150 +600,98 @@ public class TableTapCalibrator : MonoBehaviour
         if (dConfirm <= buttonPokeDistance)
         {
             if (logEvents) Debug.Log("[TableTapCalibrator] Confirm pressed.");
-            Finalize();
+            FinalizeConfirm();
         }
     }
 
-    private Vector3 GetIndexTipOr(Handedness hand)
+    private void FinalizeConfirm()
     {
-        return GetJointTipOr(hand, XRHandJointID.IndexTip);
-    }
-
-    private Vector3 GetJointTipOr(Handedness hand, XRHandJointID jointId)
-    {
-        if (!EnsureHandSubsystem()) return new Vector3(1e6f, 1e6f, 1e6f);
-
-        XRHand xrHand = hand == Handedness.Left ? handSubsystem.leftHand : handSubsystem.rightHand;
-        if (!xrHand.isTracked) return new Vector3(1e6f, 1e6f, 1e6f);
-
-        XRHandJoint joint = xrHand.GetJoint(jointId);
-        if (!joint.TryGetPose(out Pose pose)) return new Vector3(1e6f, 1e6f, 1e6f);
-
-        // Convert session → world via the camera offset transform.
-        var origin = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
-        Transform offset = (origin != null && origin.CameraFloorOffsetObject != null)
-            ? origin.CameraFloorOffsetObject.transform
-            : (Camera.main != null ? Camera.main.transform.parent : null);
-        return offset != null ? offset.TransformPoint(pose.position) : pose.position;
-    }
-
-    private void Finalize()
-    {
-        DetectedTable result = BuildDetectedTable();
         phase = Phase.Inactive;
 
         if (logEvents)
-            Debug.Log($"[TableTapCalibrator] Confirmed: pos={result.position}, " +
-                      $"size={result.size}, yawDeg={result.rotation.eulerAngles.y:F1}, " +
-                      $"surfaceY={result.avgTapSurfaceY:F3}m, eyeY={result.avgEyeY:F3}m");
+            Debug.Log($"[TableTapCalibrator] Confirmed: pos={computedTable.position}, " +
+                      $"size={computedTable.size}, yawDeg={computedTable.rotation.eulerAngles.y:F1}, " +
+                      $"surfaceY={computedTable.avgTapSurfaceY:F3} m, eyeY={computedTable.avgEyeY:F3} m");
 
-        OnTableConfirmed?.Invoke(result);
+        OnTableConfirmed?.Invoke(computedTable);
     }
 
-    private DetectedTable BuildDetectedTable()
+    // ================================================================
+    // PINCH HELPERS (reused from original)
+    // ================================================================
+
+    private bool EnsureHandSubsystem()
     {
-        // tap 0 = near-left, 1 = near-right, 2 = far-right, 3 = far-left
-        Vector3 tap0 = taps[0], tap1 = taps[1], tap2 = taps[2], tap3 = taps[3];
+        if (handSubsystem == null || !handSubsystem.running)
+            handSubsystem = WhiteboardPen.GetHandSubsystem();
+        return handSubsystem != null;
+    }
 
-        // Surface Y = mean of 4 tap Ys (robust to one tap on an object)
-        float surfaceY = (tap0.y + tap1.y + tap2.y + tap3.y) * 0.25f;
+    private bool ConsumePinchCaptureEdge()
+    {
+        if (!EnsureHandSubsystem()) return false;
 
-        // Center = centroid projected to surface Y
-        Vector3 centroidXZ = (tap0 + tap1 + tap2 + tap3) * 0.25f;
-        Vector3 center = new Vector3(centroidXZ.x, surfaceY, centroidXZ.z);
+        bool leftPinched  = GetPinchState(Handedness.Left);
+        bool rightPinched = GetPinchState(Handedness.Right);
 
-        // Forward direction = from midpoint(near edge) to midpoint(far edge)
-        Vector3 midNear = 0.5f * (tap0 + tap1);
-        Vector3 midFar  = 0.5f * (tap2 + tap3);
-        Vector3 forward = midFar - midNear;
-        forward.y = 0f;
-        if (forward.sqrMagnitude < 1e-4f)
+        bool leftEdge  = leftPinched  && !wasLeftPinched;
+        bool rightEdge = rightPinched && !wasRightPinched;
+
+        wasLeftPinched  = leftPinched;
+        wasRightPinched = rightPinched;
+
+        switch (pinchCaptureHand)
         {
-            // Degenerate: fall back to "facing the user"
-            Camera cam = Camera.main;
-            forward = cam != null ? (cam.transform.position - center) : Vector3.forward;
-            forward.y = 0f;
+            case PinchCaptureHandMode.Left:   return leftEdge;
+            case PinchCaptureHandMode.Right:  return rightEdge;
+            case PinchCaptureHandMode.Either: return leftEdge || rightEdge;
+            case PinchCaptureHandMode.OppositeStylusHand:
+            default:
+                if (TryGetStylusHand(out Handedness stylusHandLocal))
+                {
+                    Handedness opp = stylusHandLocal == Handedness.Right
+                        ? Handedness.Left : Handedness.Right;
+                    return opp == Handedness.Left ? leftEdge : rightEdge;
+                }
+                return leftEdge || rightEdge;
         }
-        forward.Normalize();
-        Quaternion rotation = Quaternion.LookRotation(forward, Vector3.up);
-
-        // Size: width from near edge length, depth from side edge length.
-        float width = HorizontalDistance(tap0, tap1);
-        float widthFar = HorizontalDistance(tap3, tap2);
-        width = (width + widthFar) * 0.5f;
-
-        float depthLeft  = HorizontalDistance(tap0, tap3);
-        float depthRight = HorizontalDistance(tap1, tap2);
-        float depth = (depthLeft + depthRight) * 0.5f;
-
-        Vector2 size = new Vector2(
-            Mathf.Clamp(width, minSize.x, maxSize.x),
-            Mathf.Clamp(depth, minSize.y, maxSize.y));
-
-        Camera c = Camera.main;
-        Vector3 headPos = c != null ? c.transform.position : Vector3.zero;
-        Vector3 headFwd = c != null ? c.transform.forward : Vector3.forward;
-        float avgEyeY = eyeYSamples > 0 ? eyeYAccum / eyeYSamples : headPos.y;
-
-        return new DetectedTable
-        {
-            position = center,
-            rotation = rotation,
-            size = size,
-            userHeadPosition = headPos,
-            userForward = headFwd,
-            avgEyeY = avgEyeY,
-            avgTapSurfaceY = surfaceY,
-        };
     }
 
-    private static float HorizontalDistance(Vector3 a, Vector3 b)
+    private void RefreshPinchStateHistory()
     {
-        float dx = a.x - b.x;
-        float dz = a.z - b.z;
-        return Mathf.Sqrt(dx * dx + dz * dz);
-    }
-
-    private float TapYSpan()
-    {
-        if (taps.Count == 0) return 0f;
-        float minY = taps[0].y, maxY = taps[0].y;
-        for (int i = 1; i < taps.Count; i++)
+        if (!EnsureHandSubsystem())
         {
-            if (taps[i].y < minY) minY = taps[i].y;
-            if (taps[i].y > maxY) maxY = taps[i].y;
+            wasLeftPinched = false;
+            wasRightPinched = false;
+            return;
         }
-        return maxY - minY;
+        wasLeftPinched  = GetPinchState(Handedness.Left);
+        wasRightPinched = GetPinchState(Handedness.Right);
+    }
+
+    private bool GetPinchState(Handedness hand)
+    {
+        Vector3 thumb  = GetJointTipOr(hand, XRHandJointID.ThumbTip);
+        Vector3 middle = GetJointTipOr(hand, XRHandJointID.MiddleTip);
+        if (thumb.x >= 1e5f || middle.x >= 1e5f) return false;
+        return Vector3.Distance(thumb, middle) < pinchThreshold;
+    }
+
+    private bool TryGetStylusHand(out Handedness hand)
+    {
+        hand = Handedness.Right;
+        if (stylusTipProvider == null || stylusTipProvider.wristTracker == null) return false;
+        hand = stylusTipProvider.wristTracker.handedness;
+        return true;
     }
 
     // ================================================================
     // INSTRUCTION TEXT
     // ================================================================
 
-    private void SetInstructionForTap()
-    {
-        int next = taps.Count; // 0..3
-        if (next >= RequiredTaps) return;
-        string label = TapLabels[next];
-
-        if (requirePinchToCapture)
-            SetInstruction($"Tap the {label} corner, hold still, then pinch to capture.\n({taps.Count}/{RequiredTaps})");
-        else
-            SetInstruction($"Tap the {label} corner.\n({taps.Count}/{RequiredTaps})");
-    }
-
     private void SetInstructionForConfirm()
     {
-        float span = TapYSpan();
-        if (span > unevenWarnSpan)
-        {
-            SetInstruction($"Table seems uneven (±{span * 1000f:F0} mm).\n" +
-                           "Press Redo to retry, or Confirm to keep.");
-        }
-        else
-        {
-            SetInstruction("Press Confirm to place your whiteboard,\nor Redo to start over.");
-        }
+        SetInstruction("Press Confirm to place your whiteboard,\nor Redo to start over.");
     }
 
     // ================================================================
@@ -645,6 +712,18 @@ public class TableTapCalibrator : MonoBehaviour
             tipIndicator.SetActive(false);
         }
 
+        if (tapMarker == null)
+        {
+            tapMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            tapMarker.name = "TableTapMarker";
+            Destroy(tapMarker.GetComponent<Collider>());
+            tapMarker.transform.localScale = Vector3.one * (tapMarkerRadius * 2f);
+            tapMarkerMat = MakeMat(ColorTapMarker);
+            ApplyMat(tapMarker, tapMarkerMat);
+            PassthroughManager.SetLayerRecursive(tapMarker, passthroughLayer);
+            tapMarker.SetActive(false);
+        }
+
         if (previewRectangleObj == null)
         {
             previewRectangleObj = new GameObject("TableTapPreviewRect");
@@ -654,29 +733,41 @@ public class TableTapCalibrator : MonoBehaviour
             previewRectangle.loop = false;
             previewRectangle.positionCount = 0;
             previewRectangle.startWidth = 0.005f;
-            previewRectangle.endWidth = 0.005f;
-            previewRectangle.numCapVertices = 2;
+            previewRectangle.endWidth   = 0.005f;
+            previewRectangle.numCapVertices    = 2;
             previewRectangle.numCornerVertices = 2;
-            var lineMat = MakeMat(ColorPreview);
-            previewRectangle.material = lineMat;
+            previewRectangle.material = MakeMat(ColorPreview);
             previewRectangle.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             previewRectangle.receiveShadows = false;
             previewRectangleObj.SetActive(false);
+        }
+
+        if (dragPathObj == null)
+        {
+            dragPathObj = new GameObject("TableTapDragPath");
+            dragPathObj.layer = passthroughLayer;
+            dragPathRenderer = dragPathObj.AddComponent<LineRenderer>();
+            dragPathRenderer.useWorldSpace = true;
+            dragPathRenderer.loop = false;
+            dragPathRenderer.positionCount = 0;
+            dragPathRenderer.startWidth = 0.004f;
+            dragPathRenderer.endWidth   = 0.004f;
+            dragPathRenderer.material = MakeMat(ColorDragPath);
+            dragPathRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            dragPathRenderer.receiveShadows = false;
+            dragPathObj.SetActive(false);
         }
 
         if (confirmButton == null)
         {
             confirmButton = MakeButton("TableTapConfirm", "Confirm", out confirmButtonMat, out confirmLabel);
             confirmButton.SetActive(false);
-            // Prime with confirm-style colour
-            SetButtonColor(confirmButtonMat, ColorConfirm);
         }
 
         if (redoButton == null)
         {
             redoButton = MakeButton("TableTapRedo", "Redo", out redoButtonMat, out redoLabel);
             redoButton.SetActive(false);
-            SetButtonColor(redoButtonMat, ColorRedo);
         }
 
         if (instructionObj == null)
@@ -703,50 +794,25 @@ public class TableTapCalibrator : MonoBehaviour
         }
     }
 
-    private GameObject EnsureTapMarker(int index)
+    private void ClearTapMarker()
     {
-        while (tapMarkers.Count <= index)
-        {
-            var m = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            m.name = $"TapMarker_{tapMarkers.Count + 1}";
-            Destroy(m.GetComponent<Collider>());
-            m.transform.localScale = Vector3.one * (tapMarkerRadius * 2f);
-            if (tapMarkerMat == null) tapMarkerMat = MakeMat(ColorTapMarker);
-            ApplyMat(m, tapMarkerMat);
-            PassthroughManager.SetLayerRecursive(m, passthroughLayer);
-            m.SetActive(false);
-            tapMarkers.Add(m);
-        }
-        return tapMarkers[index];
-    }
-
-    private void ClearTapMarkers()
-    {
-        foreach (var m in tapMarkers) if (m != null) m.SetActive(false);
+        if (tapMarker != null) tapMarker.SetActive(false);
     }
 
     private void UpdatePreviewRectangle()
     {
-        if (previewRectangle == null) return;
-
-        if (taps.Count < 2)
+        if (previewRectangle == null || previewTaps.Count < 4)
         {
             HidePreviewRectangle();
             return;
         }
 
         previewRectangleObj.SetActive(true);
-        // Draw the polyline through existing taps, closing only once we have 4.
-        int points = taps.Count + (taps.Count >= 4 ? 1 : 0);
-        previewRectangle.positionCount = points;
-        for (int i = 0; i < taps.Count; i++)
-            previewRectangle.SetPosition(i, taps[i]);
-        if (taps.Count >= 4)
-            previewRectangle.SetPosition(4, taps[0]);
-
-        bool uneven = TapYSpan() > unevenWarnSpan;
-        previewRectangle.startColor = previewRectangle.endColor =
-            uneven ? ColorPreviewUneven : ColorPreview;
+        previewRectangle.positionCount = 5;
+        for (int i = 0; i < 4; i++)
+            previewRectangle.SetPosition(i, previewTaps[i]);
+        previewRectangle.SetPosition(4, previewTaps[0]); // close the loop
+        previewRectangle.startColor = previewRectangle.endColor = ColorPreview;
     }
 
     private void HidePreviewRectangle()
@@ -754,31 +820,28 @@ public class TableTapCalibrator : MonoBehaviour
         if (previewRectangleObj != null) previewRectangleObj.SetActive(false);
     }
 
+    private void HideDragPath()
+    {
+        if (dragPathObj != null) dragPathObj.SetActive(false);
+    }
+
     private void ShowConfirmAndRedo()
     {
         if (confirmButton == null || redoButton == null) return;
 
-        // Compute where the buttons should sit: above the rectangle centre, on
-        // the user's side, facing them.
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        Vector3 centroidXZ = Vector3.zero;
-        foreach (var t in taps) centroidXZ += t;
-        centroidXZ /= taps.Count;
+        // Position buttons above the centre of the computed table.
+        Vector3 centre = computedTable.position + Vector3.up * buttonHeightAboveRect;
 
-        float surfaceY = RunningMeanY();
-        Vector3 centre = new Vector3(centroidXZ.x, surfaceY + buttonHeightAboveRect, centroidXZ.z);
-
-        // Face the user (XZ-only forward)
         Vector3 toUser = cam.transform.position - centre;
         toUser.y = 0f;
         if (toUser.sqrMagnitude < 1e-4f) toUser = -cam.transform.forward;
         toUser.Normalize();
 
-        Quaternion rot = Quaternion.LookRotation(-toUser, Vector3.up); // face user
-
-        Vector3 right = Vector3.Cross(Vector3.up, -toUser).normalized;
+        Quaternion rot   = Quaternion.LookRotation(-toUser, Vector3.up);
+        Vector3 right    = Vector3.Cross(Vector3.up, -toUser).normalized;
 
         confirmButtonPos = centre + right * (buttonSpacing * 0.5f);
         redoButtonPos    = centre - right * (buttonSpacing * 0.5f);
@@ -824,7 +887,33 @@ public class TableTapCalibrator : MonoBehaviour
     }
 
     // ================================================================
-    // HELPERS
+    // HAND JOINT HELPERS
+    // ================================================================
+
+    private Vector3 GetIndexTipOr(Handedness hand)
+    {
+        return GetJointTipOr(hand, XRHandJointID.IndexTip);
+    }
+
+    private Vector3 GetJointTipOr(Handedness hand, XRHandJointID jointId)
+    {
+        if (!EnsureHandSubsystem()) return new Vector3(1e6f, 1e6f, 1e6f);
+
+        XRHand xrHand = hand == Handedness.Left ? handSubsystem.leftHand : handSubsystem.rightHand;
+        if (!xrHand.isTracked) return new Vector3(1e6f, 1e6f, 1e6f);
+
+        XRHandJoint joint = xrHand.GetJoint(jointId);
+        if (!joint.TryGetPose(out Pose pose)) return new Vector3(1e6f, 1e6f, 1e6f);
+
+        var origin = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
+        Transform offset = (origin != null && origin.CameraFloorOffsetObject != null)
+            ? origin.CameraFloorOffsetObject.transform
+            : (Camera.main != null ? Camera.main.transform.parent : null);
+        return offset != null ? offset.TransformPoint(pose.position) : pose.position;
+    }
+
+    // ================================================================
+    // MATERIAL / BUTTON HELPERS
     // ================================================================
 
     private GameObject MakeButton(string objName, string label,
@@ -882,16 +971,17 @@ public class TableTapCalibrator : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (tipIndicator != null)      Destroy(tipIndicator);
-        foreach (var m in tapMarkers) if (m != null) Destroy(m);
+        if (tipIndicator        != null) Destroy(tipIndicator);
+        if (tapMarker           != null) Destroy(tapMarker);
         if (previewRectangleObj != null) Destroy(previewRectangleObj);
-        if (confirmButton != null)     Destroy(confirmButton);
-        if (redoButton != null)        Destroy(redoButton);
-        if (instructionObj != null)    Destroy(instructionObj);
+        if (dragPathObj         != null) Destroy(dragPathObj);
+        if (confirmButton       != null) Destroy(confirmButton);
+        if (redoButton          != null) Destroy(redoButton);
+        if (instructionObj      != null) Destroy(instructionObj);
 
-        if (tipIndicatorMat != null) Destroy(tipIndicatorMat);
-        if (tapMarkerMat != null) Destroy(tapMarkerMat);
+        if (tipIndicatorMat  != null) Destroy(tipIndicatorMat);
+        if (tapMarkerMat     != null) Destroy(tapMarkerMat);
         if (confirmButtonMat != null) Destroy(confirmButtonMat);
-        if (redoButtonMat != null) Destroy(redoButtonMat);
+        if (redoButtonMat    != null) Destroy(redoButtonMat);
     }
 }
