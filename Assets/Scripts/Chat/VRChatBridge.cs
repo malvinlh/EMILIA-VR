@@ -862,10 +862,8 @@ public class VRChatBridge : MonoBehaviour
                 _azkiRoaming = azkiHost.AddComponent<AzkiIslandRoamingController>();
         }
 
-        // NOTE: Dialogue-panel events (Talk / Idle switching) are intentionally NOT
-        // wired here. AzkiProximityUIController owns that responsibility in the Beach
-        // scene — it detects player proximity, shows/hides the Chat UI, and calls
-        // PlayTalkWhileEngaged() / ReturnToIdleWhileEngaged() directly.
+        if (_azkiRoaming != null && _dialoguePanel != null)
+            _azkiRoaming.SetDialoguePanel(_dialoguePanel);
     }
 
     // ── Bedroom-scene helper (existing logic, extracted for clarity) ──────

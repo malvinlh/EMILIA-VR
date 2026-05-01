@@ -147,6 +147,8 @@ public class AzkiIslandRoamingController : MonoBehaviour
     private bool _isInProximityEngagement;
     private Transform _engagementTarget;
 
+    private VRDialoguePanel _dialoguePanel;
+
     private int _idleHash;
     private int _idleBHash;
     private int _walkHash;
@@ -418,6 +420,38 @@ public class AzkiIslandRoamingController : MonoBehaviour
         EnforceAnimation(PatrolAnimation.Idle, force: true);
     }
 
+    /// <summary>
+    /// Wires the dialogue panel so Talk/Idle follow response visibility directly,
+    /// matching the bedroom-scene pattern in AzkiChatWaypointPatrolController.
+    /// </summary>
+    public void SetDialoguePanel(VRDialoguePanel panel)
+    {
+        if (_dialoguePanel != null)
+            _dialoguePanel.OnAssistantResponseVisibilityChanged -= OnDialogueVisibilityChanged;
+
+        _dialoguePanel = panel;
+
+        if (_dialoguePanel != null)
+        {
+            _dialoguePanel.OnAssistantResponseVisibilityChanged += OnDialogueVisibilityChanged;
+            OnDialogueVisibilityChanged(_dialoguePanel.IsAssistantResponseVisible);
+        }
+    }
+
+    private void OnDialogueVisibilityChanged(bool isVisible)
+    {
+        if (isVisible)
+            PlayTalkWhileEngaged();
+        else
+            ReturnToIdleWhileEngaged();
+    }
+
+    private void OnDestroy()
+    {
+        if (_dialoguePanel != null)
+            _dialoguePanel.OnAssistantResponseVisibilityChanged -= OnDialogueVisibilityChanged;
+    }
+
     private void HandleProximityEngagement()
     {
         // Keep the NavMesh agent stopped.
@@ -584,7 +618,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
         }
 
         _agent.SetDestination(destination);
-        EnforceAnimation(PatrolAnimation.Walk, force: false);
+        EnforceAnimation(PatrolAnimation.Walk, force: true);
     }
 
     private bool TryGetPatrolDestination(out Vector3 destination)
