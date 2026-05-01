@@ -281,44 +281,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 108135374}
   m_LocalEulerAnglesHint: {x: 90, y: 0, z: 0}
---- !u!21 &76633103
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &107205525
 GameObject:
   m_ObjectHideFlags: 0
@@ -1004,7 +966,7 @@ MonoBehaviour:
   ringRenderer: {fileID: 1062530148}
   baseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
   accentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-  worldRadius: 0.3045263
+  worldRadius: 0.32990873
   ringThickness: 0.22
   arcCount: 10
   sparkleStrength: 0.3
@@ -1156,63 +1118,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 235007826}
   m_Mesh: {fileID: -7632612965272535458, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
---- !u!1001 &253830707
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 1193953125369175018, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_Name
-      value: vfx_LootDrop_01
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -11.111111
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 4380190821754405079, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 7d39067bead4bc14aa0b451564aa5198, type: 3}
 --- !u!1 &301341871
 GameObject:
   m_ObjectHideFlags: 0
@@ -2292,7 +2197,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.3045263
+      value: 0.32990873
       mode: 0
       spread: 0
       speed:
@@ -6586,7 +6491,7 @@ MonoBehaviour:
   ringRenderer: {fileID: 680366813}
   baseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
   accentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-  worldRadius: 0.3045263
+  worldRadius: 0.3299086
   ringThickness: 0.22
   arcCount: 10
   sparkleStrength: 0.3
@@ -7011,44 +6916,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 495627484}
   m_CullTransparentMesh: 1
---- !u!21 &500048752
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: PortalCalmRing_Runtime
-  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs: []
-    m_Ints: []
-    m_Floats:
-    - _ArcCount: 10
-    - _Feather: 0.03
-    - _InnerRadius: 0.73
-    - _Intensity: 0.62
-    - _OuterRadius: 0.95
-    - _SoftNoise: 0.5
-    - _SparkleStrength: 0.3
-    - _SpinSpeed: 0.9
-    m_Colors:
-    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &503335109 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3564783574603935192, guid: 103f3cee1340b1d4faf42e4303abd6ef, type: 3}
@@ -7232,63 +7099,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 5721985358974210490, guid: 103f3cee1340b1d4faf42e4303abd6ef, type: 3}
---- !u!1001 &569086709
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 1943286446490004412, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_Name
-      value: vfx_LootDrop_02
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -6.6666665
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 5674383046283250234, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: e953460ff16e0a6459684f9b77202b5c, type: 3}
 --- !u!1 &572921137
 GameObject:
   m_ObjectHideFlags: 0
@@ -8266,7 +8076,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.29843578
+      value: 0.32331043
       mode: 0
       spread: 0
       speed:
@@ -13962,7 +13772,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 2.375, y: 0.114, z: 5.214}
-  m_LocalScale: {x: 0.6090526, y: 0.6090526, z: 1}
+  m_LocalScale: {x: 0.6598172, y: 0.6598172, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 446732942}
@@ -13992,7 +13802,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 500048752}
+  - {fileID: 1543798973}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -15798,7 +15608,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 2.375, y: 0.114, z: 5.214}
-  m_LocalScale: {x: 0.6090526, y: 0.6090526, z: 1}
+  m_LocalScale: {x: 0.65981746, y: 0.65981746, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 235007827}
@@ -15828,7 +15638,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 76633103}
+  - {fileID: 1158316941}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -16714,7 +16524,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.29843578
+      value: 0.32331055
       mode: 0
       spread: 0
       speed:
@@ -20989,6 +20799,44 @@ MonoBehaviour:
   m_OnKeyboardFocusChanged:
     m_PersistentCalls:
       m_Calls: []
+--- !u!21 &1158316941
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1165766939
 GameObject:
   m_ObjectHideFlags: 0
@@ -22222,6 +22070,44 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
+--- !u!21 &1543798973
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: PortalCalmRing_Runtime
+  m_Shader: {fileID: 4800000, guid: eb508b55b6ec6344ea2f899cb1b0b553, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _ArcCount: 10
+    - _Feather: 0.03
+    - _InnerRadius: 0.73
+    - _Intensity: 0.62
+    - _OuterRadius: 0.95
+    - _SoftNoise: 0.5
+    - _SparkleStrength: 0.3
+    - _SpinSpeed: 0.9
+    m_Colors:
+    - _AccentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
+    - _BaseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1561861569
 GameObject:
   m_ObjectHideFlags: 0
@@ -23208,7 +23094,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.3045263
+      value: 0.3299086
       mode: 0
       spread: 0
       speed:
@@ -28730,5 +28616,3 @@ SceneRoots:
   - {fileID: 1754051868}
   - {fileID: 1814382133}
   - {fileID: 1460637446}
-  - {fileID: 569086709}
-  - {fileID: 253830707}
