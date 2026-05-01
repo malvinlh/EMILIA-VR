@@ -447,6 +447,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     public void PlayCheeringOneShot()
     {
+        LockAtAuthoredPose();
         _isCheeringPoseHeld = false;
         _isCheeringPlaying  = true;
         if (_animator != null)
