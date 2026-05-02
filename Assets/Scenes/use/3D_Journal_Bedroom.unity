@@ -8098,27 +8098,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 603eb01cf045f644798fe03cee55a935, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PortalCalmRingVfx
-  autoCreateRenderer: 1
-  ringObjectName: PortalCalmRing_Auto
-  ringAnchor: {fileID: 1121943004043793669}
-  ringRenderer: {fileID: 1634097692}
-  baseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  accentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-  worldRadius: 0.30452645
-  ringThickness: 0.22
-  arcCount: 10
-  sparkleStrength: 0.3
-  softNoise: 0.5
-  preserveManualRingTransform: 1
-  defaultLocalPosition: {x: 0, y: 0.01, z: 0}
-  defaultLocalEuler: {x: 90, y: 0, z: 0}
-  useUnscaledTime: 1
-  idleSpinSpeed: 0.9
-  enterSpinSpeed: 4.5
-  idleIntensity: 0.62
-  enterIntensity: 1.15
-  spinResponse: 7
-  intensityResponse: 6
 --- !u!64 &1183078237
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -12520,7 +12499,7 @@ MonoBehaviour:
   whiteboardUIGroup: {fileID: 78799590}
   vintageMicrophone: {fileID: 1760708232}
   bottlePreDuringProp: {fileID: 0}
-  choicePanelHeight: 3.5
+  choicePanelHeight: 3.15
   bottleNeckZone: {fileID: 0}
   _placeholderRenderers:
   - {fileID: 0}
