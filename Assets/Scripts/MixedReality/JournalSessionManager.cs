@@ -1222,10 +1222,10 @@ public class JournalSessionManager : MonoBehaviour
         GameObject textObj = new GameObject("JournalInstruction");
         instructionText = textObj.AddComponent<TextMeshPro>();
 
-        instructionText.fontSize = 3f;
+        instructionText.fontSize = 2.4f;
         instructionText.alignment = TextAlignmentOptions.Center;
         instructionText.color = new Color(0.95f, 0.92f, 0.85f);
-        instructionText.rectTransform.sizeDelta = new Vector2(1.2f, 0.4f);
+        instructionText.rectTransform.sizeDelta = new Vector2(1.35f, 0.48f);
         instructionText.enableWordWrapping = true;
 
         // Put on passthrough UI layer so text is visible during passthrough

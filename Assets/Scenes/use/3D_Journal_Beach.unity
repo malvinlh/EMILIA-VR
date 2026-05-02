@@ -7310,7 +7310,7 @@ MonoBehaviour:
   outputFileName: recording.wav
   folderName: ChatRecordings
   micDevice: 
-  sampleRate: 44100
+  sampleRate: 16000
   maxLengthSec: 3599
   micButton: {fileID: 0}
   micCanvasGroup: {fileID: 0}
@@ -10428,7 +10428,7 @@ MonoBehaviour:
   outputFileName: recording.wav
   folderName: JournalRecordings
   micDevice: 
-  sampleRate: 44100
+  sampleRate: 16000
   maxLengthSec: 3599
   micButton: {fileID: 0}
   micCanvasGroup: {fileID: 0}
@@ -13079,7 +13079,7 @@ MonoBehaviour:
   tapMarkerRadius: 0.01
   instructionForward: 0.9
   instructionHeight: 0.18
-  fontSize: 0.28
+  fontSize: 0.3
   logEvents: 0
 --- !u!64 &869365583
 MeshCollider:
@@ -13778,7 +13778,7 @@ MonoBehaviour:
   nextArmDelay: 0.6
   instructionForward: 0.9
   instructionHeight: 0.2
-  fontSize: 0.3
+  fontSize: 0.32
   logEvents: 0
 --- !u!1 &992886154
 GameObject:
@@ -18604,7 +18604,6 @@ MonoBehaviour:
   targetScene: Assets/Scenes/use/3D_Login.unity
   loadDelay: 2.8
   enterSpinDuration: 2.8
-  requiredStayDuration: 3
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:
@@ -18621,7 +18620,6 @@ MonoBehaviour:
   enterSfxVolume: 1
   stopIdleLoopOnEnter: 0
   playEnterBurstVfx: 0
-  portalRingVfx: {fileID: 1361628423}
   synchronizeParticlesWithRing: 1
   idleParticleSpinSpeed: 0.16
   enterParticleSpinSpeed: 1.45
@@ -18640,6 +18638,7 @@ MonoBehaviour:
   minimumComfortLoadDelay: 0.9
   fadeCanvas: {fileID: 274220592}
   fadeDuration: 0.35
+  vignetteMaxAlpha: 0.5
   useUnscaledTime: 1
   onTransitionStarted:
     m_PersistentCalls:
@@ -31161,7 +31160,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 1.9
+      value: 2.4
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode

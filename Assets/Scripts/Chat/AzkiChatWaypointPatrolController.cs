@@ -73,6 +73,13 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     [Min(0)]
     [SerializeField] private int minStopsBetweenIdleB = 2;
 
+    [Header("Waiting Idle Timing")]
+    [Min(0f)]
+    [SerializeField] private float minWaitingBaseIdleDuration = 0.9f;
+
+    [Min(0f)]
+    [SerializeField] private float maxWaitingBaseIdleDuration = 1.8f;
+
     [Header("Facing")]
     [SerializeField] private bool snapFacingToAxis = true;
 
@@ -109,6 +116,10 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     [SerializeField] private string idleBStateName = "Base Layer.IdleB";
 
+    [SerializeField] private string idleCStateName = "Base Layer.IdleC";
+
+    [SerializeField] private string idleDStateName = "Base Layer.IdleD";
+
     [SerializeField] private string walkStateName = "Base Layer.Walk";
 
     [SerializeField] private string talkStateName     = "Base Layer.Talk";
@@ -127,6 +138,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     {
         Idle,
         IdleB,
+        IdleC,
+        IdleD,
         Walk,
         Talk
     }
@@ -141,9 +154,12 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     private int _currentPointIndex = -1;
     private bool _isStopping;
-    private bool _currentStopUsesIdleB;
+    private AnimState _currentStopIdleState = AnimState.Idle;
     private float _stopUntilTime;
     private Quaternion _targetStopRotation;
+    private bool _isWaitingForResponse;
+    private AnimState _currentWaitingIdleState = AnimState.Idle;
+    private float _waitingIdleUntilTime;
 
     private bool _talkActive;
     private bool _loggedMissingNavMesh;
@@ -156,17 +172,21 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     private bool _isInProximityEngagement;
     private Transform _engagementTarget;
 
-    private int _stopsSinceIdleB = int.MaxValue;
+    private int _stopsSinceAlternateIdle = int.MaxValue;
     private AnimState _currentAnimState = AnimState.Idle;
     private float _nextAnimSwitchTime;
 
     private int _idleHash;
     private int _idleBHash;
+    private int _idleCHash;
+    private int _idleDHash;
     private int _walkHash;
     private int _talkHash;
     private int _cheeringHash;
     private int _idleShortHash;
     private int _idleBShortHash;
+    private int _idleCShortHash;
+    private int _idleDShortHash;
     private int _walkShortHash;
     private int _talkShortHash;
     private int _cheeringShortHash;
@@ -204,6 +224,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     {
         if (maxStopDuration < minStopDuration)
             maxStopDuration = minStopDuration;
+        if (maxWaitingBaseIdleDuration < minWaitingBaseIdleDuration)
+            maxWaitingBaseIdleDuration = minWaitingBaseIdleDuration;
 
         ResolveStandingPoints();
 
@@ -248,7 +270,13 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
             return;
         }
 
-        SyncTalkStateFromPanel();
+        SyncDialogueStateFromPanel();
+
+        if (_isWaitingForResponse)
+        {
+            HandleWaitingMode();
+            return;
+        }
 
         if (_talkActive)
         {
@@ -297,23 +325,10 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         _isInProximityEngagement = true;
         _engagementTarget = player;
 
-        // Cancel any active talk so the agent stops cleanly.
-        if (_talkActive)
-        {
-            _talkActive = false;
-            _isAligningBeforeTalk = false;
-            _talkLoopStarted = false;
-        }
+        if (_talkActive || _isWaitingForResponse)
+            return;
 
-        if (_agent != null && _agent.enabled)
-        {
-            if (_agent.isOnNavMesh)
-            {
-                _agent.isStopped = true;
-                _agent.ResetPath();
-            }
-            _agent.updateRotation = false;
-        }
+        StopAgentMovementForDialogue();
 
         _isStopping = false;
         EnforceAnimation(AnimState.Idle, force: true);
@@ -327,6 +342,9 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         _isInProximityEngagement = false;
         _engagementTarget = null;
 
+        if (_talkActive || _isWaitingForResponse)
+            return;
+
         if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
             _agent.updateRotation = true;
 
@@ -339,8 +357,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     /// </summary>
     public void PlayTalkWhileEngaged()
     {
-        if (!_isInProximityEngagement) return;
-        SetTalkActive(true);
+        if (!_isInProximityEngagement || _talkActive || _isWaitingForResponse) return;
+        EnforceAnimation(AnimState.Talk, force: true);
     }
 
     /// <summary>
@@ -349,8 +367,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     /// </summary>
     public void ReturnToIdleWhileEngaged()
     {
-        if (!_isInProximityEngagement) return;
-        SetTalkActive(false);
+        if (!_isInProximityEngagement || _talkActive || _isWaitingForResponse) return;
+        EnforceAnimation(AnimState.Idle, force: true);
     }
 
     private void HandleProximityEngagement()
@@ -383,24 +401,33 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
             return;
 
         if (dialoguePanel != null)
+        {
             dialoguePanel.OnAssistantResponseVisibilityChanged -= OnAssistantResponseVisibilityChanged;
+            dialoguePanel.OnTypingIndicatorVisibilityChanged -= OnTypingIndicatorVisibilityChanged;
+        }
 
         dialoguePanel = panel;
 
         if (dialoguePanel != null)
         {
             dialoguePanel.OnAssistantResponseVisibilityChanged += OnAssistantResponseVisibilityChanged;
-            SetTalkActive(dialoguePanel.IsAssistantResponseVisible);
+            dialoguePanel.OnTypingIndicatorVisibilityChanged += OnTypingIndicatorVisibilityChanged;
+            SyncDialogueStateFromPanel();
         }
         else
         {
-            SetTalkActive(false);
+            SyncDialogueStateFromPanel();
         }
     }
 
     private void OnAssistantResponseVisibilityChanged(bool isVisible)
     {
-        SetTalkActive(isVisible);
+        SyncDialogueStateFromPanel();
+    }
+
+    private void OnTypingIndicatorVisibilityChanged(bool isVisible)
+    {
+        SyncDialogueStateFromPanel();
     }
 
     // ── JournalReviewController integration ─────────────────────────────────
@@ -413,9 +440,11 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         _isCheeringPoseHeld = false;
         _isCheeringPlaying  = false;
         _talkActive = false;
+        _isWaitingForResponse = false;
         _isStopping = false;
         _isAligningBeforeTalk = false;
         _talkLoopStarted = false;
+        ResetWaitingIdleCycle();
         if (_agent != null)
         {
             if (_agent.isOnNavMesh) { _agent.isStopped = true; _agent.ResetPath(); }
@@ -429,8 +458,10 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         _journalLocked = false;
         if (_animator != null) _animator.speed = 1f;
         _talkActive = false;
+        _isWaitingForResponse = false;
         _isAligningBeforeTalk = false;
         _talkLoopStarted = false;
+        ResetWaitingIdleCycle();
         if (_agent != null) _agent.updateRotation = true;
         if (!EnsureAgentOnNavMesh()) { EnforceAnimation(AnimState.Idle, force: true); return; }
         BeginStopWindow();
@@ -473,68 +504,100 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         }
     }
 
-    private void SyncTalkStateFromPanel()
+    private void SyncDialogueStateFromPanel()
     {
-        if (dialoguePanel == null)
-            return;
+        bool waitingForResponse = dialoguePanel != null && dialoguePanel.IsTypingIndicatorVisible;
+        bool talkActive = !waitingForResponse &&
+                          dialoguePanel != null &&
+                          dialoguePanel.IsAssistantResponseVisible;
 
-        SetTalkActive(dialoguePanel.IsAssistantResponseVisible);
+        if (_isWaitingForResponse != waitingForResponse)
+        {
+            _isWaitingForResponse = waitingForResponse;
+            if (_isWaitingForResponse)
+                EnterWaitingState();
+            else
+                ExitWaitingState(enteringTalk: talkActive);
+        }
+
+        if (_talkActive != talkActive)
+        {
+            _talkActive = talkActive;
+            if (_talkActive)
+                EnterTalkState();
+            else
+                ExitTalkState(enteringWaiting: _isWaitingForResponse);
+        }
     }
 
-    private void SetTalkActive(bool active)
+    private void EnterTalkState()
     {
-        if (_talkActive == active)
-            return;
+        StopAgentMovementForDialogue();
+        _isStopping = false;
+        _currentStopIdleState = AnimState.Idle;
+        _talkLoopStarted = false;
+        ResetWaitingIdleCycle();
 
-        _talkActive = active;
-
-        if (_talkActive)
+        if (useHybridPreTalkAlignment)
         {
-            if (_agent != null && _agent.enabled)
-            {
-                if (_agent.isOnNavMesh)
-                {
-                    _agent.isStopped = true;
-                    _agent.ResetPath();
-                }
-                _agent.updateRotation = false;
-            }
-
-            _isStopping = false;
-            _currentStopUsesIdleB = false;
-            _talkLoopStarted = false;
-
-            if (useHybridPreTalkAlignment)
-            {
-                _isAligningBeforeTalk = true;
-                _preTalkDeadlineTime = Time.time + Mathf.Max(0f, preTalkMaxDelaySeconds);
-                EnforceAnimation(AnimState.Idle, force: true);
-            }
-            else
-            {
-                _isAligningBeforeTalk = false;
-                FacePlayerBeforeTalk();
-                StartTalkLoop();
-            }
-
+            _isAligningBeforeTalk = true;
+            _preTalkDeadlineTime = Time.time + Mathf.Max(0f, preTalkMaxDelaySeconds);
+            EnforceAnimation(AnimState.Idle, force: true);
             return;
         }
 
         _isAligningBeforeTalk = false;
+        FacePlayerBeforeTalk();
+        StartTalkLoop();
+    }
+
+    private void ExitTalkState(bool enteringWaiting)
+    {
+        _isAligningBeforeTalk = false;
         _talkLoopStarted = false;
+
+        if (enteringWaiting || _journalLocked)
+            return;
+
+        if (_isInProximityEngagement)
+        {
+            EnforceAnimation(AnimState.Idle, force: true);
+            return;
+        }
+
+        BeginStopWindow();
+    }
+
+    private void EnterWaitingState()
+    {
+        StopAgentMovementForDialogue();
+        _isAligningBeforeTalk = false;
+        _talkLoopStarted = false;
+        _isStopping = false;
+        _currentStopIdleState = AnimState.Idle;
+        ResetWaitingIdleCycle();
+        StartWaitingIdleCycle(force: true);
+    }
+
+    private void ExitWaitingState(bool enteringTalk)
+    {
+        ResetWaitingIdleCycle();
+
+        if (enteringTalk || _journalLocked)
+            return;
+
+        if (_isInProximityEngagement)
+        {
+            EnforceAnimation(AnimState.Idle, force: true);
+            return;
+        }
 
         BeginStopWindow();
     }
 
     private void HandleTalkMode()
     {
-        if (_agent != null && _agent.enabled)
-        {
-            if (_agent.isOnNavMesh)
-                _agent.isStopped = true;
-
-            _agent.updateRotation = false;
-        }
+        StopAgentMovementForDialogue();
 
         if (_isAligningBeforeTalk)
         {
@@ -565,6 +628,28 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         var info = _animator.GetCurrentAnimatorStateInfo(0);
         if (StateMatches(info, _talkHash, _talkShortHash) && info.normalizedTime >= 1f)
             _animator.Play(_talkHash, 0, 0f);
+    }
+
+    private void HandleWaitingMode()
+    {
+        StopAgentMovementForDialogue();
+
+        if (IsAlternateIdleState(_currentWaitingIdleState))
+        {
+            if (!HasCompletedIdleVariantPlayback(_currentWaitingIdleState))
+            {
+                EnforceAnimation(_currentWaitingIdleState, force: false);
+                return;
+            }
+
+            StartWaitingBaseIdleDwell(force: true);
+            return;
+        }
+
+        EnforceAnimation(AnimState.Idle, force: false);
+
+        if (Time.time >= _waitingIdleUntilTime)
+            StartWaitingIdleCycle(force: false);
     }
 
     private void StartTalkLoop()
@@ -649,20 +734,35 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         return null;
     }
 
+    private void StopAgentMovementForDialogue()
+    {
+        if (_agent == null || !_agent.enabled)
+            return;
+
+        if (_agent.isOnNavMesh)
+        {
+            _agent.isStopped = true;
+            _agent.ResetPath();
+            _agent.velocity = Vector3.zero;
+        }
+
+        _agent.updateRotation = false;
+    }
+
     private void HandleStopWindow()
     {
         RotateTowardsTargetStopRotation();
 
-        if (_currentStopUsesIdleB)
+        if (IsAlternateIdleState(_currentStopIdleState))
         {
-            if (!HasCompletedIdleBPlayback())
+            if (!HasCompletedIdleVariantPlayback(_currentStopIdleState))
             {
-                EnforceAnimation(AnimState.IdleB, force: false);
+                EnforceAnimation(_currentStopIdleState, force: false);
                 return;
             }
 
-            // IdleB one-shot is complete: immediately resume walking.
-            _currentStopUsesIdleB = false;
+            // Alternate idle one-shot is complete: immediately resume walking.
+            _currentStopIdleState = AnimState.Idle;
             _isStopping = false;
             MoveToNextStandingPoint();
             return;
@@ -702,28 +802,31 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
             : minStopDuration;
         _stopUntilTime = Time.time + stopDuration;
 
-        bool playIdleB = ShouldPlayIdleB();
-        _currentStopUsesIdleB = playIdleB;
-        if (playIdleB)
-            _stopsSinceIdleB = 0;
-        else if (_stopsSinceIdleB < int.MaxValue)
-            _stopsSinceIdleB++;
-
-        EnforceAnimation(playIdleB ? AnimState.IdleB : AnimState.Idle, force: true);
+        _currentStopIdleState = SelectPatrolIdleState();
+        EnforceAnimation(_currentStopIdleState, force: true);
     }
 
-    private bool ShouldPlayIdleB()
+    private AnimState SelectPatrolIdleState()
     {
         if (_animator == null)
-            return false;
+            return AnimState.Idle;
 
-        if (!_animator.HasState(0, _idleHash) || !_animator.HasState(0, _idleBHash))
-            return false;
+        int availableAlternateCount = CountAvailableAlternateIdleStates();
+        if (!_animator.HasState(0, _idleHash) || availableAlternateCount == 0)
+        {
+            IncrementAlternateIdleCooldown();
+            return AnimState.Idle;
+        }
 
-        if (_stopsSinceIdleB < minStopsBetweenIdleB)
-            return false;
+        if (_stopsSinceAlternateIdle < minStopsBetweenIdleB ||
+            UnityEngine.Random.value > idleBChancePerStop)
+        {
+            IncrementAlternateIdleCooldown();
+            return AnimState.Idle;
+        }
 
-        return UnityEngine.Random.value <= idleBChancePerStop;
+        _stopsSinceAlternateIdle = 0;
+        return GetAvailableAlternateIdleByOrdinal(UnityEngine.Random.Range(0, availableAlternateCount));
     }
 
     private Quaternion GetPointFacingRotation()
@@ -782,7 +885,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         if (_agent == null || !_agent.enabled || !_agent.isOnNavMesh)
             return;
 
-        _currentStopUsesIdleB = false;
+        _currentStopIdleState = AnimState.Idle;
 
         if (_standingPoints.Count == 0)
         {
@@ -811,6 +914,87 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         }
 
         BeginStopWindow();
+    }
+
+    private void ResetWaitingIdleCycle()
+    {
+        _currentWaitingIdleState = AnimState.Idle;
+        _waitingIdleUntilTime = 0f;
+    }
+
+    private void StartWaitingIdleCycle(bool force)
+    {
+        _currentWaitingIdleState = SelectWaitingIdleState();
+
+        if (_currentWaitingIdleState == AnimState.Idle)
+        {
+            _waitingIdleUntilTime = Time.time + GetWaitingBaseIdleDuration();
+            EnforceAnimation(AnimState.Idle, force);
+            return;
+        }
+
+        _waitingIdleUntilTime = 0f;
+        EnforceAnimation(_currentWaitingIdleState, force: true);
+    }
+
+    private void StartWaitingBaseIdleDwell(bool force)
+    {
+        _currentWaitingIdleState = AnimState.Idle;
+        _waitingIdleUntilTime = Time.time + GetWaitingBaseIdleDuration();
+        EnforceAnimation(AnimState.Idle, force);
+    }
+
+    private AnimState SelectWaitingIdleState()
+    {
+        int availableAlternateCount = CountAvailableAlternateIdleStates();
+        int choice = UnityEngine.Random.Range(0, availableAlternateCount + 1);
+        return choice == 0
+            ? AnimState.Idle
+            : GetAvailableAlternateIdleByOrdinal(choice - 1);
+    }
+
+    private float GetWaitingBaseIdleDuration()
+    {
+        return maxWaitingBaseIdleDuration > minWaitingBaseIdleDuration
+            ? UnityEngine.Random.Range(minWaitingBaseIdleDuration, maxWaitingBaseIdleDuration)
+            : minWaitingBaseIdleDuration;
+    }
+
+    private void IncrementAlternateIdleCooldown()
+    {
+        if (_stopsSinceAlternateIdle < int.MaxValue)
+            _stopsSinceAlternateIdle++;
+    }
+
+    private int CountAvailableAlternateIdleStates()
+    {
+        int count = 0;
+
+        if (HasAnimationState(AnimState.IdleB)) count++;
+        if (HasAnimationState(AnimState.IdleC)) count++;
+        if (HasAnimationState(AnimState.IdleD)) count++;
+
+        return count;
+    }
+
+    private AnimState GetAvailableAlternateIdleByOrdinal(int ordinal)
+    {
+        if (HasAnimationState(AnimState.IdleB))
+        {
+            if (ordinal == 0) return AnimState.IdleB;
+            ordinal--;
+        }
+
+        if (HasAnimationState(AnimState.IdleC))
+        {
+            if (ordinal == 0) return AnimState.IdleC;
+            ordinal--;
+        }
+
+        if (HasAnimationState(AnimState.IdleD) && ordinal == 0)
+            return AnimState.IdleD;
+
+        return AnimState.Idle;
     }
 
     private bool TrySetDestination(int pointIndex)
@@ -1063,11 +1247,15 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     {
         _idleHash = Animator.StringToHash(idleStateName);
         _idleBHash = Animator.StringToHash(idleBStateName);
+        _idleCHash = Animator.StringToHash(idleCStateName);
+        _idleDHash = Animator.StringToHash(idleDStateName);
         _walkHash = Animator.StringToHash(walkStateName);
         _talkHash = Animator.StringToHash(talkStateName);
 
         _idleShortHash = HashShortStateName(idleStateName);
         _idleBShortHash = HashShortStateName(idleBStateName);
+        _idleCShortHash = HashShortStateName(idleCStateName);
+        _idleDShortHash = HashShortStateName(idleDStateName);
         _walkShortHash = HashShortStateName(walkStateName);
         _talkShortHash     = HashShortStateName(talkStateName);
         _cheeringHash      = Animator.StringToHash(cheeringStateName);
@@ -1095,6 +1283,14 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
                 targetHash = _idleBHash;
                 targetShortHash = _idleBShortHash;
                 break;
+            case AnimState.IdleC:
+                targetHash = _idleCHash;
+                targetShortHash = _idleCShortHash;
+                break;
+            case AnimState.IdleD:
+                targetHash = _idleDHash;
+                targetShortHash = _idleDShortHash;
+                break;
             case AnimState.Walk:
                 targetHash = _walkHash;
                 targetShortHash = _walkShortHash;
@@ -1108,8 +1304,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         if (!_animator.HasState(0, targetHash))
             return;
 
-        // Keep IdleB as a one-shot that must finish before switching out.
-        if (!force && targetState != AnimState.IdleB && !HasCompletedIdleBPlayback())
+        // Keep alternate idles as one-shots that must finish before switching out.
+        if (!force && !IsAlternateIdleState(targetState) && !HasCompletedCurrentAlternateIdlePlayback())
             return;
 
         if (_animator.IsInTransition(0))
@@ -1138,24 +1334,120 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         _nextAnimSwitchTime = Time.time + minStateHoldSeconds;
     }
 
-    private bool HasCompletedIdleBPlayback()
+    private bool HasCompletedCurrentAlternateIdlePlayback()
     {
-        if (_animator == null)
+        if (!TryGetActiveAlternateIdleState(out AnimState activeState))
             return true;
+
+        return HasCompletedIdleVariantPlayback(activeState);
+    }
+
+    private bool HasCompletedIdleVariantPlayback(AnimState state)
+    {
+        if (_animator == null || !IsAlternateIdleState(state))
+            return true;
+
+        GetAnimationStateHashes(state, out int fullHash, out int shortHash);
 
         if (_animator.IsInTransition(0))
         {
             var next = _animator.GetNextAnimatorStateInfo(0);
-            if (StateMatches(next, _idleBHash, _idleBShortHash))
+            if (StateMatches(next, fullHash, shortHash))
                 return false;
         }
 
         var current = _animator.GetCurrentAnimatorStateInfo(0);
-        bool currentIsIdleB = StateMatches(current, _idleBHash, _idleBShortHash);
-        if (!currentIsIdleB)
+        if (!StateMatches(current, fullHash, shortHash))
             return true;
 
         return current.normalizedTime >= 1f;
+    }
+
+    private bool TryGetActiveAlternateIdleState(out AnimState state)
+    {
+        state = AnimState.Idle;
+
+        if (_animator == null)
+            return false;
+
+        if (_animator.IsInTransition(0) &&
+            TryMatchAlternateIdleState(_animator.GetNextAnimatorStateInfo(0), out state))
+        {
+            return true;
+        }
+
+        return TryMatchAlternateIdleState(_animator.GetCurrentAnimatorStateInfo(0), out state);
+    }
+
+    private bool TryMatchAlternateIdleState(AnimatorStateInfo info, out AnimState state)
+    {
+        if (StateMatches(info, _idleBHash, _idleBShortHash))
+        {
+            state = AnimState.IdleB;
+            return true;
+        }
+
+        if (StateMatches(info, _idleCHash, _idleCShortHash))
+        {
+            state = AnimState.IdleC;
+            return true;
+        }
+
+        if (StateMatches(info, _idleDHash, _idleDShortHash))
+        {
+            state = AnimState.IdleD;
+            return true;
+        }
+
+        state = AnimState.Idle;
+        return false;
+    }
+
+    private bool IsAlternateIdleState(AnimState state)
+    {
+        return state == AnimState.IdleB ||
+               state == AnimState.IdleC ||
+               state == AnimState.IdleD;
+    }
+
+    private bool HasAnimationState(AnimState state)
+    {
+        if (_animator == null)
+            return false;
+
+        GetAnimationStateHashes(state, out int fullHash, out _);
+        return fullHash != 0 && _animator.HasState(0, fullHash);
+    }
+
+    private void GetAnimationStateHashes(AnimState state, out int fullHash, out int shortHash)
+    {
+        switch (state)
+        {
+            case AnimState.Idle:
+                fullHash = _idleHash;
+                shortHash = _idleShortHash;
+                return;
+            case AnimState.IdleB:
+                fullHash = _idleBHash;
+                shortHash = _idleBShortHash;
+                return;
+            case AnimState.IdleC:
+                fullHash = _idleCHash;
+                shortHash = _idleCShortHash;
+                return;
+            case AnimState.IdleD:
+                fullHash = _idleDHash;
+                shortHash = _idleDShortHash;
+                return;
+            case AnimState.Walk:
+                fullHash = _walkHash;
+                shortHash = _walkShortHash;
+                return;
+            default:
+                fullHash = _talkHash;
+                shortHash = _talkShortHash;
+                return;
+        }
     }
 
     private static bool StateMatches(AnimatorStateInfo info, int fullHash, int shortHash)

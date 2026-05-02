@@ -93,6 +93,10 @@ public class RecordAudio : MonoBehaviour
     private bool _pendingStart;
     // Reused across recordings to avoid allocating a multi-MB float[] on every Stop.
     private float[] _trimBuffer;
+    // True while the pre-warm coroutine is briefly holding the mic device. Real
+    // user-initiated StartRecording calls wait for pre-warm to release before
+    // claiming the device themselves.
+    private bool _preWarming;
 
     #endregion
 
@@ -102,13 +106,13 @@ public class RecordAudio : MonoBehaviour
     {
         EnsureOutputPathInitialized();
 
-        if (micButton != null) 
+        if (micButton != null)
             micButton.onClick.AddListener(OnMicClicked);
 
         // Ensure CanvasGroup is available for alpha & raycast control
         if (micCanvasGroup == null && micButton != null)
         {
-            micCanvasGroup = micButton.GetComponent<CanvasGroup>() 
+            micCanvasGroup = micButton.GetComponent<CanvasGroup>()
                              ?? micButton.gameObject.AddComponent<CanvasGroup>();
         }
 
@@ -116,6 +120,71 @@ public class RecordAudio : MonoBehaviour
         ApplyMicVisibility(true);
         ApplyMicInteractable(true);
         ApplyBlink(false);
+    }
+
+    private void Start()
+    {
+        // Pre-warm the audio capture path so the user's first real click does
+        // not pay the 10–100 ms cost of the OS audio HW initializing for the
+        // first time. We briefly Start/End the microphone, which forces the
+        // platform to allocate buffers and bring up the device. Subsequent
+        // Microphone.Start calls are then near-instant.
+        StartCoroutine(PreWarmMicrophone());
+    }
+
+    private IEnumerator PreWarmMicrophone()
+    {
+#if UNITY_ANDROID && !UNITY_EDITOR
+        const string MIC_PERMISSION = "android.permission.RECORD_AUDIO";
+        if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(MIC_PERMISSION))
+        {
+            UnityEngine.Android.Permission.RequestUserPermission(MIC_PERMISSION);
+            // Poll until permission resolves (or 10 s timeout).
+            float pt = 0f;
+            while (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(MIC_PERMISSION) && pt < 10f)
+            {
+                pt += Time.deltaTime;
+                yield return null;
+            }
+        }
+#endif
+        // Wait for the audio subsystem to enumerate at least one device.
+        float wait = 0f;
+        while (Microphone.devices.Length == 0 && wait < 5f)
+        {
+            wait += Time.deltaTime;
+            yield return null;
+        }
+
+        if (Microphone.devices.Length == 0)
+        {
+            Debug.LogWarning("[RecordAudio] PreWarm: no microphone devices found after 5 s.");
+            yield break;
+        }
+
+        string device = ResolveMicDevice();
+        _preWarming = true;
+        AudioClip warmClip = null;
+        try
+        {
+            warmClip = Microphone.Start(device, loop: false, lengthSec: 1, frequency: sampleRate);
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[RecordAudio] PreWarm: Microphone.Start failed: {ex.Message}");
+        }
+
+        // Yield two frames so the OS audio thread has time to push the device
+        // through its init path before we tear it down.
+        yield return null;
+        yield return null;
+
+        try { Microphone.End(device); } catch { /* swallowed — pre-warm best-effort */ }
+
+        if (warmClip != null) Destroy(warmClip);
+
+        _preWarming = false;
+        Debug.Log("[RecordAudio] PreWarm complete — first real Microphone.Start should now be cheap.");
     }
 
     private void OnDestroy()
@@ -204,6 +273,12 @@ public class RecordAudio : MonoBehaviour
         yield return null;
 
         if (!_pendingStart) yield break;     // cancelled before start
+
+        // If the pre-warm coroutine is currently holding the device, wait for it
+        // to release before claiming the mic ourselves. Quick (≤ 2 frames in
+        // practice) and only relevant if the user clicks within the brief window
+        // immediately after scene load.
+        while (_preWarming) yield return null;
 
         string device = ResolveMicDevice();
         _recordedClip = Microphone.Start(device, loop: false, lengthSec: maxLengthSec, frequency: sampleRate);

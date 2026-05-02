@@ -778,7 +778,7 @@ public class TableTapCalibrator : MonoBehaviour
             var bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
             bg.name = "BG";
             bg.transform.SetParent(instructionObj.transform, false);
-            bg.transform.localScale = new Vector3(1.5f, 0.45f, 1f);
+            bg.transform.localScale = new Vector3(1.6f, 0.52f, 1f);
             bg.transform.localPosition = new Vector3(0f, 0f, 0.001f);
             bg.layer = passthroughLayer;
             Destroy(bg.GetComponent<Collider>());
@@ -788,7 +788,7 @@ public class TableTapCalibrator : MonoBehaviour
             instructionText.fontSize = fontSize;
             instructionText.alignment = TextAlignmentOptions.Center;
             instructionText.color = Color.white;
-            instructionText.rectTransform.sizeDelta = new Vector2(1.4f, 0.5f);
+            instructionText.rectTransform.sizeDelta = new Vector2(1.5f, 0.56f);
             instructionText.textWrappingMode = TextWrappingModes.Normal;
             instructionText.sortingOrder = 1;
         }
@@ -932,10 +932,10 @@ public class TableTapCalibrator : MonoBehaviour
         labelObj.layer = passthroughLayer;
         tmp = labelObj.AddComponent<TextMeshPro>();
         tmp.text = label;
-        tmp.fontSize = 0.25f;
+        tmp.fontSize = 0.28f;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
-        tmp.rectTransform.sizeDelta = new Vector2(0.14f, 0.07f);
+        tmp.rectTransform.sizeDelta = new Vector2(0.16f, 0.08f);
         labelObj.transform.localScale = new Vector3(
             1f / 0.12f * 0.10f,
             1f / 0.055f * 0.045f,

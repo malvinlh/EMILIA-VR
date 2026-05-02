@@ -65,12 +65,25 @@ public class AzkiIslandRoamingController : MonoBehaviour
     [Min(0)]
     [SerializeField] private int minIdleWindowsBetweenIdleB = 2;
 
+    [Header("Waiting Idle Timing")]
+    [Min(0f)]
+    [SerializeField] private float minWaitingBaseIdleDuration = 0.9f;
+
+    [Min(0f)]
+    [SerializeField] private float maxWaitingBaseIdleDuration = 1.8f;
+
     [Header("Animation")]
     [Tooltip("Animator state path for patrol idle.")]
     [SerializeField] private string idleStateName = "Base Layer.Idle";
 
     [Tooltip("Animator state path for alternate patrol idle.")]
     [SerializeField] private string idleBStateName = "Base Layer.IdleB";
+
+    [Tooltip("Animator state path for alternate patrol idle C.")]
+    [SerializeField] private string idleCStateName = "Base Layer.IdleC";
+
+    [Tooltip("Animator state path for alternate patrol idle D.")]
+    [SerializeField] private string idleDStateName = "Base Layer.IdleD";
 
     [Tooltip("Animator state path for patrol walk.")]
     [SerializeField] private string walkStateName = "Base Layer.Walk";
@@ -106,6 +119,8 @@ public class AzkiIslandRoamingController : MonoBehaviour
     {
         Idle,
         IdleB,
+        IdleC,
+        IdleD,
         Walk,
         Talk,
         Cheering
@@ -133,7 +148,12 @@ public class AzkiIslandRoamingController : MonoBehaviour
     private bool _isLocked;
     private bool _isIdling;
     private float _idleUntilTime;
-    private int _idleWindowsSinceIdleB = int.MaxValue;
+    private PatrolAnimation _currentIdleWindowAnimation = PatrolAnimation.Idle;
+    private int _idleWindowsSinceAlternateIdle = int.MaxValue;
+    private bool _isWaitingForResponse;
+    private bool _talkActive;
+    private PatrolAnimation _currentWaitingIdleAnimation = PatrolAnimation.Idle;
+    private float _waitingIdleUntilTime;
 
     private PatrolAnimation _currentPatrolAnimation = PatrolAnimation.Idle;
     private float _nextAnimSwitchTime;
@@ -146,16 +166,21 @@ public class AzkiIslandRoamingController : MonoBehaviour
     // Proximity-engagement state (NPC idle-and-face-player mode)
     private bool _isInProximityEngagement;
     private Transform _engagementTarget;
+    private Transform _cachedPlayerTransform;
 
     private VRDialoguePanel _dialoguePanel;
 
     private int _idleHash;
     private int _idleBHash;
+    private int _idleCHash;
+    private int _idleDHash;
     private int _walkHash;
     private int _talkHash;
     private int _cheeringHash;
     private int _idleShortHash;
     private int _idleBShortHash;
+    private int _idleCShortHash;
+    private int _idleDShortHash;
     private int _walkShortHash;
     private int _talkShortHash;
     private int _cheeringShortHash;
@@ -180,21 +205,39 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
     private void Start()
     {
+        if (maxIdleDuration < minIdleDuration)
+            maxIdleDuration = minIdleDuration;
+        if (maxWaitingBaseIdleDuration < minWaitingBaseIdleDuration)
+            maxWaitingBaseIdleDuration = minWaitingBaseIdleDuration;
+
         ResumeRoaming();
     }
 
     private void Update()
     {
-        // Proximity engagement takes priority over all other patrol states.
-        if (_isInProximityEngagement)
-        {
-            HandleProximityEngagement();
-            return;
-        }
-
         if (_isLocked)
         {
             HandleLockedMode();
+            return;
+        }
+
+        SyncDialogueStateFromPanel();
+
+        if (_isWaitingForResponse)
+        {
+            HandleWaitingMode();
+            return;
+        }
+
+        if (_talkActive)
+        {
+            HandleTalkMode();
+            return;
+        }
+
+        if (_isInProximityEngagement)
+        {
+            HandleProximityEngagement();
             return;
         }
 
@@ -208,21 +251,21 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
         if (_isIdling)
         {
-            bool waitingForIdleBCompletion =
-                _currentPatrolAnimation == PatrolAnimation.IdleB &&
-                !HasCompletedIdleBPlayback();
-
-            if (waitingForIdleBCompletion)
+            if (IsAlternateIdleState(_currentIdleWindowAnimation))
             {
-                EnforceAnimation(PatrolAnimation.IdleB, force: false);
-                return;
-            }
+                if (!HasCompletedIdleVariantPlayback(_currentIdleWindowAnimation))
+                {
+                    EnforceAnimation(_currentIdleWindowAnimation, force: false);
+                    return;
+                }
 
-            // IdleB is a one-shot: once completed, continue idling in Idle.
-            if (_currentPatrolAnimation == PatrolAnimation.IdleB)
+                _currentIdleWindowAnimation = PatrolAnimation.Idle;
                 EnforceAnimation(PatrolAnimation.Idle, force: true);
+            }
             else
-                EnforceAnimation(_currentPatrolAnimation, force: false);
+            {
+                EnforceAnimation(_currentIdleWindowAnimation, force: false);
+            }
 
             if (Time.time >= _idleUntilTime)
             {
@@ -252,8 +295,12 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
         _isLocked = true;
         _isIdling = false;
+        _talkActive = false;
+        _isWaitingForResponse = false;
         _overrideMode = AnimationOverrideMode.None;
         _cheeringFinished = false;
+        _currentIdleWindowAnimation = PatrolAnimation.Idle;
+        ResetWaitingIdleCycle();
 
         if (_gravityController != null)
             _gravityController.enabled = false;
@@ -319,8 +366,11 @@ public class AzkiIslandRoamingController : MonoBehaviour
         ReleaseCheeringPoseHold();
 
         _isLocked = false;
+        _talkActive = false;
+        _isWaitingForResponse = false;
         _overrideMode = AnimationOverrideMode.None;
         _cheeringFinished = false;
+        ResetWaitingIdleCycle();
 
         if (_gravityController != null)
             _gravityController.enabled = false;
@@ -349,6 +399,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
         _agent.isStopped = false;
         _agent.updateRotation = true;
         _isIdling = false;
+        _currentIdleWindowAnimation = PatrolAnimation.Idle;
 
         SetNextDestination();
     }
@@ -375,16 +426,12 @@ public class AzkiIslandRoamingController : MonoBehaviour
         if (_agent != null)
         {
             if (!_agent.enabled) _agent.enabled = true;
-            if (_agent.isOnNavMesh)
-            {
-                _agent.isStopped = true;
-                _agent.ResetPath();
-                _agent.velocity = Vector3.zero;
-            }
-            _agent.updateRotation = false;
+            if (!_talkActive && !_isWaitingForResponse)
+                StopAgentMovementForDialogue();
         }
 
-        EnforceAnimation(PatrolAnimation.Idle, force: true);
+        if (!_talkActive && !_isWaitingForResponse)
+            EnforceAnimation(PatrolAnimation.Idle, force: true);
     }
 
     /// <summary>
@@ -394,6 +441,10 @@ public class AzkiIslandRoamingController : MonoBehaviour
     {
         _isInProximityEngagement = false;
         _engagementTarget = null;
+
+        if (_talkActive || _isWaitingForResponse)
+            return;
+
         _overrideMode = AnimationOverrideMode.None;
         ResumeRoaming();
     }
@@ -404,8 +455,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
     /// </summary>
     public void PlayTalkWhileEngaged()
     {
-        if (!_isInProximityEngagement) return;
-        _overrideMode = AnimationOverrideMode.TalkLoop;
+        if (!_isInProximityEngagement || _talkActive || _isWaitingForResponse) return;
         EnforceAnimation(PatrolAnimation.Talk, force: true);
     }
 
@@ -415,8 +465,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
     /// </summary>
     public void ReturnToIdleWhileEngaged()
     {
-        if (!_isInProximityEngagement) return;
-        _overrideMode = AnimationOverrideMode.None;
+        if (!_isInProximityEngagement || _talkActive || _isWaitingForResponse) return;
         EnforceAnimation(PatrolAnimation.Idle, force: true);
     }
 
@@ -427,42 +476,154 @@ public class AzkiIslandRoamingController : MonoBehaviour
     public void SetDialoguePanel(VRDialoguePanel panel)
     {
         if (_dialoguePanel != null)
+        {
             _dialoguePanel.OnAssistantResponseVisibilityChanged -= OnDialogueVisibilityChanged;
+            _dialoguePanel.OnTypingIndicatorVisibilityChanged -= OnTypingIndicatorVisibilityChanged;
+        }
 
         _dialoguePanel = panel;
 
         if (_dialoguePanel != null)
         {
             _dialoguePanel.OnAssistantResponseVisibilityChanged += OnDialogueVisibilityChanged;
-            OnDialogueVisibilityChanged(_dialoguePanel.IsAssistantResponseVisible);
+            _dialoguePanel.OnTypingIndicatorVisibilityChanged += OnTypingIndicatorVisibilityChanged;
         }
+
+        SyncDialogueStateFromPanel();
     }
 
     private void OnDialogueVisibilityChanged(bool isVisible)
     {
-        if (isVisible)
-            PlayTalkWhileEngaged();
-        else
-            ReturnToIdleWhileEngaged();
+        SyncDialogueStateFromPanel();
+    }
+
+    private void OnTypingIndicatorVisibilityChanged(bool isVisible)
+    {
+        SyncDialogueStateFromPanel();
     }
 
     private void OnDestroy()
     {
         if (_dialoguePanel != null)
+        {
             _dialoguePanel.OnAssistantResponseVisibilityChanged -= OnDialogueVisibilityChanged;
+            _dialoguePanel.OnTypingIndicatorVisibilityChanged -= OnTypingIndicatorVisibilityChanged;
+        }
+    }
+
+    private void SyncDialogueStateFromPanel()
+    {
+        bool waitingForResponse = _dialoguePanel != null && _dialoguePanel.IsTypingIndicatorVisible;
+        bool talkActive = !waitingForResponse &&
+                          _dialoguePanel != null &&
+                          _dialoguePanel.IsAssistantResponseVisible;
+
+        if (_isWaitingForResponse != waitingForResponse)
+        {
+            _isWaitingForResponse = waitingForResponse;
+            if (_isWaitingForResponse)
+                EnterWaitingState();
+            else
+                ExitWaitingState(enteringTalk: talkActive);
+        }
+
+        if (_talkActive != talkActive)
+        {
+            _talkActive = talkActive;
+            if (_talkActive)
+                EnterTalkState();
+            else
+                ExitTalkState(enteringWaiting: _isWaitingForResponse);
+        }
+    }
+
+    private void EnterTalkState()
+    {
+        StopAgentMovementForDialogue();
+        _isIdling = false;
+        _currentIdleWindowAnimation = PatrolAnimation.Idle;
+        ResetWaitingIdleCycle();
+        EnforceAnimation(PatrolAnimation.Talk, force: true);
+    }
+
+    private void ExitTalkState(bool enteringWaiting)
+    {
+        if (enteringWaiting || _isLocked)
+            return;
+
+        if (_isInProximityEngagement)
+        {
+            EnforceAnimation(PatrolAnimation.Idle, force: true);
+            return;
+        }
+
+        ResumeRoaming();
+    }
+
+    private void EnterWaitingState()
+    {
+        StopAgentMovementForDialogue();
+        _isIdling = false;
+        _currentIdleWindowAnimation = PatrolAnimation.Idle;
+        ResetWaitingIdleCycle();
+        StartWaitingIdleCycle(force: true);
+    }
+
+    private void ExitWaitingState(bool enteringTalk)
+    {
+        ResetWaitingIdleCycle();
+
+        if (enteringTalk || _isLocked)
+            return;
+
+        if (_isInProximityEngagement)
+        {
+            EnforceAnimation(PatrolAnimation.Idle, force: true);
+            return;
+        }
+
+        ResumeRoaming();
+    }
+
+    private void HandleTalkMode()
+    {
+        StopAgentMovementForDialogue();
+        RotateTowardsPlayer(proximityTurnSpeed);
+        EnforceAnimation(PatrolAnimation.Talk, force: false);
+
+        if (_animator == null || _animator.IsInTransition(0))
+            return;
+
+        var info = _animator.GetCurrentAnimatorStateInfo(0);
+        if (StateMatches(info, _talkHash, _talkShortHash) && info.normalizedTime >= 1f)
+            _animator.Play(_talkHash, 0, 0f);
+    }
+
+    private void HandleWaitingMode()
+    {
+        StopAgentMovementForDialogue();
+
+        if (IsAlternateIdleState(_currentWaitingIdleAnimation))
+        {
+            if (!HasCompletedIdleVariantPlayback(_currentWaitingIdleAnimation))
+            {
+                EnforceAnimation(_currentWaitingIdleAnimation, force: false);
+                return;
+            }
+
+            StartWaitingBaseIdleDwell(force: true);
+            return;
+        }
+
+        EnforceAnimation(PatrolAnimation.Idle, force: false);
+
+        if (Time.time >= _waitingIdleUntilTime)
+            StartWaitingIdleCycle(force: false);
     }
 
     private void HandleProximityEngagement()
     {
-        // Keep the NavMesh agent stopped.
-        if (_agent != null && _agent.enabled && _agent.isOnNavMesh)
-        {
-            if (!_agent.isStopped)
-            {
-                _agent.isStopped = true;
-                _agent.velocity  = Vector3.zero;
-            }
-        }
+        StopAgentMovementForDialogue();
 
         // Continuously face the player.
         if (_engagementTarget != null)
@@ -477,21 +638,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
             }
         }
 
-        // Drive Talk or Idle animation.
-        if (_overrideMode == AnimationOverrideMode.TalkLoop)
-        {
-            EnforceAnimation(PatrolAnimation.Talk, force: false);
-            if (_animator != null && !_animator.IsInTransition(0))
-            {
-                var info = _animator.GetCurrentAnimatorStateInfo(0);
-                if (StateMatches(info, _talkHash, _talkShortHash) && info.normalizedTime >= 1f)
-                    _animator.Play(_talkHash, 0, 0f);
-            }
-        }
-        else
-        {
-            EnforceAnimation(PatrolAnimation.Idle, force: false);
-        }
+        EnforceAnimation(PatrolAnimation.Idle, force: false);
     }
 
     // ─────────────────────────────────────────────────────────────────────
@@ -538,12 +685,16 @@ public class AzkiIslandRoamingController : MonoBehaviour
     {
         _idleHash = Animator.StringToHash(idleStateName);
         _idleBHash = Animator.StringToHash(idleBStateName);
+        _idleCHash = Animator.StringToHash(idleCStateName);
+        _idleDHash = Animator.StringToHash(idleDStateName);
         _walkHash = Animator.StringToHash(walkStateName);
         _talkHash = Animator.StringToHash(talkStateName);
         _cheeringHash = Animator.StringToHash(cheeringStateName);
 
         _idleShortHash = HashShortStateName(idleStateName);
         _idleBShortHash = HashShortStateName(idleBStateName);
+        _idleCShortHash = HashShortStateName(idleCStateName);
+        _idleDShortHash = HashShortStateName(idleDStateName);
         _walkShortHash = HashShortStateName(walkStateName);
         _talkShortHash = HashShortStateName(talkStateName);
         _cheeringShortHash = HashShortStateName(cheeringStateName);
@@ -606,6 +757,65 @@ public class AzkiIslandRoamingController : MonoBehaviour
         return false;
     }
 
+    private void StopAgentMovementForDialogue()
+    {
+        if (_agent == null || !_agent.enabled)
+            return;
+
+        if (_agent.isOnNavMesh)
+        {
+            _agent.isStopped = true;
+            _agent.ResetPath();
+            _agent.velocity = Vector3.zero;
+        }
+
+        _agent.updateRotation = false;
+    }
+
+    private bool RotateTowardsPlayer(float turnSpeedDegPerSec)
+    {
+        Transform player = ResolvePlayerTransform();
+        if (player == null)
+            return false;
+
+        Vector3 toPlayer = player.position - transform.position;
+        toPlayer.y = 0f;
+
+        if (toPlayer.sqrMagnitude < 0.0001f)
+            return true;
+
+        Quaternion targetRotation = Quaternion.LookRotation(toPlayer.normalized, Vector3.up);
+        transform.rotation = Quaternion.RotateTowards(
+            transform.rotation,
+            targetRotation,
+            turnSpeedDegPerSec * Time.deltaTime
+        );
+
+        return true;
+    }
+
+    private Transform ResolvePlayerTransform()
+    {
+        if (_cachedPlayerTransform != null)
+            return _cachedPlayerTransform;
+
+        Camera mainCam = Camera.main;
+        if (mainCam != null)
+        {
+            _cachedPlayerTransform = mainCam.transform;
+            return _cachedPlayerTransform;
+        }
+
+        Camera anyCam = FindFirstObjectByType<Camera>();
+        if (anyCam != null)
+        {
+            _cachedPlayerTransform = anyCam.transform;
+            return _cachedPlayerTransform;
+        }
+
+        return null;
+    }
+
     private void SetNextDestination()
     {
         if (_agent == null || !_agent.enabled || !_agent.isOnNavMesh)
@@ -653,25 +863,119 @@ public class AzkiIslandRoamingController : MonoBehaviour
     private void BeginIdleWindow()
     {
         _isIdling = true;
+        _currentIdleWindowAnimation = PatrolAnimation.Idle;
 
         if (_agent != null)
             _agent.ResetPath();
 
         _idleUntilTime = Time.time + Random.Range(minIdleDuration, maxIdleDuration);
 
-        // IdleB should appear occasionally, not after every walk.
-        bool canUseIdleB = _animator != null && _animator.HasState(0, _idleHash) && _animator.HasState(0, _idleBHash);
-        bool cooldownSatisfied = _idleWindowsSinceIdleB >= minIdleWindowsBetweenIdleB;
-        bool playIdleB = canUseIdleB && cooldownSatisfied && Random.value <= idleBChancePerIdleWindow;
+        _currentIdleWindowAnimation = SelectIdleWindowAnimation();
+        EnforceAnimation(_currentIdleWindowAnimation, force: true);
+    }
 
-        if (playIdleB)
-            _idleWindowsSinceIdleB = 0;
-        else if (_idleWindowsSinceIdleB < int.MaxValue)
-            _idleWindowsSinceIdleB++;
+    private PatrolAnimation SelectIdleWindowAnimation()
+    {
+        if (_animator == null)
+            return PatrolAnimation.Idle;
 
-        PatrolAnimation idleVariant = playIdleB ? PatrolAnimation.IdleB : PatrolAnimation.Idle;
+        int availableAlternateCount = CountAvailableAlternateIdleStates();
+        if (!_animator.HasState(0, _idleHash) || availableAlternateCount == 0)
+        {
+            IncrementAlternateIdleCooldown();
+            return PatrolAnimation.Idle;
+        }
 
-        EnforceAnimation(idleVariant, force: true);
+        if (_idleWindowsSinceAlternateIdle < minIdleWindowsBetweenIdleB ||
+            Random.value > idleBChancePerIdleWindow)
+        {
+            IncrementAlternateIdleCooldown();
+            return PatrolAnimation.Idle;
+        }
+
+        _idleWindowsSinceAlternateIdle = 0;
+        return GetAvailableAlternateIdleByOrdinal(Random.Range(0, availableAlternateCount));
+    }
+
+    private void ResetWaitingIdleCycle()
+    {
+        _currentWaitingIdleAnimation = PatrolAnimation.Idle;
+        _waitingIdleUntilTime = 0f;
+    }
+
+    private void StartWaitingIdleCycle(bool force)
+    {
+        _currentWaitingIdleAnimation = SelectWaitingIdleAnimation();
+
+        if (_currentWaitingIdleAnimation == PatrolAnimation.Idle)
+        {
+            _waitingIdleUntilTime = Time.time + GetWaitingBaseIdleDuration();
+            EnforceAnimation(PatrolAnimation.Idle, force);
+            return;
+        }
+
+        _waitingIdleUntilTime = 0f;
+        EnforceAnimation(_currentWaitingIdleAnimation, force: true);
+    }
+
+    private void StartWaitingBaseIdleDwell(bool force)
+    {
+        _currentWaitingIdleAnimation = PatrolAnimation.Idle;
+        _waitingIdleUntilTime = Time.time + GetWaitingBaseIdleDuration();
+        EnforceAnimation(PatrolAnimation.Idle, force);
+    }
+
+    private PatrolAnimation SelectWaitingIdleAnimation()
+    {
+        int availableAlternateCount = CountAvailableAlternateIdleStates();
+        int choice = Random.Range(0, availableAlternateCount + 1);
+        return choice == 0
+            ? PatrolAnimation.Idle
+            : GetAvailableAlternateIdleByOrdinal(choice - 1);
+    }
+
+    private float GetWaitingBaseIdleDuration()
+    {
+        return maxWaitingBaseIdleDuration > minWaitingBaseIdleDuration
+            ? Random.Range(minWaitingBaseIdleDuration, maxWaitingBaseIdleDuration)
+            : minWaitingBaseIdleDuration;
+    }
+
+    private void IncrementAlternateIdleCooldown()
+    {
+        if (_idleWindowsSinceAlternateIdle < int.MaxValue)
+            _idleWindowsSinceAlternateIdle++;
+    }
+
+    private int CountAvailableAlternateIdleStates()
+    {
+        int count = 0;
+
+        if (HasAnimationState(PatrolAnimation.IdleB)) count++;
+        if (HasAnimationState(PatrolAnimation.IdleC)) count++;
+        if (HasAnimationState(PatrolAnimation.IdleD)) count++;
+
+        return count;
+    }
+
+    private PatrolAnimation GetAvailableAlternateIdleByOrdinal(int ordinal)
+    {
+        if (HasAnimationState(PatrolAnimation.IdleB))
+        {
+            if (ordinal == 0) return PatrolAnimation.IdleB;
+            ordinal--;
+        }
+
+        if (HasAnimationState(PatrolAnimation.IdleC))
+        {
+            if (ordinal == 0) return PatrolAnimation.IdleC;
+            ordinal--;
+        }
+
+        if (HasAnimationState(PatrolAnimation.IdleD) && ordinal == 0)
+            return PatrolAnimation.IdleD;
+
+        return PatrolAnimation.Idle;
     }
 
     private void HandleLockedMode()
@@ -775,6 +1079,8 @@ public class AzkiIslandRoamingController : MonoBehaviour
         {
             PatrolAnimation.Idle => _idleHash,
             PatrolAnimation.IdleB => _idleBHash,
+            PatrolAnimation.IdleC => _idleCHash,
+            PatrolAnimation.IdleD => _idleDHash,
             PatrolAnimation.Walk => _walkHash,
             PatrolAnimation.Talk => _talkHash,
             _ => _cheeringHash
@@ -784,6 +1090,8 @@ public class AzkiIslandRoamingController : MonoBehaviour
         {
             PatrolAnimation.Idle => _idleShortHash,
             PatrolAnimation.IdleB => _idleBShortHash,
+            PatrolAnimation.IdleC => _idleCShortHash,
+            PatrolAnimation.IdleD => _idleDShortHash,
             PatrolAnimation.Walk => _walkShortHash,
             PatrolAnimation.Talk => _talkShortHash,
             _ => _cheeringShortHash
@@ -792,8 +1100,8 @@ public class AzkiIslandRoamingController : MonoBehaviour
         if (!_animator.HasState(0, targetHash))
             return;
 
-        // IdleB is non-interruptible until its first cycle is complete.
-        if (!force && target != PatrolAnimation.IdleB && !HasCompletedIdleBPlayback())
+        // Alternate idle states are non-interruptible until their first cycle is complete.
+        if (!force && !IsAlternateIdleState(target) && !HasCompletedCurrentAlternateIdlePlayback())
             return;
 
         // If we're already transitioning to the requested state, don't restart the transition.
@@ -823,25 +1131,124 @@ public class AzkiIslandRoamingController : MonoBehaviour
         _nextAnimSwitchTime = Time.time + minStateHoldSeconds;
     }
 
-    private bool HasCompletedIdleBPlayback()
+    private bool HasCompletedCurrentAlternateIdlePlayback()
     {
-        if (_animator == null)
+        if (!TryGetActiveAlternateIdleState(out PatrolAnimation activeState))
             return true;
 
-        // If we're currently blending into IdleB, it has not completed yet.
+        return HasCompletedIdleVariantPlayback(activeState);
+    }
+
+    private bool HasCompletedIdleVariantPlayback(PatrolAnimation state)
+    {
+        if (_animator == null || !IsAlternateIdleState(state))
+            return true;
+
+        GetAnimationStateHashes(state, out int fullHash, out int shortHash);
+
         if (_animator.IsInTransition(0))
         {
             var next = _animator.GetNextAnimatorStateInfo(0);
-            if (StateMatches(next, _idleBHash, _idleBShortHash))
+            if (StateMatches(next, fullHash, shortHash))
                 return false;
         }
 
         var current = _animator.GetCurrentAnimatorStateInfo(0);
-        bool currentIsIdleB = StateMatches(current, _idleBHash, _idleBShortHash);
-        if (!currentIsIdleB)
+        if (!StateMatches(current, fullHash, shortHash))
             return true;
 
         return current.normalizedTime >= 1f;
+    }
+
+    private bool TryGetActiveAlternateIdleState(out PatrolAnimation state)
+    {
+        state = PatrolAnimation.Idle;
+
+        if (_animator == null)
+            return false;
+
+        if (_animator.IsInTransition(0) &&
+            TryMatchAlternateIdleState(_animator.GetNextAnimatorStateInfo(0), out state))
+        {
+            return true;
+        }
+
+        return TryMatchAlternateIdleState(_animator.GetCurrentAnimatorStateInfo(0), out state);
+    }
+
+    private bool TryMatchAlternateIdleState(AnimatorStateInfo stateInfo, out PatrolAnimation state)
+    {
+        if (StateMatches(stateInfo, _idleBHash, _idleBShortHash))
+        {
+            state = PatrolAnimation.IdleB;
+            return true;
+        }
+
+        if (StateMatches(stateInfo, _idleCHash, _idleCShortHash))
+        {
+            state = PatrolAnimation.IdleC;
+            return true;
+        }
+
+        if (StateMatches(stateInfo, _idleDHash, _idleDShortHash))
+        {
+            state = PatrolAnimation.IdleD;
+            return true;
+        }
+
+        state = PatrolAnimation.Idle;
+        return false;
+    }
+
+    private bool IsAlternateIdleState(PatrolAnimation state)
+    {
+        return state == PatrolAnimation.IdleB ||
+               state == PatrolAnimation.IdleC ||
+               state == PatrolAnimation.IdleD;
+    }
+
+    private bool HasAnimationState(PatrolAnimation state)
+    {
+        if (_animator == null)
+            return false;
+
+        GetAnimationStateHashes(state, out int fullHash, out _);
+        return fullHash != 0 && _animator.HasState(0, fullHash);
+    }
+
+    private void GetAnimationStateHashes(PatrolAnimation state, out int fullHash, out int shortHash)
+    {
+        switch (state)
+        {
+            case PatrolAnimation.Idle:
+                fullHash = _idleHash;
+                shortHash = _idleShortHash;
+                return;
+            case PatrolAnimation.IdleB:
+                fullHash = _idleBHash;
+                shortHash = _idleBShortHash;
+                return;
+            case PatrolAnimation.IdleC:
+                fullHash = _idleCHash;
+                shortHash = _idleCShortHash;
+                return;
+            case PatrolAnimation.IdleD:
+                fullHash = _idleDHash;
+                shortHash = _idleDShortHash;
+                return;
+            case PatrolAnimation.Walk:
+                fullHash = _walkHash;
+                shortHash = _walkShortHash;
+                return;
+            case PatrolAnimation.Talk:
+                fullHash = _talkHash;
+                shortHash = _talkShortHash;
+                return;
+            default:
+                fullHash = _cheeringHash;
+                shortHash = _cheeringShortHash;
+                return;
+        }
     }
 
     private static bool StateMatches(AnimatorStateInfo stateInfo, int fullHash, int shortHash)

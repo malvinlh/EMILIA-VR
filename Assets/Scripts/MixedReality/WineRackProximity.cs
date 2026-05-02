@@ -59,18 +59,18 @@ public class WineRackProximity : MonoBehaviour
 
     private void TryHandleBottle(Collider other, string eventName)
     {
-        Debug.Log($"[WineRackProximity] {eventName} fired by: {other.name} (tag={other.tag}) — _triggered={_triggered}, IsWaitingForRack={reviewController?.IsWaitingForRack}");
-
+        // Cheap early-out checks first — the rack's trigger volume is large
+        // (~17 × 12 × 10 m), so OnTriggerStay fires every FixedUpdate for any
+        // collider inside it (including the player). Logging before this gate
+        // produced a per-frame Debug.Log stream that stalled the main thread
+        // on Quest (logcat-over-ADB cost ~1–3 ms each), causing locomotion to
+        // feel laggy whenever the player stood near the wine rack.
         if (_triggered) return;
         if (reviewController == null || !reviewController.IsWaitingForRack) return;
 
-        if (!HasBottleTag(other.transform))
-        {
-            Debug.Log($"[WineRackProximity] Ignored '{other.name}' — no '{bottleTag}' tag found in hierarchy.");
-            return;
-        }
+        if (!HasBottleTag(other.transform)) return;
 
-        Debug.Log($"[WineRackProximity] Bottle matched tag '{bottleTag}' — triggering HandleBottleRacked.");
+        Debug.Log($"[WineRackProximity] {eventName}: bottle matched tag '{bottleTag}' on '{other.name}' — triggering HandleBottleRacked.");
         _triggered = true;
         reviewController.HandleBottleRacked();
 

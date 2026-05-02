@@ -5043,7 +5043,7 @@ MonoBehaviour:
   nextArmDelay: 0.6
   instructionForward: 0.9
   instructionHeight: 0.2
-  fontSize: 0.3
+  fontSize: 0.32
   logEvents: 0
 --- !u!4 &602012318
 Transform:
@@ -11133,7 +11133,7 @@ MonoBehaviour:
   outputFileName: recording.wav
   folderName: JournalRecordings
   micDevice: 
-  sampleRate: 44100
+  sampleRate: 16000
   maxLengthSec: 3599
   micButton: {fileID: 0}
   micCanvasGroup: {fileID: 0}
@@ -12610,7 +12610,7 @@ MonoBehaviour:
   outputFileName: recording.wav
   folderName: ChatRecordings
   micDevice: 
-  sampleRate: 44100
+  sampleRate: 16000
   maxLengthSec: 3599
   micButton: {fileID: 0}
   micCanvasGroup: {fileID: 0}
@@ -14529,7 +14529,7 @@ MonoBehaviour:
   tapMarkerRadius: 0.01
   instructionForward: 0.9
   instructionHeight: 0.18
-  fontSize: 0.28
+  fontSize: 0.3
   logEvents: 0
 --- !u!4 &2127075500
 Transform:

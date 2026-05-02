@@ -66,6 +66,9 @@ public class JournalStartButton : MonoBehaviour
     private bool wasHovering;
     private TextMeshPro _tooltipTmp;
     private bool _xrHovering;
+    // Cached so Update() doesn't pay Camera.main's tag-scan cost every frame
+    // while the tooltip is visible.
+    private Camera _mainCamera;
 
     private void Awake()
     {
@@ -187,14 +190,8 @@ public class JournalStartButton : MonoBehaviour
             return;
         }
 
-        // Billboard tooltip toward the camera while it is visible
-        if (_tooltipTmp != null && _tooltipTmp.gameObject.activeSelf && Camera.main != null)
-        {
-            _tooltipTmp.transform.position = transform.position + tooltipWorldOffset;
-            Vector3 lookDir = _tooltipTmp.transform.position - Camera.main.transform.position;
-            if (lookDir.sqrMagnitude > 0.0001f)
-                _tooltipTmp.transform.rotation = Quaternion.LookRotation(lookDir);
-        }
+        // Tooltip billboard moved to LateUpdate — runs after the camera, avoids
+        // a one-frame visual lag, and skipped entirely when the tooltip isn't visible.
 
         // Only run fingertip detection when hands are active
         if (handSubsystem == null || !handSubsystem.running)
@@ -225,6 +222,24 @@ public class JournalStartButton : MonoBehaviour
         }
 
         wasHovering = isHovering;
+    }
+
+    private void LateUpdate()
+    {
+        // Billboard the tooltip toward the camera, but only while it's visible.
+        // Camera.main is cached on first use to avoid Unity's per-call tag scan.
+        if (_tooltipTmp == null || !_tooltipTmp.gameObject.activeSelf) return;
+
+        if (_mainCamera == null)
+        {
+            _mainCamera = Camera.main;
+            if (_mainCamera == null) return;
+        }
+
+        _tooltipTmp.transform.position = transform.position + tooltipWorldOffset;
+        Vector3 lookDir = _tooltipTmp.transform.position - _mainCamera.transform.position;
+        if (lookDir.sqrMagnitude > 0.0001f)
+            _tooltipTmp.transform.rotation = Quaternion.LookRotation(lookDir);
     }
 
     private bool TryPokeWithHand(XRHand hand)
