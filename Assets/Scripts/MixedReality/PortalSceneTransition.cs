@@ -43,10 +43,6 @@ public class PortalSceneTransition : MonoBehaviour
     [Tooltip("How long the ring should spin up before transition load starts.")]
     [SerializeField] [Range(0f, 10f)] private float enterSpinDuration = 2.8f;
 
-    [Header("Teleport Dwell")]
-    [Tooltip("How long the player must remain inside the portal before teleport starts.")]
-    [SerializeField] [Range(0f, 10f)] private float requiredStayDuration = 3.0f;
-
     [Header("Who Can Trigger")]
     [Tooltip("Primary tag used to detect the player collider or camera.")]
     [SerializeField] private string playerTag = "MainCamera";
@@ -73,7 +69,6 @@ public class PortalSceneTransition : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float enterSfxVolume = 1f;
     [SerializeField] private bool stopIdleLoopOnEnter = false;
     [SerializeField] private bool playEnterBurstVfx = false;
-    [SerializeField] private PortalCalmRingVfx portalRingVfx;
 
     [Header("Synced Spin Particles")]
     [Tooltip("Keep idle particles spinning with the portal ring and accelerate on enter.")]
@@ -130,6 +125,7 @@ public class PortalSceneTransition : MonoBehaviour
     [SerializeField] private CanvasGroup fadeCanvas;
 
     [SerializeField] [Range(0f, 3f)] private float fadeDuration = 0.35f;
+    [SerializeField] [Range(0f, 1f)] private float vignetteMaxAlpha = 0.5f;
     [SerializeField] private bool useUnscaledTime = true;
 
     [Header("Callbacks")]
@@ -148,7 +144,8 @@ public class PortalSceneTransition : MonoBehaviour
     private Material particleRuntimeMaterial;
     private float currentParticleSpin01;
     private readonly HashSet<int> activePlayerTriggerIds = new HashSet<int>();
-    private float currentStayTimer;
+    private Coroutine _activeTransition;
+    private Coroutine _vignetteCoroutine;
 
     private void Reset()
     {
@@ -179,9 +176,6 @@ public class PortalSceneTransition : MonoBehaviour
         if (enterBurstVfx != null && enterBurstVfx.isPlaying)
             enterBurstVfx.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
 
-        if (portalRingVfx != null)
-            portalRingVfx.SetIdleState(immediate: true);
-
         EnsureParticleMaterials();
         currentParticleSpin01 = 0f;
         ApplySynchronizedParticleSpin(currentParticleSpin01);
@@ -203,7 +197,6 @@ public class PortalSceneTransition : MonoBehaviour
 
     private void Update()
     {
-        UpdateTeleportDwell();
         UpdateSyncedParticleSpin();
     }
 
@@ -236,9 +229,7 @@ public class PortalSceneTransition : MonoBehaviour
         if (requireForwardEntry && !IsEnteringFromFront(other)) return;
 
         activePlayerTriggerIds.Add(other.GetInstanceID());
-
-        if (requiredStayDuration <= 0f)
-            StartCoroutine(TransitionRoutine());
+        _activeTransition = StartCoroutine(TransitionRoutine());
     }
 
     private void OnTriggerExit(Collider other)
@@ -246,30 +237,34 @@ public class PortalSceneTransition : MonoBehaviour
         if (other == null)
             return;
 
-        if (activePlayerTriggerIds.Remove(other.GetInstanceID()) && activePlayerTriggerIds.Count == 0)
-            ResetTeleportDwell();
+        activePlayerTriggerIds.Remove(other.GetInstanceID());
+
+        if (isTransitioning && IsPlayerTrigger(other))
+            InterruptTransition();
     }
 
-    private void UpdateTeleportDwell()
+    private void InterruptTransition()
     {
-        if (isTransitioning)
-            return;
+        if (_activeTransition != null)
+        {
+            StopCoroutine(_activeTransition);
+            _activeTransition = null;
+        }
 
-        if (activePlayerTriggerIds.Count == 0)
-            return;
+        isTransitioning = false;
+        activePlayerTriggerIds.Clear();
 
-        float dt = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
-        if (dt <= 0f)
-            return;
+        if (portalAudioSource != null && portalAudioSource.isPlaying)
+            portalAudioSource.Stop();
 
-        currentStayTimer += dt;
-        if (currentStayTimer >= requiredStayDuration)
-            StartCoroutine(TransitionRoutine());
-    }
+        if (stopIdleLoopOnEnter && idleLoopVfx != null && !idleLoopVfx.isPlaying)
+            idleLoopVfx.Play(true);
 
-    private void ResetTeleportDwell()
-    {
-        currentStayTimer = 0f;
+        currentParticleSpin01 = 0f;
+
+        if (_vignetteCoroutine != null)
+            StopCoroutine(_vignetteCoroutine);
+        _vignetteCoroutine = StartCoroutine(FadeVignette(fadeCanvas != null ? fadeCanvas.alpha : 0f, 0f, 0.4f));
     }
 
     private bool IsPlayerTrigger(Collider other)
@@ -373,24 +368,6 @@ public class PortalSceneTransition : MonoBehaviour
 
         if (triggeringLayers.value == 0 && Camera.main != null)
             triggeringLayers = 1 << Camera.main.gameObject.layer;
-
-        if (portalRingVfx == null)
-            portalRingVfx = portalRoot.GetComponentInChildren<PortalCalmRingVfx>(includeInactive);
-
-        if (portalRingVfx == null && autoCreateMissingReferences)
-        {
-            portalRingVfx = GetComponent<PortalCalmRingVfx>();
-            if (portalRingVfx == null)
-                portalRingVfx = gameObject.AddComponent<PortalCalmRingVfx>();
-        }
-
-        if (portalRingVfx != null)
-        {
-            float estimatedRadius = EstimatePortalRadius();
-            Transform ringAnchor = vfxAnchor != null ? vfxAnchor : transform;
-            portalRingVfx.AutoConfigure(portalRoot, ringAnchor, estimatedRadius);
-            portalRingVfx.SetIdleState(immediate: true);
-        }
 
         EnsureParticleMaterials();
         currentParticleSpin01 = 0f;
@@ -684,9 +661,6 @@ public class PortalSceneTransition : MonoBehaviour
 
     private float GetTargetParticleSpin01()
     {
-        if (portalRingVfx != null)
-            return portalRingVfx.CurrentSpin01;
-
         return isTransitioning ? 1f : 0f;
     }
 
@@ -950,8 +924,6 @@ public class PortalSceneTransition : MonoBehaviour
     private IEnumerator TransitionRoutine()
     {
         isTransitioning = true;
-        activePlayerTriggerIds.Clear();
-        ResetTeleportDwell();
 
         onTransitionStarted?.Invoke();
 
@@ -967,31 +939,42 @@ public class PortalSceneTransition : MonoBehaviour
         if (portalAudioSource != null && enterSfx != null)
             portalAudioSource.PlayOneShot(enterSfx, enterSfxVolume);
 
-        if (portalRingVfx != null)
-            portalRingVfx.TriggerEnterSpin(enterSpinDuration);
-
         float transitionDelay = Mathf.Max(loadDelay, enterSpinDuration);
 
         if (fadeCanvas != null && fadeDuration > 0f)
         {
             float preFadeWait = Mathf.Max(0f, transitionDelay - fadeDuration);
             if (preFadeWait > 0f)
-                yield return WaitSeconds(preFadeWait);
+            {
+                fadeCanvas.gameObject.SetActive(true);
+                fadeCanvas.blocksRaycasts = false;
+                fadeCanvas.interactable = false;
+                fadeCanvas.alpha = 0f;
 
-            yield return FadeCanvas(0f, 1f, fadeDuration);
+                float elapsed = 0f;
+                while (elapsed < preFadeWait)
+                {
+                    float dt = useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+                    elapsed += dt;
+                    fadeCanvas.alpha = Mathf.Lerp(0f, vignetteMaxAlpha, Mathf.Clamp01(elapsed / preFadeWait));
+                    yield return null;
+                }
+            }
+
+            yield return FadeCanvas(vignetteMaxAlpha, 1f, fadeDuration);
         }
         else if (transitionDelay > 0f)
         {
             yield return WaitSeconds(transitionDelay);
         }
 
+        _activeTransition = null;
         yield return LoadTargetScene();
     }
 
     private void OnDisable()
     {
         activePlayerTriggerIds.Clear();
-        ResetTeleportDwell();
     }
 
     private IEnumerator FadeCanvas(float from, float to, float duration)
@@ -1010,6 +993,27 @@ public class PortalSceneTransition : MonoBehaviour
         }
 
         fadeCanvas.alpha = to;
+    }
+
+    private IEnumerator FadeVignette(float from, float to, float duration)
+    {
+        if (fadeCanvas == null) yield break;
+
+        fadeCanvas.gameObject.SetActive(true);
+        fadeCanvas.blocksRaycasts = false;
+        fadeCanvas.interactable = false;
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += useUnscaledTime ? Time.unscaledDeltaTime : Time.deltaTime;
+            fadeCanvas.alpha = Mathf.Lerp(from, to, Mathf.Clamp01(elapsed / duration));
+            yield return null;
+        }
+
+        fadeCanvas.alpha = to;
+        if (to <= 0f)
+            fadeCanvas.gameObject.SetActive(false);
     }
 
     private IEnumerator WaitSeconds(float seconds)

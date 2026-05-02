@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -17,9 +18,14 @@ public class LoginManager : MonoBehaviour
     [SerializeField] private TMP_Text errorTextNickname;
     [SerializeField] private TMP_Text errorTextFullName;
 
-    [Header("Portal Glass GameObjects")]
-    [SerializeField] private GameObject beachPortalGlass;
-    [SerializeField] private GameObject bedroomPortalGlass;
+    [Header("Electricity VFX")]
+    [SerializeField] private GameObject beachElectricityVfx;
+    [SerializeField] private GameObject bedroomElectricityVfx;
+    [SerializeField] [Range(0f, 10f)] private float electricityDuration = 2.0f;
+
+    [Header("Portal VFX (Portal1)")]
+    [SerializeField] private GameObject beachPortalVfx;
+    [SerializeField] private GameObject bedroomPortalVfx;
 
     [Header("On Success")]
     [SerializeField] private UnityEvent onLoginSuccess;
@@ -36,16 +42,18 @@ public class LoginManager : MonoBehaviour
     {
         SetErrorVisible(errorTextNickname, false);
         SetErrorVisible(errorTextFullName, false);
-        beachPortalGlass?.SetActive(false);
-        bedroomPortalGlass?.SetActive(false);
+        beachElectricityVfx?.SetActive(false);
+        bedroomElectricityVfx?.SetActive(false);
+        beachPortalVfx?.SetActive(false);
+        bedroomPortalVfx?.SetActive(false);
 
         if (_sessionLoggedIn)
         {
             if (nicknameInput != null) { nicknameInput.text = _sessionNickname; nicknameInput.interactable = false; }
             if (fullNameInput  != null) { fullNameInput.text  = _sessionFullName;  fullNameInput.interactable  = false; }
             if (continueButton != null)   continueButton.interactable = false;
-            beachPortalGlass?.SetActive(true);
-            bedroomPortalGlass?.SetActive(true);
+            beachPortalVfx?.SetActive(true);
+            bedroomPortalVfx?.SetActive(true);
         }
     }
 
@@ -70,8 +78,21 @@ public class LoginManager : MonoBehaviour
         _sessionNickname = nickname;
         _sessionFullName = fullName;
 
-        beachPortalGlass?.SetActive(true);
-        bedroomPortalGlass?.SetActive(true);
+        StartCoroutine(LoginVfxSequence());
+    }
+
+    private IEnumerator LoginVfxSequence()
+    {
+        beachElectricityVfx?.SetActive(true);
+        bedroomElectricityVfx?.SetActive(true);
+
+        yield return new WaitForSeconds(electricityDuration);
+
+        beachElectricityVfx?.SetActive(false);
+        bedroomElectricityVfx?.SetActive(false);
+
+        beachPortalVfx?.SetActive(true);
+        bedroomPortalVfx?.SetActive(true);
 
         onLoginSuccess?.Invoke();
     }
