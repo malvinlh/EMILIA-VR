@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.IO;
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -28,8 +30,9 @@ public class RecordAudio : MonoBehaviour
     [Tooltip("Target microphone device (leave empty for default).")]
     [SerializeField] private string micDevice = "";
 
-    [Tooltip("Sample rate of the recording (Hz).")]
-    [SerializeField] private int sampleRate = 44100;
+    [Tooltip("Sample rate of the recording (Hz). 16 kHz matches what speech-to-text models consume natively " +
+             "and keeps WAV files ~2.75x smaller than 44.1 kHz, dramatically shrinking the on-Stop file write.")]
+    [SerializeField] private int sampleRate = 16000;
 
     [Tooltip("Maximum recording length in seconds (default: 3599).")]
     [SerializeField] private int maxLengthSec = 3599;
@@ -59,9 +62,17 @@ public class RecordAudio : MonoBehaviour
     #region Events & State
 
     /// <summary>
-    /// Event invoked after a recording is saved. Passes the file path.
+    /// Event invoked after a recording is saved to disk. Passes the file path.
     /// </summary>
     public event Action<string> OnSaved;
+
+    /// <summary>
+    /// Event invoked the moment a recording has been encoded to a WAV byte buffer,
+    /// before the (off-thread) disk write completes. Subscribers that only need the
+    /// audio payload (e.g. transcription) can start consuming immediately and skip
+    /// the disk round-trip.
+    /// </summary>
+    public event Action<byte[], string> OnEncoded;
 
     /// <summary>
     /// Event invoked whenever the mic state changes (true = recording).
@@ -79,6 +90,9 @@ public class RecordAudio : MonoBehaviour
     private AudioClip _recordedClip;
     private float _startTime;
     private Coroutine _blinkCo;
+    private bool _pendingStart;
+    // Reused across recordings to avoid allocating a multi-MB float[] on every Stop.
+    private float[] _trimBuffer;
 
     #endregion
 
@@ -160,11 +174,16 @@ public class RecordAudio : MonoBehaviour
     #region Recording
 
     /// <summary>
-    /// Starts microphone recording using the configured settings.
+    /// Starts microphone recording using the configured settings. The actual
+    /// <see cref="Microphone.Start"/> call (which can block the main thread for
+    /// 10–100 ms while initializing the audio device on Quest) is deferred by one
+    /// frame so the click handler returns immediately and the mic-button visual
+    /// can render before the HW init stalls the next render. Net result: the
+    /// click frame stays smooth and only one render is touched by the stall.
     /// </summary>
     public void StartRecording()
     {
-        if (IsRecording) return;
+        if (IsRecording || _pendingStart) return;
         EnsureOutputPathInitialized();
 
         if (Microphone.devices.Length == 0)
@@ -173,12 +192,27 @@ public class RecordAudio : MonoBehaviour
             return;
         }
 
+        _pendingStart = true;
+        StartCoroutine(CoStartRecording());
+    }
+
+    private IEnumerator CoStartRecording()
+    {
+        // Yield once so the click event finishes propagating and the UI updates
+        // (e.g. the mic icon flipping to "Recording") render this frame. The
+        // blocking Microphone.Start runs next frame.
+        yield return null;
+
+        if (!_pendingStart) yield break;     // cancelled before start
+
         string device = ResolveMicDevice();
         _recordedClip = Microphone.Start(device, loop: false, lengthSec: maxLengthSec, frequency: sampleRate);
+        _pendingStart = false;
+
         if (_recordedClip == null)
         {
             Debug.LogError($"[RecordAudio] Failed to start recording on device '{device}'.");
-            return;
+            yield break;
         }
 
         _activeMicDevice = device;
@@ -195,7 +229,12 @@ public class RecordAudio : MonoBehaviour
     }
 
     /// <summary>
-    /// Stops recording and saves the audio to disk if valid.
+    /// Stops recording and saves the audio to disk if valid. Encoding to a WAV byte
+    /// buffer happens on the main thread (it needs <see cref="AudioClip.GetData"/>),
+    /// but the encoded bytes are then handed off to a background thread for the
+    /// actual file write via <see cref="Task.Run"/>. <see cref="OnEncoded"/> fires
+    /// immediately so transcription can begin in parallel; <see cref="OnSaved"/>
+    /// fires later, after the disk write completes.
     /// </summary>
     public void StopRecording()
     {
@@ -206,25 +245,24 @@ public class RecordAudio : MonoBehaviour
         IsRecording = false;
 
         float recordedSeconds = Mathf.Max(0f, Time.realtimeSinceStartup - _startTime);
-        string savedPath = null;
+        byte[] wavBytes       = null;
+        string targetPath     = null;
+        string fileName       = null;
 
         try
         {
             if (_recordedClip != null && recordedSeconds > 0.01f)
             {
-                var trimmed = TrimClip(_recordedClip, recordedSeconds);
-                if (trimmed != null && trimmed.samples > 0)
+                int floatsToEncode = ReadTrimmedSamplesIntoPool(_recordedClip, recordedSeconds);
+                if (floatsToEncode > 0)
                 {
-                    string targetPath = EnsureWavExtension(_filePath);
-                    if (WavUtility.Save(targetPath, trimmed))
-                    {
-                        savedPath = targetPath;
-                        Debug.Log($"[RecordAudio] Recording saved to: {savedPath}");
-                    }
-                    else
-                    {
-                        Debug.LogError("[RecordAudio] WAV save failed.");
-                    }
+                    targetPath = EnsureWavExtension(_filePath);
+                    fileName   = Path.GetFileName(targetPath);
+                    wavBytes   = WavUtility.EncodeToBytes(
+                        _trimBuffer, floatsToEncode,
+                        _recordedClip.channels, _recordedClip.frequency);
+                    if (wavBytes == null)
+                        Debug.LogError("[RecordAudio] WAV encode failed.");
                 }
                 else
                 {
@@ -238,7 +276,8 @@ public class RecordAudio : MonoBehaviour
         }
         catch (Exception ex)
         {
-            Debug.LogError($"[RecordAudio] Stop/save failed: {ex.Message}");
+            Debug.LogError($"[RecordAudio] Stop/encode failed: {ex.Message}");
+            wavBytes = null;
         }
         finally
         {
@@ -249,31 +288,75 @@ public class RecordAudio : MonoBehaviour
 
             ApplyBlink(false);
             SetCanvasAlpha(1f);
+        }
 
-            // Notify listeners only when a valid file was produced.
-            if (!string.IsNullOrEmpty(savedPath))
-                OnSaved?.Invoke(savedPath);
+        // Fire OnEncoded immediately (off the main-thread blocking path) so listeners
+        // such as transcription can start uploading while we write to disk in parallel.
+        if (wavBytes != null && wavBytes.Length > 0)
+        {
+            OnEncoded?.Invoke(wavBytes, fileName);
+            StartCoroutine(CoWriteWavAsync(targetPath, wavBytes));
         }
     }
 
     /// <summary>
-    /// Trims the AudioClip to the specified length (in seconds).
+    /// Writes the encoded WAV bytes to disk on a background thread and fires
+    /// <see cref="OnSaved"/> when done. The main thread polls Task completion
+    /// via WaitUntil so we never block any frame on disk I/O.
     /// </summary>
-    private AudioClip TrimClip(AudioClip clip, float length)
+    private IEnumerator CoWriteWavAsync(string targetPath, byte[] wavBytes)
     {
-        if (clip == null) return null;
+        if (string.IsNullOrEmpty(targetPath) || wavBytes == null) yield break;
 
-        int samples = Mathf.Min((int)(length * clip.frequency), clip.samples);
-        samples = Mathf.Max(samples, 0);
+        string directory = Path.GetDirectoryName(targetPath);
+        var task = Task.Run(() =>
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
+                File.WriteAllBytes(targetPath, wavBytes);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[RecordAudio] Async WAV write failed: {ex.Message}");
+                return false;
+            }
+        });
 
-        if (samples == 0) return clip;
+        yield return new WaitUntil(() => task.IsCompleted);
 
-        var data = new float[samples * clip.channels];
-        clip.GetData(data, 0);
+        if (task.Status == TaskStatus.RanToCompletion && task.Result)
+        {
+            Debug.Log($"[RecordAudio] Recording saved to: {targetPath}");
+            OnSaved?.Invoke(targetPath);
+        }
+    }
 
-        var newClip = AudioClip.Create(clip.name, samples, clip.channels, clip.frequency, false);
-        newClip.SetData(data, 0);
-        return newClip;
+    /// <summary>
+    /// Reads the recorded portion of <paramref name="clip"/> into the pooled
+    /// <see cref="_trimBuffer"/> and returns the number of valid floats
+    /// (samples × channels) that should be encoded. Returns 0 when the clip is
+    /// empty or invalid. Avoids the <see cref="AudioClip.Create"/> +
+    /// <see cref="AudioClip.SetData"/> round-trip the previous TrimClip used to
+    /// build a temporary clip, since the encoder consumes raw floats directly.
+    /// </summary>
+    private int ReadTrimmedSamplesIntoPool(AudioClip clip, float length)
+    {
+        if (clip == null) return 0;
+
+        int samplesPerChannel = Mathf.Min((int)(length * clip.frequency), clip.samples);
+        if (samplesPerChannel <= 0) return 0;
+
+        int floatCount = samplesPerChannel * clip.channels;
+        if (_trimBuffer == null || _trimBuffer.Length < floatCount)
+            _trimBuffer = new float[floatCount];
+
+        // GetData fills the first (clip.samples * channels) entries; the encoder only
+        // reads `floatCount`, so capturing the leading recorded portion is sufficient.
+        clip.GetData(_trimBuffer, 0);
+        return floatCount;
     }
 
     private void EnsureOutputPathInitialized()

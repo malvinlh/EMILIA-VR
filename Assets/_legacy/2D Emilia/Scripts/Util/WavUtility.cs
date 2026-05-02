@@ -67,6 +67,89 @@ public static class WavUtility
         }
     }
 
+    /// <summary>
+    /// Encodes an <see cref="AudioClip"/> into an in-memory PCM 16-bit WAV byte buffer.
+    /// Must be called on the main thread (uses <see cref="AudioClip.GetData"/>); the
+    /// resulting <c>byte[]</c> can then be written to disk on a background thread.
+    /// </summary>
+    public static byte[] EncodeToBytes(AudioClip clip)
+    {
+        if (clip == null)
+        {
+            Debug.LogError("[WavUtility] Cannot encode null AudioClip.");
+            return null;
+        }
+
+        try
+        {
+            int sampleCount = clip.samples * clip.channels;
+            int dataByteLen = sampleCount * 2;                    // 16-bit PCM
+            int totalLen    = HEADER_SIZE + dataByteLen;
+
+            // Pre-size the buffer exactly so MemoryStream never reallocates.
+            using (var ms = new MemoryStream(totalLen))
+            {
+                // Reserve header space; we'll seek back and fill it after the body.
+                ms.SetLength(HEADER_SIZE);
+                ms.Position = HEADER_SIZE;
+
+                ConvertAndWrite(ms, clip);
+                WriteHeader(ms, clip);
+
+                return ms.ToArray();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[WavUtility] Failed to encode WAV: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Encodes raw float audio samples (interleaved if multi-channel, range -1..1) into
+    /// an in-memory PCM 16-bit WAV byte buffer. Lets callers skip the
+    /// <see cref="AudioClip.Create"/> + second <see cref="AudioClip.GetData"/> round-trip
+    /// that <see cref="EncodeToBytes(AudioClip)"/> would otherwise perform when they
+    /// already have the float samples in hand (e.g. via a pooled buffer).
+    /// </summary>
+    /// <param name="samples">Float buffer. Only the first <paramref name="sampleCount"/> entries are read.</param>
+    /// <param name="sampleCount">Number of <em>samples × channels</em> floats to encode. Capped at <paramref name="samples"/>.Length.</param>
+    /// <param name="channels">Channel count (1 = mono, 2 = stereo).</param>
+    /// <param name="frequency">Sample rate in Hz.</param>
+    public static byte[] EncodeToBytes(float[] samples, int sampleCount, int channels, int frequency)
+    {
+        if (samples == null || sampleCount <= 0 || channels <= 0 || frequency <= 0)
+        {
+            Debug.LogError("[WavUtility] Cannot encode — invalid sample buffer or metadata.");
+            return null;
+        }
+
+        if (sampleCount > samples.Length) sampleCount = samples.Length;
+
+        try
+        {
+            int dataByteLen = sampleCount * 2;                    // 16-bit PCM
+            int totalLen    = HEADER_SIZE + dataByteLen;
+
+            using (var ms = new MemoryStream(totalLen))
+            {
+                ms.SetLength(HEADER_SIZE);
+                ms.Position = HEADER_SIZE;
+
+                WriteSamplesAsPcm16(ms, samples, sampleCount);
+                WriteRawHeader(ms, sampleCount / channels, channels, frequency);
+
+                return ms.ToArray();
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[WavUtility] Failed to encode WAV from float buffer: {ex.Message}");
+            return null;
+        }
+    }
+
     #endregion
 
     #region Private Helpers
@@ -87,37 +170,49 @@ public static class WavUtility
     }
 
     /// <summary>
-    /// Converts Unity float samples (-1..1) to 16-bit PCM and writes them to the file stream.
+    /// Converts Unity float samples (-1..1) to 16-bit PCM and writes them to the stream.
     /// </summary>
-    private static void ConvertAndWrite(FileStream fileStream, AudioClip clip)
+    private static void ConvertAndWrite(Stream fileStream, AudioClip clip)
     {
         float[] samples = new float[clip.samples * clip.channels];
         clip.GetData(samples, 0);
-
-        short[] intData = new short[samples.Length];
-        byte[] bytesData = new byte[samples.Length * 2];
-
-        const float rescaleFactor = 32767f; // max range of Int16
-
-        for (int i = 0; i < samples.Length; i++)
-        {
-            intData[i] = (short)(samples[i] * rescaleFactor);
-            byte[] byteArr = BitConverter.GetBytes(intData[i]);
-            byteArr.CopyTo(bytesData, i * 2);
-        }
-
-        fileStream.Write(bytesData, 0, bytesData.Length);
+        WriteSamplesAsPcm16(fileStream, samples, samples.Length);
     }
 
     /// <summary>
-    /// Writes a standard 44-byte WAV header for PCM 16-bit format.
+    /// Writes the first <paramref name="sampleCount"/> floats from <paramref name="samples"/>
+    /// as little-endian 16-bit PCM to the stream.
     /// </summary>
-    private static void WriteHeader(FileStream fileStream, AudioClip clip)
+    private static void WriteSamplesAsPcm16(Stream stream, float[] samples, int sampleCount)
     {
-        int hz = clip.frequency;
-        int channels = clip.channels;
-        int samples = clip.samples;
+        byte[] bytesData = new byte[sampleCount * 2];
 
+        const float rescaleFactor = 32767f; // max range of Int16
+
+        for (int i = 0; i < sampleCount; i++)
+        {
+            short s = (short)(samples[i] * rescaleFactor);
+            int   o = i * 2;
+            bytesData[o]     = (byte)(s & 0xFF);
+            bytesData[o + 1] = (byte)((s >> 8) & 0xFF);
+        }
+
+        stream.Write(bytesData, 0, bytesData.Length);
+    }
+
+    /// <summary>
+    /// Writes a standard 44-byte WAV header for PCM 16-bit format using clip metadata.
+    /// </summary>
+    private static void WriteHeader(Stream fileStream, AudioClip clip)
+    {
+        WriteRawHeader(fileStream, clip.samples, clip.channels, clip.frequency);
+    }
+
+    /// <summary>
+    /// Writes a standard 44-byte WAV header for PCM 16-bit format from raw metadata.
+    /// </summary>
+    private static void WriteRawHeader(Stream fileStream, int samplesPerChannel, int channels, int hz)
+    {
         fileStream.Seek(0, SeekOrigin.Begin);
 
         // Chunk ID "RIFF"
@@ -157,7 +252,7 @@ public static class WavUtility
         fileStream.Write(System.Text.Encoding.UTF8.GetBytes("data"), 0, 4);
 
         // Subchunk2 size (NumSamples * Channels * BytesPerSample)
-        fileStream.Write(BitConverter.GetBytes(samples * channels * 2), 0, 4);
+        fileStream.Write(BitConverter.GetBytes(samplesPerChannel * channels * 2), 0, 4);
     }
 
     #endregion

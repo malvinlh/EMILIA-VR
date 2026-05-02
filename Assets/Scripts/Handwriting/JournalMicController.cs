@@ -1,5 +1,4 @@
 using System.Collections;
-using System.IO;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -85,7 +84,11 @@ public class JournalMicController : MonoBehaviour
 
         if (recorder != null)
         {
-            recorder.OnSaved           += OnAudioSaved;
+            // Subscribe to OnEncoded (fires the moment the WAV bytes are in memory)
+            // instead of OnSaved (fires after the disk write completes). The bytes
+            // path lets transcription start in parallel with the off-thread file
+            // write — no disk round-trip on the user-perceived latency path.
+            recorder.OnEncoded         += OnAudioEncoded;
             recorder.OnMicStateChanged += OnRecorderMicStateChanged;
         }
         else
@@ -168,7 +171,7 @@ public class JournalMicController : MonoBehaviour
 
         if (recorder != null)
         {
-            recorder.OnSaved           -= OnAudioSaved;
+            recorder.OnEncoded         -= OnAudioEncoded;
             recorder.OnMicStateChanged -= OnRecorderMicStateChanged;
         }
     }
@@ -260,23 +263,23 @@ public class JournalMicController : MonoBehaviour
         UpdateMicVisual();
     }
 
-    private void OnAudioSaved(string filePath)
+    private void OnAudioEncoded(byte[] wavBytes, string fileName)
     {
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+        if (wavBytes == null || wavBytes.Length == 0)
         {
             _micState = MicState.Idle;
             UpdateMicVisual();
             return;
         }
 
-        _transcribeCo = StartCoroutine(CoTranscribe(filePath));
+        _transcribeCo = StartCoroutine(CoTranscribe(wavBytes, fileName));
     }
 
     // ==================================================================
     // TRANSCRIPTION
     // ==================================================================
 
-    private IEnumerator CoTranscribe(string filePath)
+    private IEnumerator CoTranscribe(byte[] wavBytes, string fileName)
     {
         _micState = MicState.Transcribing;
         UpdateMicVisual();
@@ -291,8 +294,10 @@ public class JournalMicController : MonoBehaviour
         }
 
         string transcribed = null;
-        yield return api.TranscribeFile(
-            filePath,
+        yield return api.Transcribe(
+            wavBytes,
+            string.IsNullOrEmpty(fileName) ? "audio.wav" : fileName,
+            "audio/wav",
             onSuccess: text => transcribed = text,
             onError:   err  => Debug.LogWarning($"{TAG} Transcription error: {err}"));
 

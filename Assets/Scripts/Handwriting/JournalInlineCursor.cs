@@ -83,6 +83,14 @@ public class JournalInlineCursor : MonoBehaviour
     private readonly List<RectTransform> _highlights = new List<RectTransform>();
     private int                      _lastKnownPage = -1;
 
+    // ── TMP cache ─────────────────────────────────────────────────────────
+    // ForceMeshUpdate() is one of TMP's most expensive operations. Calling it
+    // every frame during a pinch (as the original code did) was a major hover-
+    // lag contributor. Instead we only call it when the underlying text has
+    // actually changed — driven by ScribbleManager.OnTextChanged.
+    private bool _textDirty           = true;
+    private bool _scribbleSubscribed;
+
     // Cached Camera Floor Offset Object — required to convert session-space
     // joint positions to world space (same pattern as WhiteboardPen).
     private Transform _cameraOffsetTransform;
@@ -162,9 +170,43 @@ public class JournalInlineCursor : MonoBehaviour
         if (Instance == this) Instance = null;
         IsHandTracked = false;
         if (_blinkCo != null) StopCoroutine(_blinkCo);
+        UnsubscribeScribble();
         ScribbleManager.Instance?.ClearInsertCursor();
         foreach (var h in _highlights)
             if (h != null) Destroy(h.gameObject);
+    }
+
+    private void TrySubscribeScribble()
+    {
+        if (_scribbleSubscribed) return;
+        var mgr = ScribbleManager.Instance;
+        if (mgr == null) return;
+        mgr.OnTextChanged += OnScribbleTextChanged;
+        _scribbleSubscribed = true;
+    }
+
+    private void UnsubscribeScribble()
+    {
+        if (!_scribbleSubscribed) return;
+        var mgr = ScribbleManager.Instance;
+        if (mgr != null) mgr.OnTextChanged -= OnScribbleTextChanged;
+        _scribbleSubscribed = false;
+    }
+
+    private void OnScribbleTextChanged(string _) => _textDirty = true;
+
+    /// <summary>
+    /// Calls <see cref="TMP_Text.ForceMeshUpdate"/> only when our cached textInfo
+    /// is known to be stale. On unchanged frames the existing textInfo is used,
+    /// avoiding the per-frame TMP rebuild that was the dominant hover-lag cost.
+    /// </summary>
+    private void EnsureTextInfoFresh()
+    {
+        if (_textDirty && resultText != null)
+        {
+            resultText.ForceMeshUpdate();
+            _textDirty = false;
+        }
     }
 
     // ==================================================================
@@ -193,11 +235,22 @@ public class JournalInlineCursor : MonoBehaviour
         var rightHand = _handSubsystem.rightHand;
         if (!rightHand.isTracked) { SetRayVisible(false); IsHandTracked = false; return; }
 
+        // ── Lazy subscribe to ScribbleManager.OnTextChanged ───────────
+        // ScribbleManager.Instance may not exist yet at our Start(); subscribe
+        // the first time we observe it here so the text-dirty flag is driven
+        // by content changes instead of forcing a TMP rebuild every frame.
+        if (!_scribbleSubscribed) TrySubscribeScribble();
+
         // ── Page-change guard ─────────────────────────────────────────
         // Dismiss cursor / selection if the user navigated to a different page.
         int currentPage = ScribbleManager.Instance?.CurrentPageIndex ?? -1;
-        if (currentPage != _lastKnownPage && _lastKnownPage >= 0)
-            ResetToIdle();
+        if (currentPage != _lastKnownPage)
+        {
+            // Page swap → resultText was rebound to a different page's content,
+            // so any cached textInfo is stale.
+            _textDirty = true;
+            if (_lastKnownPage >= 0) ResetToIdle();
+        }
         _lastKnownPage = currentPage;
 
         // ── Joint poses (session → world) ──────────────────────────────
@@ -409,7 +462,7 @@ public class JournalInlineCursor : MonoBehaviour
         int wordCount = ScribbleManager.Instance.CurrentWordCount;
         if (wordCount == 0) return 0;
 
-        resultText.ForceMeshUpdate();
+        EnsureTextInfoFresh();
         var textInfo = resultText.textInfo;
         if (textInfo == null || textInfo.wordCount == 0) return wordCount;
 
@@ -498,7 +551,7 @@ public class JournalInlineCursor : MonoBehaviour
     {
         if (resultText == null || canvasRoot == null) return Vector2.zero;
 
-        resultText.ForceMeshUpdate();
+        EnsureTextInfoFresh();
         var textInfo = resultText.textInfo;
         if (textInfo == null || textInfo.characterCount == 0) return Vector2.zero;
 
@@ -557,7 +610,7 @@ public class JournalInlineCursor : MonoBehaviour
     {
         if (resultText == null || canvasRoot == null) { ClearSelectionHighlights(); return; }
 
-        resultText.ForceMeshUpdate();
+        EnsureTextInfoFresh();
         var textInfo = resultText.textInfo;
         if (textInfo == null || textInfo.wordCount == 0) { ClearSelectionHighlights(); return; }
 
@@ -649,6 +702,12 @@ public class JournalInlineCursor : MonoBehaviour
 
     private void CheckButtonPoke(Vector3 fingertipWorld)
     {
+        // Run only every other frame. A finger approaching a button at a
+        // realistic poke speed (≤ ~1 m/s) moves <0.011 m per Quest frame at
+        // 90 Hz, so a 45 Hz check still detects entry into the 12 mm fire
+        // zone reliably while halving the per-frame poke-detection cost.
+        if ((Time.frameCount & 1) != 0) return;
+
         var pm  = WhiteboardPageManager.Instance;
         if (pm == null) return;
 

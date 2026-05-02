@@ -298,7 +298,26 @@ public class WineRackJournalListController : MonoBehaviour
                 Debug.LogWarning($"[WineRackJournalList] No Button found on entry '{j.Title}' — " +
                                  "check that JournalEntry prefab has a BackButton.");
             }
+
+            // Belt-and-braces: every Graphic on a list entry contributes to the
+            // per-frame UI raycast cost while the controller / hand ray hovers
+            // over the canvas. Only the Button's targetGraphic actually needs
+            // to receive ray hits; switch everything else off so the raycaster
+            // skips them. Keeps hover smooth even with many list entries.
+            DisableRaycastTargetsExceptButton(go, viewBtn);
         }
+    }
+
+    private static void DisableRaycastTargetsExceptButton(GameObject entry, Button viewBtn)
+    {
+        if (entry == null) return;
+
+        var graphics = entry.GetComponentsInChildren<Graphic>(includeInactive: true);
+        for (int i = 0; i < graphics.Length; i++)
+            graphics[i].raycastTarget = false;
+
+        if (viewBtn != null && viewBtn.targetGraphic != null)
+            viewBtn.targetGraphic.raycastTarget = true;
     }
 
     // ================================================================

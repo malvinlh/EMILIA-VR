@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using EMILIA.Data;
@@ -127,7 +126,10 @@ public class VRChatBridge : MonoBehaviour
 
         if (_recorder != null)
         {
-            _recorder.OnSaved += OnAudioSaved;
+            // Subscribe to OnEncoded (in-memory bytes) instead of OnSaved (post-disk-write)
+            // so the chat transcription request fires the moment the WAV is encoded,
+            // in parallel with the off-thread file write — no disk round-trip.
+            _recorder.OnEncoded += OnAudioEncoded;
             _recorder.OnMicStateChanged += OnMicStateProxy;
         }
 
@@ -141,7 +143,7 @@ public class VRChatBridge : MonoBehaviour
     {
         if (_recorder != null)
         {
-            _recorder.OnSaved -= OnAudioSaved;
+            _recorder.OnEncoded -= OnAudioEncoded;
             _recorder.OnMicStateChanged -= OnMicStateProxy;
         }
 
@@ -484,22 +486,24 @@ public class VRChatBridge : MonoBehaviour
         RefreshControlInputLock();
     }
 
-    private void OnAudioSaved(string filePath)
+    private void OnAudioEncoded(byte[] wavBytes, string fileName)
     {
-        if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) return;
+        if (wavBytes == null || wavBytes.Length == 0) return;
         if (_isAwaitingResponse) return;
 
-        StartCoroutine(TranscribeAndSend(filePath));
+        StartCoroutine(TranscribeAndSend(wavBytes, fileName));
     }
 
-    private IEnumerator TranscribeAndSend(string filePath)
+    private IEnumerator TranscribeAndSend(byte[] wavBytes, string fileName)
     {
         SetAwaitingResponse(true);
         _dialoguePanel.ShowTypingIndicator();
 
         string transcribed = null;
-        yield return ServiceManager.Instance.TranscribeApi.TranscribeFile(
-            filePath,
+        yield return ServiceManager.Instance.TranscribeApi.Transcribe(
+            wavBytes,
+            string.IsNullOrEmpty(fileName) ? "audio.wav" : fileName,
+            "audio/wav",
             onSuccess: text => transcribed = text,
             onError:   err  => Debug.LogError($"[VRChatBridge] Transcribe error: {err}")
         );
