@@ -5934,218 +5934,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 2707197451072399721, guid: 524cb1c12f4448e4a86212960c8abc68, type: 3}
---- !u!1001 &808532219
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 5506159456734555947}
-    m_Modifications:
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalScale.x
-      value: 0.49604088
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalScale.y
-      value: 0.49604088
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalScale.z
-      value: 0.49604088
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 2.352557
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0.28439644
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 5.2127295
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 0.50000006
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0.5
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0.5
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0.50000006
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: -90
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: -90
-      objectReference: {fileID: 0}
-    - target: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_ConstrainProportionsScale
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 919132149155446097, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_Name
-      value: BedroomPortal
-      objectReference: {fileID: 0}
-    - target: {fileID: 919132149155446097, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 808532223}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 808532222}
-  m_SourcePrefab: {fileID: 100100000, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
---- !u!1 &808532220 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-  m_PrefabInstance: {fileID: 808532219}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &808532221 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
-  m_PrefabInstance: {fileID: 808532219}
-  m_PrefabAsset: {fileID: 0}
---- !u!82 &808532222
-AudioSource:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 808532220}
-  m_Enabled: 1
-  serializedVersion: 4
-  OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 0}
-  m_PlayOnAwake: 0
-  m_Volume: 1
-  m_Pitch: 1
-  Loop: 0
-  Mute: 0
-  Spatialize: 0
-  SpatializePostEffects: 0
-  Priority: 128
-  DopplerLevel: 0
-  MinDistance: 0.3
-  MaxDistance: 4
-  Pan2D: 0
-  rolloffMode: 1
-  BypassEffects: 0
-  BypassListenerEffects: 0
-  BypassReverbZones: 0
-  rolloffCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 1
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  panLevelCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  spreadCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  reverbZoneMixCustomCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
---- !u!64 &808532223
-MeshCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 808532220}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 0
-  m_CookingOptions: 30
-  m_Mesh: {fileID: -542596395008620785, guid: f4ab01d85c487704ca3a71c1c887fc38, type: 3}
 --- !u!64 &814541600
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -7926,7 +7714,7 @@ MonoBehaviour:
   autoWireInEditor: 0
   autoCreateMissingReferences: 0
   autoCreateComfortFadeCanvas: 1
-  targetScene: Assets/Scenes/use/3D_Journal_Bedroom.unity
+  targetScene: Assets/Scenes/use/3D_Login.unity
   loadDelay: 3
   enterSpinDuration: 3
   playerTag: MainCamera
@@ -7935,12 +7723,12 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1
   requireForwardEntry: 0
-  portalForwardReference: {fileID: 1886562284}
+  portalForwardReference: {fileID: 5506159456734555947}
   idleLoopVfx: {fileID: 0}
   enterBurstVfx: {fileID: 0}
   portalAnimator: {fileID: 0}
   enterAnimatorTrigger: Enter
-  portalAudioSource: {fileID: 808532222}
+  portalAudioSource: {fileID: 1176094224}
   enterSfx: {fileID: 8300000, guid: 28247823dbcb92f4bb84b4932fde5dec, type: 3}
   enterSfxVolume: 1
   stopIdleLoopOnEnter: 0
@@ -7955,7 +7743,7 @@ MonoBehaviour:
   particleTint: {r: 0.72, g: 0.66, b: 0.94, a: 0.78}
   particleBrightness: 1.1
   applyCalmComfortProfile: 1
-  vfxAnchor: {fileID: 1886562284}
+  vfxAnchor: {fileID: 1121943004043793669}
   calmTint: {r: 0.52, g: 0.86, b: 0.92, a: 1}
   calmAccent: {r: 0.74, g: 0.92, b: 0.96, a: 1}
   motionIntensity: 0.35
@@ -8086,18 +7874,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 0.60905284, y: 0.91432106, z: 0.60905284}
   m_Center: {x: 2.3665936, y: 0.55504256, z: 5.2156415}
---- !u!114 &1176094230
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6313140232795652736}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 603eb01cf045f644798fe03cee55a935, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PortalCalmRingVfx
 --- !u!64 &1183078237
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -12953,118 +12729,6 @@ Transform:
   - {fileID: 1350759758}
   m_Father: {fileID: 1377243293}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1886562283
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1886562284}
-  - component: {fileID: 1886562286}
-  - component: {fileID: 1886562285}
-  m_Layer: 0
-  m_Name: BedroomPortalTrigger
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 2147483647
-  m_IsActive: 1
---- !u!4 &1886562284
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1886562283}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0.0000000036814072, y: -0.4617487, z: 0.0000000049212137, w: 0.8870109}
-  m_LocalPosition: {x: 3.8506005, y: -0.0062834523, z: 2.7702239}
-  m_LocalScale: {x: 0.49604094, y: 0.49604106, z: 0.49604097}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 5506159456734555947}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &1886562285
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1886562283}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 1
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 3
-  m_Size: {x: 0.60905266, y: 0.42602813, z: 0.60905266}
-  m_Center: {x: 2.3665936, y: 0.3108961, z: 5.2156415}
---- !u!114 &1886562286
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1886562283}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5aa8233919ecd93478ffdad5266b8286, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PortalSceneTransition
-  autoWireOnAwake: 0
-  autoWireInEditor: 0
-  autoCreateMissingReferences: 0
-  autoCreateComfortFadeCanvas: 1
-  targetScene: Assets/Scenes/use/3D_Journal_Bedroom.unity
-  loadDelay: 3
-  enterSpinDuration: 3
-  playerTag: MainCamera
-  allowCharacterControllerTrigger: 1
-  triggeringLayers:
-    serializedVersion: 2
-    m_Bits: 1
-  requireForwardEntry: 0
-  portalForwardReference: {fileID: 1886562284}
-  idleLoopVfx: {fileID: 0}
-  enterBurstVfx: {fileID: 0}
-  portalAnimator: {fileID: 0}
-  enterAnimatorTrigger: Enter
-  portalAudioSource: {fileID: 808532222}
-  enterSfx: {fileID: 8300000, guid: 28247823dbcb92f4bb84b4932fde5dec, type: 3}
-  enterSfxVolume: 1
-  stopIdleLoopOnEnter: 0
-  playEnterBurstVfx: 0
-  synchronizeParticlesWithRing: 1
-  idleParticleSpinSpeed: 0.16
-  enterParticleSpinSpeed: 1.45
-  idleParticleSimulationSpeed: 0.85
-  enterParticleSimulationSpeed: 1.8
-  particleSpinResponse: 8
-  autoAssignParticleMaterials: 1
-  particleTint: {r: 0.72, g: 0.66, b: 0.94, a: 0.78}
-  particleBrightness: 1.1
-  applyCalmComfortProfile: 1
-  vfxAnchor: {fileID: 1886562284}
-  calmTint: {r: 0.52, g: 0.86, b: 0.92, a: 1}
-  calmAccent: {r: 0.74, g: 0.92, b: 0.96, a: 1}
-  motionIntensity: 0.35
-  glassEmission: 0.5
-  minimumComfortLoadDelay: 0.9
-  fadeCanvas: {fileID: 0}
-  fadeDuration: 0.35
-  vignetteMaxAlpha: 0.5
-  useUnscaledTime: 1
-  onTransitionStarted:
-    m_PersistentCalls:
-      m_Calls: []
 --- !u!64 &1894956696
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -13136,9 +12800,9 @@ Transform:
   m_GameObject: {fileID: 1900400644}
   serializedVersion: 2
   m_LocalRotation: {x: 0.000000026715826, y: -0.70648944, z: -0.00000002669834, w: 0.7077237}
-  m_LocalPosition: {x: 2.2979925, y: 0.3602907, z: 5.2082653}
-  m_LocalScale: {x: 0.17857474, y: 0.28274336, z: 0.24802044}
-  m_ConstrainProportionsScale: 0
+  m_LocalPosition: {x: 2.2979925, y: 0.926, z: 5.208}
+  m_LocalScale: {x: 0.35, y: 0.5541667, z: 0.48611102}
+  m_ConstrainProportionsScale: 1
   m_Children:
   - {fileID: 1201320672}
   m_Father: {fileID: 5506159456734555947}
@@ -23918,9 +23582,7 @@ Transform:
   - {fileID: 2063212658945514678}
   - {fileID: 2267159294992457892}
   - {fileID: 8374690375812045836}
-  - {fileID: 1886562284}
   - {fileID: 1900400645}
-  - {fileID: 808532221}
   m_Father: {fileID: 543450652516888786}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &5506426633804083492
@@ -24866,7 +24528,6 @@ GameObject:
   - component: {fileID: 6737367132075370279}
   - component: {fileID: 1176094223}
   - component: {fileID: 1176094229}
-  - component: {fileID: 1176094230}
   m_Layer: 0
   m_Name: PortalGlass
   m_TagString: Untagged
