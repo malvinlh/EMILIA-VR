@@ -46,6 +46,9 @@ public class StylusTipProvider : MonoBehaviour
     public Plane WritingPlane { get; set; }
     public bool HasWritingPlane { get; private set; }
 
+    // ── Suppression ──────────────────────────────────────────────────
+    private bool _penSuppressed;
+
     // ── Filters ──────────────────────────────────────────────────────
     private OneEuroFilter filterX;
     private OneEuroFilter filterY;
@@ -97,8 +100,16 @@ public class StylusTipProvider : MonoBehaviour
         HasWritingPlane = false;
     }
 
+    public void SetPenEnabled(bool enabled)
+    {
+        _penSuppressed = !enabled;
+        if (_penSuppressed) { TipWorldPosition = null; Confidence = 0f; }
+    }
+
     private void Update()
     {
+        if (_penSuppressed) { TipWorldPosition = null; Confidence = 0f; return; }
+
         if (wristTracker == null || !wristTracker.IsCalibrated)
         {
             TipWorldPosition = null;

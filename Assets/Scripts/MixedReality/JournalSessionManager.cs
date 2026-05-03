@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using EMILIA.Data;
 using UnityEngine;
+using UnityEngine.XR.Hands;
 using UnityEngine.XR.Interaction.Toolkit.Locomotion;
 using TMPro;
 
@@ -217,6 +218,12 @@ public class JournalSessionManager : MonoBehaviour
     private float originalHeightAdjustmentY;
     private bool hasAdjustedHeightAdjustment;
 
+    // ── Pen Toggle (Journaling) ──────────────────────────────────────
+    private bool _penEnabled = true;
+    private bool _togglePrevPinched;
+    private XRHandSubsystem _cachedHandSubsystem;
+    private Transform _cachedCameraOffset;
+
     // ================================================================
     // LIFECYCLE
     // ================================================================
@@ -280,6 +287,9 @@ public class JournalSessionManager : MonoBehaviour
         // Keep instruction text facing user and at arm's length during passthrough
         if (instructionText != null && instructionText.gameObject.activeSelf)
             UpdateInstructionPosition();
+
+        if (CurrentState == SessionState.Journaling)
+            UpdatePenToggle();
     }
 
     // ================================================================
@@ -379,7 +389,7 @@ public class JournalSessionManager : MonoBehaviour
         tableTapCalibrator.OnTableConfirmed += OnTableConfirmed;
         tableTapCalibrator.BeginCalibration();
 
-        ShowInstruction("Tap the near-left corner of your writing area,\nthen drag to the far-right corner.");
+        // ShowInstruction("Tap the near-left corner of your writing area,\nthen drag to the far-right corner.");
     }
 
     private void OnTableConfirmed(TableTapCalibrator.DetectedTable table)
@@ -860,6 +870,9 @@ public class JournalSessionManager : MonoBehaviour
     /// </summary>
     private void OnJournalingEntered()
     {
+        _penEnabled = true;
+        ApplyPenEnabled(true);
+
         // During writing, keep AZKi hidden and non-locomoting until review begins.
         reviewController?.EnterJournalingMode();
 
@@ -893,6 +906,58 @@ public class JournalSessionManager : MonoBehaviour
         Debug.Log($"[JournalSession] Title page ready — created at {_sessionCreatedAtDisplay}");
 
         SetPortalActive(false);
+    }
+
+    // ================================================================
+    // PEN TOGGLE (left-hand thumb + middle finger pinch)
+    // ================================================================
+
+    private void UpdatePenToggle()
+    {
+        bool currentlyPinching = IsPenTogglePinching();
+
+        if (currentlyPinching && !_togglePrevPinched)
+        {
+            _penEnabled = !_penEnabled;
+            ApplyPenEnabled(_penEnabled);
+            Debug.Log($"[JournalSession] Pen toggle: pen is now {(_penEnabled ? "ENABLED" : "DISABLED")}.");
+        }
+
+        _togglePrevPinched = currentlyPinching;
+    }
+
+    private bool IsPenTogglePinching()
+    {
+        if (_cachedHandSubsystem == null || !_cachedHandSubsystem.running)
+            _cachedHandSubsystem = WhiteboardPen.GetHandSubsystem();
+
+        if (_cachedHandSubsystem == null) return false;
+
+        XRHand leftHand = _cachedHandSubsystem.leftHand;
+        if (!leftHand.isTracked) return false;
+
+        if (!leftHand.GetJoint(XRHandJointID.ThumbTip).TryGetPose(out Pose thumbPose)) return false;
+        if (!leftHand.GetJoint(XRHandJointID.MiddleTip).TryGetPose(out Pose middlePose)) return false;
+
+        if (_cachedCameraOffset == null)
+        {
+            var origin = FindAnyObjectByType<Unity.XR.CoreUtils.XROrigin>();
+            if (origin != null && origin.CameraFloorOffsetObject != null)
+                _cachedCameraOffset = origin.CameraFloorOffsetObject.transform;
+        }
+
+        Vector3 thumbW  = _cachedCameraOffset != null
+            ? _cachedCameraOffset.TransformPoint(thumbPose.position) : thumbPose.position;
+        Vector3 middleW = _cachedCameraOffset != null
+            ? _cachedCameraOffset.TransformPoint(middlePose.position) : middlePose.position;
+
+        return Vector3.Distance(thumbW, middleW) < PinchConstants.Default;
+    }
+
+    private void ApplyPenEnabled(bool enabled)
+    {
+        stylusTipProvider?.SetPenEnabled(enabled);
+        stylusVisualProp?.SetPropEnabled(enabled);
     }
 
     // ================================================================
@@ -1241,7 +1306,7 @@ public class JournalSessionManager : MonoBehaviour
         GameObject textObj = new GameObject("JournalInstruction");
         instructionText = textObj.AddComponent<TextMeshPro>();
 
-        instructionText.fontSize = 2.4f;
+        instructionText.fontSize = 0.3f;
         instructionText.alignment = TextAlignmentOptions.Center;
         instructionText.color = new Color(0.95f, 0.92f, 0.85f);
         instructionText.rectTransform.sizeDelta = new Vector2(1.35f, 0.48f);

@@ -5644,63 +5644,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Padding: {x: -8, y: -5, z: -8, w: -5}
   m_Softness: {x: 0, y: 0}
---- !u!1001 &1208401806
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187027, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6598815579406187037, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
-      propertyPath: m_Name
-      value: XR Device Simulator
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 18ddb545287c546e19cc77dc9fbb2189, type: 3}
 --- !u!1 &1260888551
 GameObject:
   m_ObjectHideFlags: 0
@@ -6818,7 +6761,7 @@ Transform:
   m_GameObject: {fileID: 1510836131}
   serializedVersion: 2
   m_LocalRotation: {x: 0.70710653, y: 0.00061708695, z: 0.00061708695, w: 0.70710653}
-  m_LocalPosition: {x: -0.009, y: -0.11, z: 0.153}
+  m_LocalPosition: {x: -0.001, y: 0.035, z: 0.176}
   m_LocalScale: {x: 0.47, y: 0.7441666, z: 0.65277773}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -6973,7 +6916,7 @@ Transform:
   m_GameObject: {fileID: 1561861569}
   serializedVersion: 2
   m_LocalRotation: {x: 0.7069452, y: 0.015117049, z: 0.015117049, w: 0.7069452}
-  m_LocalPosition: {x: 0, y: -0, z: 0.153}
+  m_LocalPosition: {x: -0.035, y: 0.031, z: 0.181}
   m_LocalScale: {x: 0.47, y: 0.74416655, z: 0.65277773}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -8695,7 +8638,7 @@ MonoBehaviour:
   splashClips:
   - {fileID: 8300000, guid: 0798dc58d63ee65489e1e01ed43316a0, type: 3}
   - {fileID: 8300000, guid: a3e98212775ec4c4690c253602cd3259, type: 3}
-  splashVolume: 0.4
+  splashVolume: 0.8
   rippleMaterial: {fileID: 2100000, guid: 786415562189f0d4f98266437676d083, type: 2}
   rippleSize: 1.2
   rippleDuration: 0.8
@@ -8728,4 +8671,3 @@ SceneRoots:
   - {fileID: 1460637446}
   - {fileID: 2100288175}
   - {fileID: 1848011607}
-  - {fileID: 1208401806}

@@ -327,10 +327,10 @@ public class JournalReviewController : MonoBehaviour
         // 7. Show AI comment — real reason from /sentiment, or hardcoded fallback.
         string dialogueText = !string.IsNullOrWhiteSpace(_aiDialogueText)
             ? _aiDialogueText
-            : "You've taken a meaningful step today by putting your thoughts into words. " +
-              "Reflecting on what you've written can help you better understand your feelings " +
-              "and find clarity in moments of uncertainty.\n\n" +
-              "Your words matter — and so do you. I'm proud of you for showing up.\n\n" +
+            : "Hari ini kamu telah mengambil langkah berarti dengan menuangkan pikiranmu ke dalam kata-kata. " +
+              "Merefleksikan apa yang kamu tulis dapat membantumu memahami perasaanmu lebih baik " +
+              "dan menemukan kejernihan di saat-saat yang penuh ketidakpastian.\n\n" +
+              "Kata-katamu berarti — dan begitu juga dirimu. Aku bangga kamu sudah hadir.\n\n" +
               "— EMILIA";
 
             // During the AI comment panel, AZKi should talk in a loop.
@@ -357,7 +357,7 @@ public class JournalReviewController : MonoBehaviour
         yield return new WaitForSeconds(0.6f);
 
         // After the AI comment finishes, stop talking and return to standby idle pose.
-        avatarRoamingController?.LockAtAuthoredPose();
+        AvatarLock();
 
         // 9. Present the keep-or-release choice.
         _state = ReviewState.ShowingChoice;
@@ -540,7 +540,7 @@ public class JournalReviewController : MonoBehaviour
         var qGO  = new GameObject("Question");
         qGO.transform.SetParent(bg.transform, false);
         var qTmp = qGO.AddComponent<TextMeshProUGUI>();
-        qTmp.text      = "Would you like to preserve this journal entry?";
+        qTmp.text      = "Apakah kamu ingin menyimpan journal ini?";
         qTmp.fontSize  = 28f;
         qTmp.alignment = TextAlignmentOptions.Center;
         qTmp.color     = s_TextDark;
@@ -559,12 +559,12 @@ public class JournalReviewController : MonoBehaviour
         rowRect.offsetMin = rowRect.offsetMax = Vector2.zero;
 
         // "Yes, keep it" — save → bottle rack path
-        var keepBtn = MakeButton("Yes, keep it", s_BtnKeep, s_TextDark,
+        var keepBtn = MakeButton("Simpan", s_BtnKeep, s_TextDark,
             row.transform, new Vector2(0f, 0f), new Vector2(0.44f, 1f));
         keepBtn.onClick.AddListener(OnKeepChosen);
 
         // "Let it go" — discard → ocean path
-        var releaseBtn = MakeButton("Let it go", s_BtnRelease, Color.white,
+        var releaseBtn = MakeButton("Buang", s_BtnRelease, Color.white,
             row.transform, new Vector2(0.56f, 0f), new Vector2(1f, 1f));
         releaseBtn.onClick.AddListener(OnReleaseChosen);
 
@@ -702,7 +702,7 @@ public class JournalReviewController : MonoBehaviour
         JournalSessionManager.Instance?.AllowLocomotion();
 
         // Guide the player to seal the bottle.
-        ShowDialogue("Before you go — seal your bottle by plugging the cork into the neck.");
+        ShowDialogue("Sebelum pergi — segel botolmu dengan memasukkan gabus ke dalam leher botol.");
 
         if (bottleNeckZone != null)
             bottleNeckZone.OnCorkSealed += OnCorkSealed;
@@ -729,7 +729,7 @@ public class JournalReviewController : MonoBehaviour
             Debug.Log($"[JournalReview] Cork sealed — state → WaitingForRack. bottleRoot={bottleRoot?.name ?? "NULL"}");
 
             ShowDialogue(
-                "Carry the bottle to the bottle rack nearby — just bring it close and it will rest there.");
+                "Bawa botol itu ke rak botol di dekatmu — cukup dekatkan dan botol akan beristirahat di sana.");
         }
         else
         {
@@ -753,8 +753,8 @@ public class JournalReviewController : MonoBehaviour
                 _rackDetector.GetComponent<Collider>().enabled = false;
 
             ShowDialogue(
-                "When you're ready, walk to the edge and toss the bottle into the ocean. " +
-                "You've already done the hard work.");
+                "Saat kamu siap, berjalanlah ke tepi dan lempar botol itu ke laut. " +
+                "Kamu sudah melakukan bagian yang paling sulit.");
         }
     }
 
@@ -804,7 +804,7 @@ public class JournalReviewController : MonoBehaviour
         }
         Debug.Log("[JournalReview] Bottle disposed (sea). Starting BottleDisposedCoroutine.");
         StartCoroutine(BottleDisposedCoroutine(
-            "Letting go takes courage too.\nThe ocean will carry it — and so will you.",
+            "Melepaskan juga butuh keberanian.\nLaut akan membawanya — begitu juga kamu.",
             saveJournal: false));
     }
 
@@ -858,14 +858,14 @@ public class JournalReviewController : MonoBehaviour
         {
             _state = ReviewState.WaitingForRack;
             _shredderDetector?.Disarm();
-            ShowDialogue("Carry your journal to the bottle rack nearby to keep it safe.");
+            ShowDialogue("Bawa kertas jurnalmu ke rak buku di dekatmu untuk disimpan dengan aman.");
         }
         else
         {
             _state = ReviewState.WaitingForShredder;
             if (_rackDetector != null) _rackDetector.GetComponent<Collider>().enabled = false;
             _shredderDetector?.Arm();
-            ShowDialogue("When you're ready, feed the paper into the shredder to let it go.");
+            ShowDialogue("Saat kamu siap, masukkan kertas itu ke dalam penghancur untuk melepaskannya.");
         }
 
         LogStateSnapshot("BeginPaperPhase.Done");
@@ -887,7 +887,7 @@ public class JournalReviewController : MonoBehaviour
         if (bottleRoot != null) DisableBottleComponents();
         _state = ReviewState.Complete;
         StartCoroutine(BottleDisposedCoroutine(
-            "Letting go takes courage too.\nThe shredder will carry it — and so will you.",
+            "Melepaskan juga butuh keberanian.\nPenghancur akan membawanya — begitu juga kamu.",
             saveJournal: false));
     }
 
@@ -923,7 +923,7 @@ public class JournalReviewController : MonoBehaviour
 
         Debug.Log("[JournalReview] Bottle disposed (rack). Starting BottleDisposedCoroutine.");
         StartCoroutine(BottleDisposedCoroutine(
-            "Your words are safe now.\nRest easy — you showed up for yourself today.",
+            "Kata-katamu kini aman.\nIstirahatlah — kamu telah hadir untuk dirimu sendiri hari ini.",
             saveJournal: true));
     }
 
@@ -972,6 +972,10 @@ public class JournalReviewController : MonoBehaviour
             ((avatarRoamingController == null || avatarRoamingController.IsCheeringPoseHeld) &&
              (_waypointController     == null || _waypointController.IsCheeringPoseHeld))
             || Time.time - cheerWaitStart > 5f);
+
+        // Keep holding the cheer pose until the dialogue panel has fully faded out.
+        // This prevents the animation from snapping away while text is still visible.
+        yield return new WaitUntil(() => _dialogueFader == null || _dialogueFader.IsHidden);
 
         // Re-enable the start button area, whiteboard UI, and hide the post-journal bottle.
         ResetSceneGroups();

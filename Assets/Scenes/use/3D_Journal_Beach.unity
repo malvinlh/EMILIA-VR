@@ -2738,6 +2738,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -4488266975990590275, guid: 61814d276c8af20439a8e6850998a406, type: 3}
+--- !u!1 &215424621
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 215424622}
+  m_Layer: 0
+  m_Name: ===== UIs =====
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &215424622
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 215424621}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 7.66124, y: 2.44565, z: 2.22327}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &222134306
 GameObject:
   m_ObjectHideFlags: 0
@@ -3782,6 +3813,37 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 57.56101, y: 2.2, z: 0.2}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &365671767
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 365671768}
+  m_Layer: 0
+  m_Name: ===== Scripts =====
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &365671768
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 365671767}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 7.66124, y: 2.44565, z: 2.22327}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &386061629
 GameObject:
   m_ObjectHideFlags: 0
@@ -7426,6 +7488,37 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -2109103874471459127, guid: 51a87c43f535fb94ab6db2e7caba3f9f, type: 3}
+--- !u!1 &803663314
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 803663315}
+  m_Layer: 0
+  m_Name: ===== Audio =====
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &803663315
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 803663314}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 7.66124, y: 2.44565, z: 2.22327}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!64 &807688653
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -8186,6 +8279,8 @@ MonoBehaviour:
   instructionForward: 0.9
   instructionHeight: 0.18
   fontSize: 0.3
+  buttonFontSize: 1
+  buttonLabelBoxSize: {x: 0.24, y: 0.12}
   logEvents: 0
 --- !u!64 &869365583
 MeshCollider:
@@ -8884,7 +8979,9 @@ MonoBehaviour:
   nextArmDelay: 0.6
   instructionForward: 0.9
   instructionHeight: 0.2
-  fontSize: 0.32
+  fontSize: 0.3
+  buttonFontSize: 1
+  buttonLabelBoxSize: {x: 0.24, y: 0.12}
   logEvents: 0
 --- !u!1 &992886154
 GameObject:
@@ -13816,27 +13913,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 603eb01cf045f644798fe03cee55a935, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PortalCalmRingVfx
-  autoCreateRenderer: 1
-  ringObjectName: PortalCalmRing_Auto
-  ringAnchor: {fileID: 1361628418}
-  ringRenderer: {fileID: 1474446838}
-  baseColor: {r: 0.42, g: 0.76, b: 0.86, a: 1}
-  accentColor: {r: 0.82, g: 0.94, b: 0.98, a: 1}
-  worldRadius: 0.30452633
-  ringThickness: 0.22
-  arcCount: 10
-  sparkleStrength: 0.3
-  softNoise: 0.5
-  preserveManualRingTransform: 1
-  defaultLocalPosition: {x: 0, y: 0.01, z: 0}
-  defaultLocalEuler: {x: 90, y: 0, z: 0}
-  useUnscaledTime: 1
-  idleSpinSpeed: 0.9
-  enterSpinSpeed: 4.5
-  idleIntensity: 0.62
-  enterIntensity: 1.15
-  spinResponse: 7
-  intensityResponse: 6
 --- !u!64 &1364779605
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -185175,35 +185251,38 @@ SceneRoots:
   m_Roots:
   - {fileID: 1554259449}
   - {fileID: 3000000012}
-  - {fileID: 6000000010}
+  - {fileID: 5000000002}
   - {fileID: 1372208763}
   - {fileID: 1404106334}
-  - {fileID: 6000000006}
   - {fileID: 195504140}
   - {fileID: 2065372731}
   - {fileID: 832575519}
   - {fileID: 1266719956}
   - {fileID: 262823917}
-  - {fileID: 3000000002}
-  - {fileID: 3000000007}
   - {fileID: 6941891827349428919}
   - {fileID: 1068344508}
   - {fileID: 543450652472430531}
-  - {fileID: 3000000022}
-  - {fileID: 210936540}
-  - {fileID: 607528761}
-  - {fileID: 5000000002}
-  - {fileID: 5000000006}
-  - {fileID: 5000000009}
-  - {fileID: 5000000012}
-  - {fileID: 561882570}
   - {fileID: 1790173463}
+  - {fileID: 215424622}
+  - {fileID: 734992062}
+  - {fileID: 3000000022}
   - {fileID: 274220596}
-  - {fileID: 1671912533}
+  - {fileID: 6000000006}
+  - {fileID: 561882570}
+  - {fileID: 803663315}
   - {fileID: 540040055}
+  - {fileID: 1671912533}
+  - {fileID: 365671768}
+  - {fileID: 1651899023}
+  - {fileID: 607528761}
+  - {fileID: 210936540}
+  - {fileID: 3000000002}
+  - {fileID: 3000000007}
+  - {fileID: 6000000010}
+  - {fileID: 5000000006}
+  - {fileID: 5000000012}
+  - {fileID: 5000000009}
   - {fileID: 1672689254}
   - {fileID: 990924402}
   - {fileID: 866369390}
   - {fileID: 1974298959}
-  - {fileID: 734992062}
-  - {fileID: 1651899023}

@@ -98,6 +98,12 @@ public class TableTapCalibrator : MonoBehaviour
     public float instructionHeight = 0.18f;
     public float fontSize = 0.28f;
 
+    [Header("Button Label")]
+    [Tooltip("Font size for button labels (e.g. Confirm, Redo). Default 1.")]
+    public float buttonFontSize = 1f;
+    [Tooltip("Text box size for button labels. Increase width/height if text wraps or clips.")]
+    public Vector2 buttonLabelBoxSize = new Vector2(0.16f, 0.08f);
+
     [Header("Diagnostics")]
     public bool logEvents = true;
 
@@ -932,10 +938,10 @@ public class TableTapCalibrator : MonoBehaviour
         labelObj.layer = passthroughLayer;
         tmp = labelObj.AddComponent<TextMeshPro>();
         tmp.text = label;
-        tmp.fontSize = 0.28f;
+        tmp.fontSize = buttonFontSize;
         tmp.alignment = TextAlignmentOptions.Center;
         tmp.color = Color.white;
-        tmp.rectTransform.sizeDelta = new Vector2(0.16f, 0.08f);
+        tmp.rectTransform.sizeDelta = buttonLabelBoxSize;
         labelObj.transform.localScale = new Vector3(
             1f / 0.12f * 0.10f,
             1f / 0.055f * 0.045f,
