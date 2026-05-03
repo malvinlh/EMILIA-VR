@@ -32,16 +32,16 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
     [Header("Blink")]
     [SerializeField] private string blinkShapeName = "まばたき";
     [Range(0f, 100f)]
-    [SerializeField] private float blinkClosedWeight = 90f;
+    [SerializeField] private float blinkClosedWeight = 100f;
     [SerializeField] private Vector2 blinkIntervalRange = new Vector2(2.5f, 5.0f);
     [Range(0.04f, 0.3f)]
-    [SerializeField] private float blinkDuration = 0.18f;
+    [SerializeField] private float blinkDuration = 0.3f;
 
     [Header("Talking Mouth")]
     [Tooltip("Mouth shapes cycled while in Talk state.")]
     [SerializeField] private string[] talkMouthShapeNames = new[] { "あ", "い", "う", "え", "お", "ワ", "ワ2", "ちゅ", "ω", "▲" };
     [SerializeField] private Vector2 talkMouthIntervalRange = new Vector2(0.09f, 0.18f);
-    [SerializeField] private Vector2 talkMouthWeightRange = new Vector2(20f, 55f);
+    [SerializeField] private Vector2 talkMouthWeightRange = new Vector2(50f, 100f);
 
     private enum FaceState
     {
@@ -108,6 +108,12 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
 
         BuildTargetWeights(state);
         ApplyWeights();
+
+        if (faceRenderer != null && TryGetBlendShapeIndex(blinkShapeName, out int blinkIdx))
+        {
+            faceRenderer.SetBlendShapeWeight(blinkIdx, _blinkWeight);
+            _currentWeights[blinkIdx] = _blinkWeight;
+        }
     }
 
     private void CacheStateHashes()
@@ -245,8 +251,6 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
                 break;
         }
 
-        if (_blinkWeight > 0.01f)
-            SetTarget(blinkShapeName, _blinkWeight);
     }
 
     private void ApplyWeights()
