@@ -1,7 +1,9 @@
 ﻿<Solution>
+  <Project Path="EnoxSoftware.OpenCVForUnity.csproj" />
   <Project Path="Live2D.Cubism.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.InteractionSimulator.csproj" />
+  <Project Path="EnoxSoftware.OpenCVForUnityExample.csproj" />
   <Project Path="Unity.XR.Hands.Samples.VisualizerSample.csproj" />
   <Project Path="Live2D.Cubism.Editor.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.DeviceSimulator.csproj" />
@@ -12,6 +14,7 @@
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.Hands.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.Hands.Editor.csproj" />
+  <Project Path="EnoxSoftware.OpenCVForUnity.Editor.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.WorldSpaceUI.Editor.csproj" />
   <Project Path="Unity.XR.Interaction.Toolkit.Samples.StarterAssets.Editor.csproj" />
   <Project Path="EZhex1991.EZSoftBone.Editor.csproj" />
