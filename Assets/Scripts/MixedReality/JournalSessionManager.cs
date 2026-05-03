@@ -49,6 +49,12 @@ public class JournalSessionManager : MonoBehaviour
              "before actually ending so the user can keep or release the journal.")]
     public JournalReviewController reviewController;
 
+    [Header("Portal During Journaling")]
+    [Tooltip("GameObjects to hide while journaling (e.g. PortalVFX, PortalGlass).")]
+    public GameObject[] portalVisuals;
+    [Tooltip("Behaviours to disable while journaling to block teleport (e.g. PortalSceneTransition).")]
+    public Behaviour[] portalTriggers;
+
     [Header("Detection Mode")]
     [Tooltip("Editor / testing only. Skip all MR calibration and jump directly to the " +
              "Journaling state on Start. Useful for testing the journal UI and review flow " +
@@ -885,6 +891,8 @@ public class JournalSessionManager : MonoBehaviour
         WhiteboardPageManager.Instance?.SetCreatedAt(_sessionCreatedAtDisplay);
 
         Debug.Log($"[JournalSession] Title page ready — created at {_sessionCreatedAtDisplay}");
+
+        SetPortalActive(false);
     }
 
     // ================================================================
@@ -942,6 +950,7 @@ public class JournalSessionManager : MonoBehaviour
         reviewController?.OnSessionEnded();
 
         SetButtonVisible(true);
+        SetPortalActive(true);
         CurrentState = SessionState.Idle;
         Debug.Log("[JournalSession] Session ended. Book re-enabled.");
     }
@@ -1160,6 +1169,16 @@ public class JournalSessionManager : MonoBehaviour
     // ================================================================
     // HELPERS
     // ================================================================
+
+    private void SetPortalActive(bool active)
+    {
+        if (portalVisuals != null)
+            foreach (var go in portalVisuals)
+                if (go != null) go.SetActive(active);
+        if (portalTriggers != null)
+            foreach (var b in portalTriggers)
+                if (b != null) b.enabled = active;
+    }
 
     private void SetButtonVisible(bool visible)
     {

@@ -11739,6 +11739,11 @@ MonoBehaviour:
   whiteboardUtils: {fileID: 719200399}
   startButton: {fileID: 1346750096}
   reviewController: {fileID: 1815533994}
+  portalVisuals:
+  - {fileID: 6313140232795652736}
+  - {fileID: 1900400644}
+  portalTriggers:
+  - {fileID: 1176094223}
   skipToJournalingOnStart: 0
   stylusCalibrationController: {fileID: 602012317}
   stylusTipProvider: {fileID: 1022418237}
