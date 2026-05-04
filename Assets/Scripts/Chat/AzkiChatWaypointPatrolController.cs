@@ -496,8 +496,16 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         var info = _animator.GetCurrentAnimatorStateInfo(0);
         bool inCheer = info.shortNameHash == _cheeringShortHash
                     || info.fullPathHash  == _cheeringHash;
-        if (inCheer && info.normalizedTime >= 0.99f && !_animator.IsInTransition(0))
+        // Use 0.95 threshold so we freeze before the Animator Controller's Exit Time
+        // transition can fire at normalizedTime ≈ 1.0. Do NOT gate on IsInTransition —
+        // the outgoing transition may already be queued.
+        // Play + Update(0f) immediately commits the hold frame (mirrors HoldCheeringPose
+        // in AzkiIslandRoamingController), preventing any in-flight transition from
+        // overriding it before speed = 0 takes effect.
+        if (inCheer && info.normalizedTime >= 0.95f)
         {
+            _animator.Play(_cheeringHash, 0, 0.99f);
+            _animator.Update(0f);
             _isCheeringPoseHeld = true;
             _isCheeringPlaying  = false;
             _animator.speed     = 0f;
