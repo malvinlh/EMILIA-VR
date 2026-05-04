@@ -56,6 +56,12 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("Behaviours to disable while journaling to block teleport (e.g. PortalSceneTransition).")]
     public Behaviour[] portalTriggers;
 
+    [Header("Pen Toggle")]
+    [Tooltip("Left-hand ThumbTip-to-MiddleTip distance (metres) required to fire the pen on/off toggle. " +
+             "Lower = requires a tighter, more deliberate pinch. Tune on device if the toggle fires accidentally.")]
+    [Range(0.005f, 0.04f)]
+    public float penTogglePinchThreshold = 0.015f;
+
     [Header("Detection Mode")]
     [Tooltip("Editor / testing only. Skip all MR calibration and jump directly to the " +
              "Journaling state on Start. Useful for testing the journal UI and review flow " +
@@ -218,6 +224,13 @@ public class JournalSessionManager : MonoBehaviour
     private float originalHeightAdjustmentY;
     private bool hasAdjustedHeightAdjustment;
 
+    // Per-scene-visit calibration cache: once a session in this scene has
+    // completed table placement, subsequent sessions skip passthrough/stylus/
+    // table-tap calibration and reuse the saved DetectedTable. The cache is an
+    // instance field, so it is naturally cleared when the scene unloads and
+    // a fresh manager is constructed on re-entry.
+    private bool hasCalibratedThisSceneVisit;
+
     // ── Pen Toggle (Journaling) ──────────────────────────────────────
     private bool _penEnabled = true;
     private bool _togglePrevPinched;
@@ -306,7 +319,34 @@ public class JournalSessionManager : MonoBehaviour
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = true;
 
-        ProceedToPassthrough();
+        if (hasCalibratedThisSceneVisit && calibrationDataValid)
+            StartSubsequentSession();
+        else
+            ProceedToPassthrough();
+    }
+
+    /// <summary>
+    /// Fast path for the 2nd, 3rd, … journaling session in the same scene visit.
+    /// Reuses the DetectedTable / SeatPoint / eye-height calibration captured by
+    /// the first session in this scene, so the user can resume journaling
+    /// without redoing passthrough, stylus calibration, or the 4-tap flow.
+    /// </summary>
+    private void StartSubsequentSession()
+    {
+        Debug.Log("[JournalSession] Subsequent same-scene session — skipping calibration.");
+
+        LockLocomotion();
+        TeleportToSeatPoint();
+
+        if (alignmentAnchor != null && calibrationDataValid)
+        {
+            Pose tablePose = new Pose(pendingTable.position, pendingTable.rotation);
+            alignmentAnchor.CreateAnchorAtTable(tablePose);
+        }
+
+        CurrentState = SessionState.Journaling;
+        OnJournalingEntered();
+        SetWhiteboardUIActive(true);
     }
 
     private void ProceedToPassthrough()
@@ -388,8 +428,6 @@ public class JournalSessionManager : MonoBehaviour
 
         tableTapCalibrator.OnTableConfirmed += OnTableConfirmed;
         tableTapCalibrator.BeginCalibration();
-
-        // ShowInstruction("Tap the near-left corner of your writing area,\nthen drag to the far-right corner.");
     }
 
     private void OnTableConfirmed(TableTapCalibrator.DetectedTable table)
@@ -411,6 +449,11 @@ public class JournalSessionManager : MonoBehaviour
         Debug.Log($"[JournalSession] Table confirmed at {table.position}, " +
                   $"size={table.size}, tapSurfaceY={table.avgTapSurfaceY:F3}. " +
                   $"User at {table.userHeadPosition} (capturedEyeY={capturedRealEyeHeight:F2}).");
+
+        // Mark the per-scene-visit cache warm so subsequent sessions can skip
+        // the calibration flow (see StartSubsequentSession). pendingTable and
+        // calibrationDataValid have just been populated above.
+        hasCalibratedThisSceneVisit = true;
 
         StartCoroutine(PreviewAndTransition(table));
     }
@@ -951,7 +994,7 @@ public class JournalSessionManager : MonoBehaviour
         Vector3 middleW = _cachedCameraOffset != null
             ? _cachedCameraOffset.TransformPoint(middlePose.position) : middlePose.position;
 
-        return Vector3.Distance(thumbW, middleW) < PinchConstants.Default;
+        return Vector3.Distance(thumbW, middleW) < penTogglePinchThreshold;
     }
 
     private void ApplyPenEnabled(bool enabled)
@@ -1005,7 +1048,10 @@ public class JournalSessionManager : MonoBehaviour
         if (alignmentAnchor != null)
             alignmentAnchor.ReleaseAnchor();
 
-        calibrationDataValid = false;
+        // Keep calibrationDataValid + pendingTable populated so the next
+        // session in the same scene visit can fast-path via
+        // StartSubsequentSession. The cache is invalidated only on scene
+        // unload (instance destroyed) or explicit cancellation (ResetToIdle).
         RestoreXROriginHeight();
         UnlockLocomotion();
 
@@ -1171,6 +1217,7 @@ public class JournalSessionManager : MonoBehaviour
     private void ResetToIdle()
     {
         calibrationDataValid = false;
+        hasCalibratedThisSceneVisit = false;
         SetWhiteboardUIActive(false);
         RestoreXROriginHeight();
         UnlockLocomotion();

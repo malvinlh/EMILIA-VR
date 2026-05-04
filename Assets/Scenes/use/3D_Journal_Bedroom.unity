@@ -11887,6 +11887,7 @@ MonoBehaviour:
   - {fileID: 1900400644}
   portalTriggers:
   - {fileID: 1176094223}
+  penTogglePinchThreshold: 0.0075
   skipToJournalingOnStart: 0
   stylusCalibrationController: {fileID: 602012317}
   stylusTipProvider: {fileID: 1022418237}

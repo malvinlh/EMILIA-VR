@@ -174,6 +174,10 @@ public class StylusCalibrationController : MonoBehaviour
 
         EnsureVisuals();
 
+        // Cleanup() from a prior run leaves these inactive — re-show now.
+        if (instructionObj != null) instructionObj.SetActive(true);
+        if (targetSphere   != null) targetSphere.SetActive(true);
+
         isActive = true;
         calibrationDone = false;
         wasPinched = true; // require a fresh rising edge before first capture
@@ -552,7 +556,7 @@ public class StylusCalibrationController : MonoBehaviour
 
     private void BillboardInstruction()
     {
-        if (instructionObj == null || !instructionObj.activeSelf) return;
+        if (instructionObj == null) return;
         Camera cam = Camera.main;
         if (cam == null) return;
 
