@@ -191,6 +191,10 @@ public class JournalSessionManager : MonoBehaviour
     public float previewDuration = 2f;
 
     [Header("Journal Whiteboard")]
+    [Tooltip("The WhiteboardPen component. When assigned, the pen on/off toggle also " +
+             "blocks all drawing input (including the index-finger fallback).")]
+    public WhiteboardPen whiteboardPen;
+
     [Tooltip("Background colour for the journal whiteboard (warm cream).")]
     public Color journalBackgroundColor = new Color(1f, 0.97f, 0.92f);
 
@@ -320,9 +324,23 @@ public class JournalSessionManager : MonoBehaviour
             whiteboardUtils.suppressManualGestures = true;
 
         if (hasCalibratedThisSceneVisit && calibrationDataValid)
-            StartSubsequentSession();
+            ShowCalibrationConfirmPanel();
         else
             ProceedToPassthrough();
+    }
+
+    private CalibrationConfirmPanel _confirmPanel;
+
+    private void ShowCalibrationConfirmPanel()
+    {
+        if (_confirmPanel == null)
+            _confirmPanel = new GameObject("CalibrationConfirmPanel")
+                                .AddComponent<CalibrationConfirmPanel>();
+
+        _confirmPanel.Show(
+            onRecalibrate: () => ProceedToPassthrough(),
+            onSkip:        () => StartSubsequentSession()
+        );
     }
 
     /// <summary>
@@ -335,6 +353,20 @@ public class JournalSessionManager : MonoBehaviour
     {
         Debug.Log("[JournalSession] Subsequent same-scene session — skipping calibration.");
 
+        // Guard: exit passthrough if still active from an unclean prior exit.
+        // This prevents the "stuck in passthrough" edge case where TeleportToSeatPoint
+        // runs but the user still sees the real world.
+        if (passthroughManager != null && passthroughManager.IsPassthroughActive)
+        {
+            passthroughManager.ExitPassthrough(RunSubsequentSession);
+            return;
+        }
+
+        RunSubsequentSession();
+    }
+
+    private void RunSubsequentSession()
+    {
         LockLocomotion();
         TeleportToSeatPoint();
 
@@ -1001,6 +1033,7 @@ public class JournalSessionManager : MonoBehaviour
     {
         stylusTipProvider?.SetPenEnabled(enabled);
         stylusVisualProp?.SetPropEnabled(enabled);
+        whiteboardPen?.SetDrawingEnabled(enabled);
     }
 
     // ================================================================
@@ -1172,6 +1205,7 @@ public class JournalSessionManager : MonoBehaviour
 
     public void CancelSession()
     {
+        _confirmPanel?.Hide();
         if (CurrentState == SessionState.Idle || CurrentState == SessionState.Ending) return;
 
         if (CurrentState == SessionState.Journaling)

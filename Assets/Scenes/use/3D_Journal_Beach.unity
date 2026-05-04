@@ -2258,6 +2258,18 @@ PrefabInstance:
       propertyPath: m_Name
       value: AZKi
       objectReference: {fileID: 0}
+    - target: {fileID: 1566137312014622043, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[20]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1566137312014622043, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[32]'
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1566137312014622043, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
+      propertyPath: 'm_BlendShapeWeights.Array.data[49]'
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5866666021909216657, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
       propertyPath: m_Controller
       value: 
@@ -15533,6 +15545,7 @@ MonoBehaviour:
   seatXZResidualWarnThreshold: 0.02
   instructionText: {fileID: 0}
   previewDuration: 1.5
+  whiteboardPen: {fileID: 3000000017}
   journalBackgroundColor: {r: 1, g: 0.97, b: 0.92, a: 1}
   detectionTimeout: 60
   playerPrefsUserIdKey: Nickname

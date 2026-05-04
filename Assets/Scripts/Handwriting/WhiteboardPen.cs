@@ -158,6 +158,31 @@ public class WhiteboardPen : MonoBehaviour
     private DigitalInkBridge inkBridge;
     private bool strokeActive;
 
+    // ── Drawing gate (pen toggle) ───────────────────────────
+    private bool _drawingEnabled = true;
+
+    /// <summary>
+    /// Enables or disables all drawing input (both stylus and finger fallback).
+    /// Called by JournalSessionManager when the pen on/off toggle fires.
+    /// </summary>
+    public void SetDrawingEnabled(bool enabled)
+    {
+        _drawingEnabled = enabled;
+        if (!enabled)
+        {
+            if (whiteboard != null) whiteboard.ToggleTouch(false);
+            if (hoverWhiteboard != null) { hoverWhiteboard.ToggleHover(false); hoverWhiteboard = null; }
+            wasTouchingLastFrame = false;
+            hasMadeContact = false;
+            strokeActive = false;
+            pinkyPinchActive = false;
+            pinkyPinchHoldTimer = 0f;
+            pinkyClearTriggeredThisHold = false;
+            consecutiveNoContactFrames = 0;
+            CurrentTouchWorldPoint = null;
+        }
+    }
+
     // ML Kit logical writing canvas (pixels).
     private const float MLKIT_AREA_W = 300f;
     private const float MLKIT_AREA_H = 200f;
@@ -596,6 +621,8 @@ public class WhiteboardPen : MonoBehaviour
             CurrentTouchWorldPoint = null;
             return;
         }
+
+        if (!_drawingEnabled) return;
 
         // Only the right hand can draw on the whiteboard.
         if (handedness == Handedness.Left) return;

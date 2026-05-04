@@ -17,8 +17,8 @@ public class PaperShredder : MonoBehaviour
     public string paperTag = "JournalBottle";
 
     [Header("VFX Anchors")]
-    [Tooltip("Where the paper is pulled toward. Falls back to local down if null.")]
-    public Transform slotTop;
+    [Tooltip("Disabled anchor whose position+rotation the paper lerps to before sliding down.")]
+    public Transform paperPlaceholder;
     [Tooltip("Where shredded strips spawn. Falls back to this transform if null.")]
     public Transform stripsSpawnOrigin;
     [Tooltip("Visual-only shredder transform to shake during the grind SFX. Falls back to the parent transform if null.")]
@@ -28,6 +28,7 @@ public class PaperShredder : MonoBehaviour
     public AudioSource grindSfx;
 
     [Header("Pull Tuning")]
+    [Range(0.05f, 0.5f)] public float snapDuration = 0.2f;
     [Range(0.3f, 2f)] public float pullDownDuration = 0.9f;
     [Range(0.05f, 0.5f)] public float pullDownDistance = 0.25f;
 
@@ -44,6 +45,12 @@ public class PaperShredder : MonoBehaviour
 
     private bool _armed;
     private bool _fired;
+
+    private void Awake()
+    {
+        if (paperPlaceholder != null)
+            paperPlaceholder.gameObject.SetActive(false);
+    }
 
     // ── Public API ─────────────────────────────────────────────────────────
 
@@ -104,23 +111,33 @@ public class PaperShredder : MonoBehaviour
 
         StartCoroutine(ShakeRoutine(feedbackDuration));
 
-        Vector3 startPos   = paper.position;
-        Quaternion startRot = paper.rotation;
-        Vector3 startScale  = paper.localScale;
-
-        Vector3 targetPos = slotTop != null
-            ? slotTop.position
-            : startPos + Vector3.down * pullDownDistance;
-
-        float elapsed = 0f;
-        float pullDuration = feedbackDuration > 0f ? feedbackDuration : pullDownDuration;
-        while (elapsed < pullDuration)
+        // Phase 1: lerp position + rotation to paperPlaceholder
+        if (paperPlaceholder != null)
         {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / pullDuration);
-            paper.position   = Vector3.Lerp(startPos, targetPos, t);
-            paper.rotation   = Quaternion.Slerp(startRot, transform.rotation, t);
-            paper.localScale = Vector3.Lerp(startScale, new Vector3(startScale.x, 0f, startScale.z), t);
+            Vector3 fromPos = paper.position;
+            Quaternion fromRot = paper.rotation;
+            float elapsed = 0f;
+            while (elapsed < snapDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / snapDuration);
+                paper.SetPositionAndRotation(
+                    Vector3.Lerp(fromPos, paperPlaceholder.position, t),
+                    Quaternion.Slerp(fromRot, paperPlaceholder.rotation, t));
+                yield return null;
+            }
+            paper.SetPositionAndRotation(paperPlaceholder.position, paperPlaceholder.rotation);
+        }
+
+        // Phase 2: slide only Y downward
+        Vector3 slideOrigin = paper.position;
+        float slideElapsed = 0f;
+        float pullDuration = feedbackDuration > 0f ? feedbackDuration : pullDownDuration;
+        while (slideElapsed < pullDuration)
+        {
+            slideElapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(slideElapsed / pullDuration);
+            paper.position = slideOrigin + Vector3.down * (pullDownDistance * t);
             yield return null;
         }
 

@@ -241,13 +241,7 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
                 break;
 
             case FaceState.Cheering:
-                SetTarget("笑い", 60f);
-                SetTarget("口角広", 28f);
-                SetTarget("眉上", 32f);
-                SetTarget("びっくり", 8f);
-                SetTarget("頬染", 35f);
-                SetTarget("キラキラ2", 45f);
-                SetTarget("ハート1", 25f);
+                SetTarget("笑い", 100f);
                 break;
         }
 
