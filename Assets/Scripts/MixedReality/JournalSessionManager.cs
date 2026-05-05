@@ -1091,12 +1091,14 @@ public class JournalSessionManager : MonoBehaviour
         if (whiteboardUtils != null)
             whiteboardUtils.suppressManualGestures = false;
 
-        reviewController?.OnSessionEnded();
-
         SetButtonVisible(true);
         SetPortalActive(true);
         CurrentState = SessionState.Idle;
         Debug.Log("[JournalSession] Session ended. Book re-enabled.");
+
+        // Resume avatar locomotion last so the cheer pose is held until
+        // the start button and portal are already visible to the player.
+        reviewController?.OnSessionEnded();
     }
 
     // ================================================================
