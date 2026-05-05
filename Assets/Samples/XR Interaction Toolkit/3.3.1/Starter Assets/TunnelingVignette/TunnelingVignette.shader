@@ -14,7 +14,8 @@ Shader "VR/TunnelingVignette"
 
         Pass
         {
-            Blend SrcAlpha OneMinusSrcAlpha
+            BlendOp Add, Max
+            Blend SrcAlpha OneMinusSrcAlpha, One One
             ZTest Always
             ZWrite Off
 

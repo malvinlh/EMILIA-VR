@@ -249,23 +249,12 @@ public class MiSideShaderGUI : ShaderGUI
         bool glass = mat.GetFloat("_GlassToggle") > 0.5f;
         SetKeyword(mat, "_GLASS", glass);
 
-        // Glass: enable alpha blending and transparent queue
-        if (glass)
-        {
-            mat.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
-            mat.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
-            mat.SetFloat("_ZWrite", 0f);
-            mat.SetOverrideTag("RenderType", "Transparent");
-            if (mat.renderQueue < 3000)
-                mat.renderQueue = 3000;
-        }
-        else
-        {
-            mat.SetFloat("_SrcBlend", (float)BlendMode.One);
-            mat.SetFloat("_DstBlend", (float)BlendMode.Zero);
-            mat.SetFloat("_ZWrite", 1f);
-            mat.SetOverrideTag("RenderType", "");
-        }
+        // Always keep opaque blend — glass uses reflection probe + Fresnel on RGB only.
+        // Transparent glass leaks the passthrough compositor on Quest 3 (alpha < 1 = see-through).
+        mat.SetFloat("_SrcBlend", (float)BlendMode.One);
+        mat.SetFloat("_DstBlend", (float)BlendMode.Zero);
+        mat.SetFloat("_ZWrite", 1f);
+        mat.SetOverrideTag("RenderType", "");
 
         // Auto render queue (glass takes priority over cutout)
         if (!glass)

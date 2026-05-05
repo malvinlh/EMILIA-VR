@@ -326,8 +326,8 @@ Shader "MiSide/Environment"
                     // Blend reflection onto the surface
                     finalColor = lerp(finalColor, reflColor, reflStrength);
 
-                    // Alpha: glass base transparency + Fresnel makes edges more opaque
-                    finalAlpha = lerp(_GlassColor.a, saturate(_GlassColor.a + 0.6), fresnel);
+                    // Alpha: force opaque — prevents passthrough compositor from bleeding through glass
+                    finalAlpha = 1.0;
                 }
                 #endif
 
