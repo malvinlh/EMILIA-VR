@@ -24,7 +24,8 @@ Material:
   m_Shader: {fileID: 4800000, guid: 18e0032a4e875e5488cee334127ac8b4, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _GLASS
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -114,7 +115,7 @@ Material:
     - _GlassFresnelPower: 3
     - _GlassReflectivity: 0.4
     - _GlassSmoothness: 0.85
-    - _GlassToggle: 0
+    - _GlassToggle: 1
     - _GlossMapScale: 1
     - _Glossiness: 0.4472136
     - _GlossyReflections: 1
