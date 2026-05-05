@@ -102,6 +102,13 @@ public class JournalStampDoneButton : MonoBehaviour
         bool journaling = session != null &&
                           session.CurrentState == JournalSessionManager.SessionState.Journaling;
 
+        if (_spawnedSeal != null && session != null &&
+            session.CurrentState == JournalSessionManager.SessionState.Idle)
+        {
+            Destroy(_spawnedSeal);
+            _spawnedSeal = null;
+        }
+
         if (!journaling)
         {
             if (_grab != null && _grab.enabled) _grab.enabled = false;
@@ -185,7 +192,7 @@ public class JournalStampDoneButton : MonoBehaviour
         if (paperSurface == null) return;
         if (_spawnedSeal != null) Destroy(_spawnedSeal);
 
-        var seal = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        var seal = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         seal.name = "WaxSeal";
         Destroy(seal.GetComponent<Collider>());
 
@@ -199,8 +206,7 @@ public class JournalStampDoneButton : MonoBehaviour
             : tip - paperUp * new Plane(paperUp, paperSurface.position).GetDistanceToPoint(tip)
               + paperUp * sealSurfaceOffset;
 
-        Quaternion sealRot = Quaternion.LookRotation(paperSurface.forward, paperUp)
-                           * Quaternion.Euler(90f, 0f, 0f);
+        Quaternion sealRot = Quaternion.FromToRotation(Vector3.up, paperUp);
 
         seal.transform.SetPositionAndRotation(sealPos, sealRot);
         seal.transform.SetParent(paperSurface, worldPositionStays: true);
@@ -212,13 +218,13 @@ public class JournalStampDoneButton : MonoBehaviour
         }
         seal.GetComponent<Renderer>().sharedMaterial = s_sealMat;
         _spawnedSeal = seal;
-        StartCoroutine(PunchScale(seal.transform));
+        StartCoroutine(PunchScale(seal.transform, new Vector3(sealDiameter, 0.001f, sealDiameter)));
     }
 
-    private IEnumerator PunchScale(Transform t)
+    private IEnumerator PunchScale(Transform t, Vector3 targetScale)
     {
         if (t == null) yield break;
-        Vector3 target = Vector3.one * sealDiameter;
+        Vector3 target = targetScale;
         float half = Mathf.Max(0.02f, sealPunchDuration * 0.5f);
 
         for (float e = 0f; e < half; e += Time.deltaTime)
