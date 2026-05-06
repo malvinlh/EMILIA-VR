@@ -4,8 +4,10 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
 /// Attach to the Slot trigger GameObject inside PaperShredder_Root.
-/// When armed by JournalReviewController, pulls the grabbed paper into the slot,
-/// spawns shredded strip particles, then notifies the controller.
+/// When armed by JournalReviewController, the slot passively waits for paper to be
+/// placed inside it. Shredding is only triggered when an external lever (or other
+/// committal gesture) calls <see cref="Pull"/>. This makes the release act
+/// deliberate rather than auto-firing on paper insertion.
 /// </summary>
 public class PaperShredder : MonoBehaviour
 {
@@ -45,6 +47,7 @@ public class PaperShredder : MonoBehaviour
 
     private bool _armed;
     private bool _fired;
+    private Transform _paperInSlot;
 
     private void Awake()
     {
@@ -57,6 +60,7 @@ public class PaperShredder : MonoBehaviour
     public void Arm()
     {
         _fired = false;
+        _paperInSlot = null;
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = true;
         _armed = true;
@@ -65,25 +69,52 @@ public class PaperShredder : MonoBehaviour
     public void Disarm()
     {
         _armed = false;
+        _paperInSlot = null;
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
     }
 
-    // ── Collision detection ────────────────────────────────────────────────
-
-    private void OnTriggerEnter(Collider other) => TryShred(other);
-    private void OnTriggerStay(Collider other)  => TryShred(other);
-
-    private void TryShred(Collider other)
+    /// <summary>
+    /// Called by the lever (or any committal gesture) when the user decides
+    /// to actually destroy the paper currently resting in the slot.
+    /// No-op unless armed, paper is in the slot, and not already shredding.
+    /// </summary>
+    public void Pull()
     {
-        if (!_armed || _fired) return;
+        if (!_armed || _fired || _paperInSlot == null) return;
         if (reviewController == null || !reviewController.IsWaitingForShredder) return;
 
-        // Walk up the hierarchy looking for the paper tag.
+        StartCoroutine(ShredRoutine(_paperInSlot));
+    }
+
+    // ── Collision detection ────────────────────────────────────────────────
+    // Paper entering / leaving the slot only updates the cached reference.
+    // Shredding is gated behind Pull() (invoked by the lever).
+
+    private void OnTriggerEnter(Collider other) => CachePaper(other);
+    private void OnTriggerStay(Collider other)  => CachePaper(other);
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (_paperInSlot == null) return;
+
         Transform t = other.transform;
         while (t != null)
         {
-            if (t.CompareTag(paperTag)) { StartCoroutine(ShredRoutine(t)); return; }
+            if (t == _paperInSlot) { _paperInSlot = null; return; }
+            t = t.parent;
+        }
+    }
+
+    private void CachePaper(Collider other)
+    {
+        if (!_armed || _fired || _paperInSlot != null) return;
+        if (reviewController == null || !reviewController.IsWaitingForShredder) return;
+
+        Transform t = other.transform;
+        while (t != null)
+        {
+            if (t.CompareTag(paperTag)) { _paperInSlot = t; return; }
             t = t.parent;
         }
     }
@@ -94,6 +125,7 @@ public class PaperShredder : MonoBehaviour
     {
         _armed = false;
         _fired = true;
+        _paperInSlot = null;
 
         // Disable grab so the player can't re-grab mid-animation.
         var grab = paper.GetComponent<XRGrabInteractable>();
