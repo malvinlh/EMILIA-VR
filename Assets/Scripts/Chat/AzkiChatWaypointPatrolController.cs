@@ -125,6 +125,10 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     [SerializeField] private string talkStateName     = "Base Layer.Talk";
     [SerializeField] private string cheeringStateName = "Base Layer.Cheering";
 
+    [Tooltip("Normalized time used when freezing the final cheering pose (1.0 = end of clip).")]
+    [Range(0.9f, 1f)]
+    [SerializeField] private float cheeringHoldNormalizedTime = 0.995f;
+
     [Range(0f, 0.5f)]
     [SerializeField] private float stateCrossFadeSeconds = 0.12f;
 
@@ -266,7 +270,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     {
         if (_journalLocked)
         {
-            if (_isCheeringPlaying) CheckCheeringComplete();
+            HandleJournalLockedMode();
             return;
         }
 
@@ -436,8 +440,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     public void LockAtAuthoredPose()
     {
+        ReleaseCheeringPoseHold();
         _journalLocked      = true;
-        _isCheeringPoseHeld = false;
         _isCheeringPlaying  = false;
         _talkActive = false;
         _isWaitingForResponse = false;
@@ -455,7 +459,9 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     public void ResumeRoaming()
     {
+        ReleaseCheeringPoseHold();
         _journalLocked = false;
+        _isCheeringPlaying = false;
         if (_animator != null) _animator.speed = 1f;
         _talkActive = false;
         _isWaitingForResponse = false;
@@ -490,26 +496,61 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     public bool IsCheeringPoseHeld => _isCheeringPoseHeld;
 
-    private void CheckCheeringComplete()
+    // Continuously re-asserts the Cheering state while journal-locked so the controller's
+    // auto-exit Cheering->Walk transition cannot escape. Mirrors the CheeringOnce branch
+    // of AzkiIslandRoamingController.HandleLockedMode.
+    private void HandleJournalLockedMode()
     {
-        if (_animator == null || !_isCheeringPlaying) return;
+        if (!_isCheeringPlaying && !_isCheeringPoseHeld) return;
+        if (_animator == null) return;
+
         var info = _animator.GetCurrentAnimatorStateInfo(0);
         bool inCheer = info.shortNameHash == _cheeringShortHash
                     || info.fullPathHash  == _cheeringHash;
-        // Use 0.95 threshold so we freeze before the Animator Controller's Exit Time
-        // transition can fire at normalizedTime ≈ 1.0. Do NOT gate on IsInTransition —
-        // the outgoing transition may already be queued.
-        // Play + Update(0f) immediately commits the hold frame (mirrors HoldCheeringPose
-        // in AzkiIslandRoamingController), preventing any in-flight transition from
-        // overriding it before speed = 0 takes effect.
-        if (inCheer && info.normalizedTime >= 0.95f)
+
+        if (_isCheeringPoseHeld)
         {
-            _animator.Play(_cheeringHash, 0, 0.99f);
-            _animator.Update(0f);
-            _isCheeringPoseHeld = true;
-            _isCheeringPlaying  = false;
-            _animator.speed     = 0f;
+            if (_animator.IsInTransition(0)) return;
+            if (!inCheer)
+            {
+                _isCheeringPoseHeld = false;
+                _isCheeringPlaying  = true;
+                _animator.speed     = 1f;
+                _animator.CrossFadeInFixedTime(_cheeringHash, stateCrossFadeSeconds, 0);
+            }
+            return;
         }
+
+        if (!_animator.IsInTransition(0) && !inCheer)
+        {
+            _animator.CrossFadeInFixedTime(_cheeringHash, stateCrossFadeSeconds, 0);
+            return;
+        }
+
+        if (inCheer && info.normalizedTime >= cheeringHoldNormalizedTime)
+            HoldCheeringPose();
+    }
+
+    private void HoldCheeringPose()
+    {
+        if (_animator == null || !_animator.HasState(0, _cheeringHash)) return;
+
+        float holdTime = Mathf.Clamp01(cheeringHoldNormalizedTime);
+        _animator.Play(_cheeringHash, 0, holdTime);
+        _animator.Update(0f);
+        _animator.speed     = 0f;
+        _isCheeringPlaying  = false;
+        _isCheeringPoseHeld = true;
+    }
+
+    private void ReleaseCheeringPoseHold()
+    {
+        if (_animator != null &&
+            (_isCheeringPoseHeld || Mathf.Approximately(_animator.speed, 0f)))
+        {
+            _animator.speed = 1f;
+        }
+        _isCheeringPoseHeld = false;
     }
 
     private void SyncDialogueStateFromPanel()
