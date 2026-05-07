@@ -205,37 +205,15 @@ public class AzkiBlendShapeExpressionController : MonoBehaviour
         switch (state)
         {
             case FaceState.Idle:
-                SetTarget("なごみ", 20f);
-                SetTarget("笑い", 18f);
-                SetTarget("口角広", 14f);
-                SetTarget("眉上", 10f);
-                SetTarget("頬染", 18f);
-                SetTarget("キラキラ1", 22f);
                 break;
 
             case FaceState.IdleB:
-                SetTarget("困る", 18f);
-                SetTarget("口角下", 8f);
-                SetTarget("へ", 8f);
-                SetTarget("眉下", 12f);
-                SetTarget("はう", 15f);
-                SetTarget("頬染", 12f);
                 break;
 
             case FaceState.Walk:
-                SetTarget("真面目", 10f);
-                SetTarget("口角縮", 5f);
-                SetTarget("眉前", 4f);
-                SetTarget("なごみ", 12f);
-                SetTarget("頬染", 8f);
                 break;
 
             case FaceState.Talk:
-                SetTarget("なごみ", 22f);
-                SetTarget("笑い", 20f);
-                SetTarget("口角広", 16f);
-                SetTarget("頬染", 22f);
-                SetTarget("キラキラ1", 18f);
                 if (!string.IsNullOrEmpty(_activeTalkMouthShape))
                     SetTarget(_activeTalkMouthShape, _activeTalkMouthWeight);
                 break;

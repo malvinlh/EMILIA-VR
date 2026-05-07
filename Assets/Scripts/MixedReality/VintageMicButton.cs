@@ -60,6 +60,10 @@ public class VintageMicButton : MonoBehaviour
     [Range(0.1f, 2f)]
     public float cooldown = 0.25f;
 
+    [Header("SFX")]
+    [Tooltip("Optional click sound played on every accepted activation.")]
+    [SerializeField] private AudioSource clickSfx;
+
     // ── Events ──────────────────────────────────────────────────────────
     /// <summary>Fired when the button is activated (controller select or hand poke).</summary>
     public event Action OnActivated;
@@ -259,6 +263,7 @@ public class VintageMicButton : MonoBehaviour
         // Physical press-depth feedback
         transform.localPosition = _idleLocalPos - _pressLocalAxis * pressDepth;
 
+        if (clickSfx != null) clickSfx.Play();
         OnActivated?.Invoke();
     }
 
