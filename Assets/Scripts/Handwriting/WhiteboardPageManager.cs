@@ -428,11 +428,7 @@ public class WhiteboardPageManager : MonoBehaviour
     {
         if (!ButtonReady()) return;
         Debug.Log($"{TAG} OnBackspaceClicked");
-        var cursor = JournalInlineCursor.Instance;
-        if (cursor != null && cursor.HasActiveSelection)
-            cursor.DeleteSelection();
-        else
-            ScribbleManager.Instance?.DeleteLastWord();
+        ScribbleManager.Instance?.DeleteLastWord();
     }
 
     /// <summary>Returns true while any WhiteboardPen is actively touching the board.</summary>

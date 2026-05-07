@@ -1,65 +1,41 @@
 using System.Collections;
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
 
 /// <summary>
-/// Handles the Mic button on the journal whiteboard Footer.
-/// Records audio via RecordAudio, transcribes via GeminiService, then injects
+/// Handles the mic toggle for the journal whiteboard.
+/// Records audio via RecordAudio, transcribes via TranscribeApi, then injects
 /// the transcribed text into ScribbleManager as typed words — same path as
 /// handwriting recognition, just from voice.
 ///
 /// Setup:
-///   1. Add this component to any persistent GO in the scene (e.g., ScribbleManager GO).
-///   2. Assign MicButton, RecordAudio, and optional MicLabel in the Inspector.
-///      The MicButton is the "MicButton" child inside WhiteboardUI/Footer.
+///   1. Add this component to any persistent GO in the scene.
+///   2. Assign the 3D button (VintageMicButton on the 'button' child of VintageMicrophone)
+///      and RecordAudio in the Inspector.
+///   3. No 2D UI buttons are used — interaction is driven entirely by the 3D prop button.
 /// </summary>
 [DefaultExecutionOrder(300)]
 public class JournalMicController : MonoBehaviour
 {
-    [Header("Panel")]
-    [Tooltip("Parent panel that contains the mic button (e.g. MicBtnPanel). " +
-             "Starts hidden; shown only while SessionState == Journaling — mirrors DonePanel behaviour.")]
-    [SerializeField] private GameObject micPanel;
-
-    [Header("Footer References")]
-    [SerializeField] private Button   micButton;
-    [SerializeField] private TMP_Text micLabel;  // optional — TMP label on the mic button
+    [Header("3D Mic Button")]
+    [SerializeField] private VintageMicButton _micButton3D;
 
     [Header("Audio Recording")]
     [SerializeField] private RecordAudio recorder;
 
     [Header("Input Guard")]
-    [Tooltip("Minimum delay between accepted mic button clicks to prevent poke press+release double fire.")]
+    [Tooltip("Minimum delay between accepted activations to prevent double-fire.")]
     [SerializeField] private float clickCooldownSec = 0.25f;
-
-    [Header("Button Colors")]
-    [SerializeField] private Color idleColor         = new Color(0.55f, 0.65f, 0.75f, 1f);
-    [SerializeField] private Color recordingColor    = new Color(0.90f, 0.25f, 0.25f, 1f);
-    [SerializeField] private Color transcribingColor = new Color(0.90f, 0.70f, 0.10f, 1f);
-
-    [Header("Pulse (while recording)")]
-    [SerializeField] private float pulseMinAlpha = 0.4f;
-    [SerializeField] private float pulseMaxAlpha = 1.0f;
-    [SerializeField] private float pulseSpeed    = 2.5f;
 
     public static JournalMicController Instance { get; private set; }
 
-    /// <summary>Exposes the mic Button for external poke detection (JournalInlineCursor).</summary>
-    public Button MicButton => micButton;
-
     private enum MicState { Idle, Recording, Transcribing }
     private MicState  _micState = MicState.Idle;
-    private Coroutine _pulseCo;
     private Coroutine _transcribeCo;
     private float     _recordingStartTime;
     private float     _lastAcceptedClickTime = -999f;
     private int       _lastAcceptedClickFrame = -1;
 
-    // Minimum seconds that must elapse before a Stop is accepted.
-    // Guards against the poke gesture firing start+stop within the same gesture.
     private const float MIN_RECORDING_SEC = 1.0f;
-
     private const string TAG = "[JournalMicController]";
 
     // ==================================================================
@@ -70,24 +46,17 @@ public class JournalMicController : MonoBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(this); return; }
         Instance = this;
-
-        // Start hidden — same as DonePanel.
-        ShowMicPanel(false);
     }
 
     private void Start()
     {
-        if (micButton != null)
-            micButton.onClick.AddListener(OnMicClicked);
+        if (_micButton3D != null)
+            _micButton3D.OnActivated += OnMicClicked;
         else
-            Debug.LogWarning($"{TAG} MicButton not assigned.");
+            Debug.LogWarning($"{TAG} _micButton3D not assigned — mic disabled.");
 
         if (recorder != null)
         {
-            // Subscribe to OnEncoded (fires the moment the WAV bytes are in memory)
-            // instead of OnSaved (fires after the disk write completes). The bytes
-            // path lets transcription start in parallel with the off-thread file
-            // write — no disk round-trip on the user-perceived latency path.
             recorder.OnEncoded         += OnAudioEncoded;
             recorder.OnMicStateChanged += OnRecorderMicStateChanged;
         }
@@ -97,21 +66,7 @@ public class JournalMicController : MonoBehaviour
         }
 
         UpdateMicVisual();
-
-        // On Android/Quest, Microphone.devices can return empty for the first few
-        // seconds after a scene loads while the OS audio stack initialises.
-        // Accessing it early (and requesting permission if needed) warms up the
-        // subsystem so it is ready before the user presses the mic button.
         StartCoroutine(WarmUpMicrophone());
-    }
-
-    private void OnEnable()
-    {
-        // Sync immediately on re-enable rather than waiting for the next Update tick.
-        var session = JournalSessionManager.Instance;
-        bool journaling = session != null &&
-                          session.CurrentState == JournalSessionManager.SessionState.Journaling;
-        ShowMicPanel(journaling);
     }
 
     private void Update()
@@ -120,10 +75,7 @@ public class JournalMicController : MonoBehaviour
         bool journaling = session != null &&
                           session.CurrentState == JournalSessionManager.SessionState.Journaling;
 
-        ShowMicPanel(journaling);
-
-        // Session ended while mic was active — reset to Idle so the button
-        // is not stuck non-interactable on the next session.
+        // Session ended while mic was active — reset to Idle.
         if (!journaling && _micState != MicState.Idle)
         {
             if (_micState == MicState.Recording)
@@ -139,12 +91,6 @@ public class JournalMicController : MonoBehaviour
         }
     }
 
-    private void ShowMicPanel(bool show)
-    {
-        if (micPanel != null && micPanel.activeSelf != show)
-            micPanel.SetActive(show);
-    }
-
     private IEnumerator WarmUpMicrophone()
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
@@ -152,11 +98,9 @@ public class JournalMicController : MonoBehaviour
         if (!UnityEngine.Android.Permission.HasUserAuthorizedPermission(MIC_PERMISSION))
         {
             UnityEngine.Android.Permission.RequestUserPermission(MIC_PERMISSION);
-            // Give the permission dialog time to resolve before polling devices.
             yield return new UnityEngine.WaitForSeconds(1f);
         }
 #endif
-        // Touch Microphone.devices to trigger subsystem init (harmless if already ready).
         int deviceCount = Microphone.devices.Length;
         Debug.Log($"{TAG} WarmUpMicrophone — devices found on start: {deviceCount}");
         yield break;
@@ -166,8 +110,8 @@ public class JournalMicController : MonoBehaviour
     {
         if (Instance == this) Instance = null;
 
-        if (micButton != null)
-            micButton.onClick.RemoveListener(OnMicClicked);
+        if (_micButton3D != null)
+            _micButton3D.OnActivated -= OnMicClicked;
 
         if (recorder != null)
         {
@@ -182,25 +126,32 @@ public class JournalMicController : MonoBehaviour
 
     private void OnMicClicked()
     {
+        // The 3D button is always visible regardless of session state. Guard here
+        // so activations outside an active journaling session are silently ignored.
+        var session = JournalSessionManager.Instance;
+        if (session == null ||
+            session.CurrentState != JournalSessionManager.SessionState.Journaling)
+            return;
+
         float now = Time.unscaledTime;
         if (_lastAcceptedClickFrame == Time.frameCount)
         {
-            Debug.Log($"{TAG} Duplicate click ignored in frame {Time.frameCount}.");
+            Debug.Log($"{TAG} Duplicate activation ignored in frame {Time.frameCount}.");
             return;
         }
         if (clickCooldownSec > 0f && now - _lastAcceptedClickTime < clickCooldownSec)
         {
-            Debug.Log($"{TAG} Click ignored by cooldown ({now - _lastAcceptedClickTime:F3}s < {clickCooldownSec:F3}s).");
+            Debug.Log($"{TAG} Activation ignored by cooldown ({now - _lastAcceptedClickTime:F3}s < {clickCooldownSec:F3}s).");
             return;
         }
         _lastAcceptedClickFrame = Time.frameCount;
-        _lastAcceptedClickTime = now;
+        _lastAcceptedClickTime  = now;
 
         Debug.Log($"{TAG} OnMicClicked state={_micState}");
         if (recorder == null) return;
+
         if (_micState == MicState.Transcribing)
         {
-            // Cancel the in-flight transcription so the user can record again.
             if (_transcribeCo != null) { StopCoroutine(_transcribeCo); _transcribeCo = null; }
             _micState = MicState.Idle;
             UpdateMicVisual();
@@ -213,15 +164,13 @@ public class JournalMicController : MonoBehaviour
             float elapsed = Time.realtimeSinceStartup - _recordingStartTime;
             if (elapsed < MIN_RECORDING_SEC)
             {
-                Debug.Log($"{TAG} Stop ignored — only {elapsed:F2}s recorded (min {MIN_RECORDING_SEC}s). Poke double-fire guard.");
+                Debug.Log($"{TAG} Stop ignored — only {elapsed:F2}s recorded (min {MIN_RECORDING_SEC}s).");
                 return;
             }
             recorder.StopRecording();
             return;
         }
 
-        // On Android the audio stack may still be initialising at the time of the
-        // first button press. Retry for up to 5 s instead of failing immediately.
         if (Microphone.devices.Length == 0)
         {
             StartCoroutine(RetryStartRecording());
@@ -322,75 +271,13 @@ public class JournalMicController : MonoBehaviour
 
     private void UpdateMicVisual()
     {
-        if (micButton == null) return;
-
-        string label;
-        Color  color;
-        bool   interactable;
-        bool   shouldPulse;
+        if (_micButton3D == null) return;
 
         switch (_micState)
         {
-            case MicState.Recording:
-                label        = "● Stop";
-                color        = recordingColor;
-                interactable = true;
-                shouldPulse  = true;
-                break;
-            case MicState.Transcribing:
-                label        = "⌛ ...";
-                color        = transcribingColor;
-                interactable = true;   // interactable so poke can cancel it
-                shouldPulse  = false;
-                break;
-            default:
-                label        = "Mic";
-                color        = idleColor;
-                interactable = true;
-                shouldPulse  = false;
-                break;
-        }
-
-        if (micLabel != null)
-            micLabel.text = label;
-
-        var img = micButton.targetGraphic as Image;
-        if (img != null) img.color = color;
-
-        micButton.interactable = interactable;
-
-        // Start or stop the pulse animation.
-        if (shouldPulse && _pulseCo == null)
-            _pulseCo = StartCoroutine(CoPulse(img));
-        else if (!shouldPulse && _pulseCo != null)
-        {
-            StopCoroutine(_pulseCo);
-            _pulseCo = null;
-            // Restore full opacity so the button doesn't freeze mid-fade.
-            if (img != null)
-            {
-                var c = img.color;
-                c.a = 1f;
-                img.color = c;
-            }
-        }
-    }
-
-    private IEnumerator CoPulse(Image img)
-    {
-        float t = 0f;
-        while (true)
-        {
-            t += Time.unscaledDeltaTime * pulseSpeed;
-            float alpha = Mathf.Lerp(pulseMinAlpha, pulseMaxAlpha,
-                                     0.5f + 0.5f * Mathf.Sin(t));
-            if (img != null)
-            {
-                var c = img.color;
-                c.a = alpha;
-                img.color = c;
-            }
-            yield return null;
+            case MicState.Recording:    _micButton3D.SetRecording();    break;
+            case MicState.Transcribing: _micButton3D.SetTranscribing(); break;
+            default:                    _micButton3D.SetIdle();         break;
         }
     }
 }
