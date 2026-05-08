@@ -322,6 +322,9 @@ public class JournalReviewController : MonoBehaviour
         // 6. Wait for the sentiment API — should already be done during the fades above.
         //    No timeout: the AI comment must be shown to the user (not a hardcoded fallback),
         //    so we wait unconditionally until the response arrives or the request errors out.
+        // Show the VR dialogue panel's typing indicator while waiting for the sentiment API
+        // — reuse the same waiting UI used for chat responses.
+        _dialoguePanel?.ShowTypingIndicator();
         yield return new WaitUntil(() => _sentimentReady);
 
         // 7. Show AI comment — real reason from /sentiment, or hardcoded fallback.
@@ -330,8 +333,7 @@ public class JournalReviewController : MonoBehaviour
             : "Hari ini kamu telah mengambil langkah berarti dengan menuangkan pikiranmu ke dalam kata-kata. " +
               "Merefleksikan apa yang kamu tulis dapat membantumu memahami perasaanmu lebih baik " +
               "dan menemukan kejernihan di saat-saat yang penuh ketidakpastian.\n\n" +
-              "Kata-katamu berarti — dan begitu juga dirimu. Aku bangga kamu sudah hadir.\n\n" +
-              "— EMILIA";
+              "Kata-katamu berarti — dan begitu juga dirimu. Aku bangga kamu sudah hadir.";
 
             // During the AI comment panel, AZKi should talk in a loop.
             AvatarTalkLoop();
