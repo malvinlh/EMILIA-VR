@@ -41,7 +41,10 @@ public class ShredderLever : MonoBehaviour
     [Header("Events")]
     public UnityEvent OnPulled;
 
+    private Vector3   _restLocalPosition;
+    private Vector3   _restLocalScale;
     private Vector3   _restLocalEulerAngles;
+    private float     _currentX;
     private bool      _isHeld;
     private bool      _pulledThisHold;
     private Coroutine _returnCoroutine;
@@ -51,8 +54,11 @@ public class ShredderLever : MonoBehaviour
 
     private void Awake()
     {
+        _restLocalPosition    = transform.localPosition;
+        _restLocalScale       = transform.localScale;
         _restLocalEulerAngles = transform.localEulerAngles;
         _restLocalEulerAngles.x = restEulerX;
+        _currentX = restEulerX;
         if (grabInteractable == null) grabInteractable = GetComponent<XRGrabInteractable>();
         // Prevent XRI from moving the handle — animation is driven exclusively by coroutines.
         grabInteractable.trackPosition = false;
@@ -94,16 +100,18 @@ public class ShredderLever : MonoBehaviour
         _returnCoroutine = StartCoroutine(ReturnToRest());
     }
 
+    // LateUpdate is the single writer of the handle's transform. It runs every
+    // frame (held or not) so XRI cannot drift the position, scale, or Y/Z rotation.
     private void LateUpdate()
     {
+        transform.localPosition = _restLocalPosition;
+        transform.localScale    = _restLocalScale;
+        transform.localRotation = Quaternion.Euler(_currentX, _restLocalEulerAngles.y, _restLocalEulerAngles.z);
+
         if (!_isHeld) return;
 
-        // Keep the handle constrained to the authored rest pose until the pull begins.
-        if (!_pulledThisHold && _autoPullCoroutine == null)
-            transform.localRotation = Quaternion.Euler(_restLocalEulerAngles);
-
         // Wait for any slight downward movement to trigger the auto-pull animation.
-        if (!_pulledThisHold && _interactorTransform != null)
+        if (!_pulledThisHold && _autoPullCoroutine == null && _interactorTransform != null)
         {
             float yDelta = _grabStartControllerY - _interactorTransform.position.y;
             if (yDelta >= triggerMovement)
@@ -117,8 +125,6 @@ public class ShredderLever : MonoBehaviour
 
     private IEnumerator AutoPull()
     {
-        // Always start from the declared rest angle — never read the live transform,
-        // which may have been corrupted by XRI grab transformers.
         float startX = _restLocalEulerAngles.x;
 
         float elapsed = 0f;
@@ -127,25 +133,21 @@ public class ShredderLever : MonoBehaviour
             elapsed += Time.deltaTime;
             float t     = Mathf.Clamp01(elapsed / pullDuration);
             float eased = t * t * (3f - 2f * t); // smoothstep
-            float eulerX = Mathf.Lerp(startX, maxPullEulerX, eased);
-            transform.localRotation = Quaternion.Euler(eulerX, _restLocalEulerAngles.y, _restLocalEulerAngles.z);
+            _currentX   = Mathf.Lerp(startX, maxPullEulerX, eased);
             yield return null;
         }
-
-        transform.localRotation = Quaternion.Euler(maxPullEulerX, _restLocalEulerAngles.y, _restLocalEulerAngles.z);
+        _currentX = maxPullEulerX;
 
         if (audioSource != null && clickClip != null)
             audioSource.PlayOneShot(clickClip, clickVolume);
 
         _autoPullCoroutine = null;
-        // Fires PaperShredder.Pull() → disables grabInteractable → HandleSelectExited → ReturnToRest.
         OnPulled?.Invoke();
     }
 
     private IEnumerator ReturnToRest()
     {
-        Quaternion fromRot = transform.localRotation;
-        Quaternion restRot = Quaternion.Euler(_restLocalEulerAngles);
+        float startX = _currentX;
         float elapsed = 0f;
         float duration = Mathf.Max(0.01f, returnDuration);
 
@@ -154,11 +156,10 @@ public class ShredderLever : MonoBehaviour
             elapsed += Time.deltaTime;
             float t     = Mathf.Clamp01(elapsed / duration);
             float eased = t * t * (3f - 2f * t);
-            transform.localRotation = Quaternion.Slerp(fromRot, restRot, eased);
+            _currentX   = Mathf.Lerp(startX, _restLocalEulerAngles.x, eased);
             yield return null;
         }
-
-        transform.localRotation = restRot;
+        _currentX = _restLocalEulerAngles.x;
         _returnCoroutine = null;
     }
 }
