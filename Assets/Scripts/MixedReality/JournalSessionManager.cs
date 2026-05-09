@@ -265,6 +265,22 @@ public class JournalSessionManager : MonoBehaviour
         if (startButton != null)
             startButton.OnButtonPressed += OnStartButtonPressed;
 
+        // Cross-scene calibration: if a previous scene completed calibration,
+        // pre-populate the instance cache so this scene behaves as "already calibrated."
+        // The user will see the confirm panel and can choose to skip or redo.
+        if (JournalCalibrationCache.IsValid)
+        {
+            pendingTable             = JournalCalibrationCache.Table;
+            capturedRealEyeHeight    = JournalCalibrationCache.CapturedRealEyeHeight;
+            calibrationDataValid     = true;
+            hasCalibratedThisSceneVisit = true;
+
+            if (!skipStylusCalibration)
+                stylusCalibrationController?.TryAutoApplyStored();
+
+            Debug.Log("[JournalSession] Cross-scene calibration cache applied.");
+        }
+
         if (instructionText == null)
             CreateInstructionText();
 
@@ -567,6 +583,7 @@ public class JournalSessionManager : MonoBehaviour
     {
         pendingTable = table;
         calibrationDataValid = true;
+        JournalCalibrationCache.Store(table, capturedRealEyeHeight);
         Debug.Log($"[JournalSession] Table confirmed at {table.position}. " +
                   "Using static whiteboard — no preview spawn.");
     }

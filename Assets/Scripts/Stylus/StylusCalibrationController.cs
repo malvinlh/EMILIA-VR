@@ -228,6 +228,25 @@ public class StylusCalibrationController : MonoBehaviour
         if (instructionObj != null) instructionObj.SetActive(false);
     }
 
+    /// <summary>
+    /// Silently applies the last saved stylus calibration from disk, if quality is acceptable.
+    /// Returns true if the offset was applied. Call this when skipping the calibration UI
+    /// (e.g., cross-scene fast-path reuse via JournalCalibrationCache).
+    /// </summary>
+    public bool TryAutoApplyStored()
+    {
+        if (wristTracker == null) return false;
+
+        var record = StylusCalibrationStore.Load();
+        if (record == null) return false;
+        if (record.rmsResidualMeters >= residualWarnThreshold) return false;
+        if (record.handedness != stylusHand.ToString()) return false;
+
+        wristTracker.SetWristOffset(new Vector3(record.offsetX, record.offsetY, record.offsetZ));
+        Debug.Log($"[StylusCalibration] Auto-applied stored offset (RMS={record.rmsResidualMeters * 1000f:F1} mm) — no UI needed.");
+        return true;
+    }
+
     // ================================================================
     // LIFECYCLE
     // ================================================================
