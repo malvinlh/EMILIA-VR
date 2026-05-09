@@ -34,7 +34,7 @@ public class PaperShredder : MonoBehaviour
     [Header("Pull Tuning")]
     [Range(0.05f, 0.5f)] public float snapDuration = 0.2f;
     [Range(0.3f, 2f)] public float pullDownDuration = 0.9f;
-    [Range(0.05f, 0.5f)] public float pullDownDistance = 0.25f;
+    [Range(0.05f, 1.0f)] public float pullDownDistance = 0.25f;
 
     [Header("Strip VFX")]
     [Range(4, 32)] public int stripCount = 12;
@@ -71,7 +71,7 @@ public class PaperShredder : MonoBehaviour
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = true;
         _armed = true;
-        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = true;
+        // Lever stays disabled until paper has snapped to PaperPlaceholder (see SnapToSlot).
     }
 
     public void Disarm()
@@ -160,6 +160,7 @@ public class PaperShredder : MonoBehaviour
 
         _paperSnapped = true;
         _snapCoroutine = null;
+        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = true;
     }
 
     // ── Shred coroutine ────────────────────────────────────────────────────
@@ -172,7 +173,6 @@ public class PaperShredder : MonoBehaviour
 
         // Stop auto-snap if lever was pulled mid-snap.
         if (_snapCoroutine != null) { StopCoroutine(_snapCoroutine); _snapCoroutine = null; }
-        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = false;
 
         // Ensure grab disabled and kinematic (SnapToSlot may have already done this).
         var grab = paper.GetComponent<XRGrabInteractable>();

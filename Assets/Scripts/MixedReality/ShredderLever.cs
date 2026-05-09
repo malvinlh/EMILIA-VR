@@ -7,13 +7,11 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 /// <summary>
 /// Pull-lever for the paper shredder. Attach to the handle mesh GameObject.
 ///
-/// Rotation is driven by mapping the controller's downward Y-displacement directly
-/// onto a clamped Euler X range (restEulerX → maxPullEulerX). This avoids quaternion
-/// direction ambiguity and keeps the handle visually between the two authored extremes.
-///
-/// Usage: player grabs the handle and pulls the controller downward.
-/// At pullThresholdDeg of travel from rest, OnPulled fires (→ PaperShredder.Pull()).
-/// Releasing the lever springs the handle back to its rest rotation.
+/// When the player grabs the handle and moves the controller down by at least
+/// <see cref="triggerMovement"/> metres, a canned lerp animation automatically drives
+/// the handle from <see cref="restEulerX"/> to <see cref="maxPullEulerX"/> over
+/// <see cref="pullDuration"/> seconds, then fires <see cref="OnPulled"/>.
+/// Releasing the lever at any point springs it back to rest.
 /// </summary>
 [RequireComponent(typeof(XRGrabInteractable))]
 public class ShredderLever : MonoBehaviour
@@ -22,14 +20,14 @@ public class ShredderLever : MonoBehaviour
     public XRGrabInteractable grabInteractable;
 
     [Header("Rotation")]
-    [Tooltip("Euler X of the handle at the rest (up) position. Must match the scene-authored value.")]
+    [Tooltip("Euler X of the handle at rest (up) position.")]
     public float restEulerX = 55f;
-    [Tooltip("Euler X of the handle at the maximum pulled-down position.")]
+    [Tooltip("Euler X of the handle at maximum pulled-down position.")]
     public float maxPullEulerX = -55f;
-    [Tooltip("Controller must travel this many metres downward to reach maxPullEulerX.")]
-    [Range(0.05f, 0.5f)] public float pullDistance = 0.25f;
-    [Tooltip("Degrees of Euler X travel from rest at which the pull is committed.")]
-    [Range(5f, 120f)] public float pullThresholdDeg = 35f;
+    [Tooltip("Minimum downward controller travel (metres) that triggers the auto-pull animation.")]
+    [Range(0.005f, 0.1f)] public float triggerMovement = 0.02f;
+    [Tooltip("Duration of the pull lerp animation in seconds.")]
+    [Range(0.1f, 1f)] public float pullDuration = 0.4f;
 
     [Header("Spring-back")]
     [Tooltip("Seconds to return to rest pose after release.")]
@@ -48,14 +46,19 @@ public class ShredderLever : MonoBehaviour
     private bool      _isHeld;
     private bool      _pulledThisHold;
     private Coroutine _returnCoroutine;
+    private Coroutine _autoPullCoroutine;
     private Transform _interactorTransform;
     private float     _grabStartControllerY;
 
     private void Awake()
     {
-        _restLocalEulerAngles = transform.localEulerAngles;
+        _restLocalEulerAngles = new Vector3(restEulerX, 0f, 0f);
         _restLocalPosition    = transform.localPosition;
         if (grabInteractable == null) grabInteractable = GetComponent<XRGrabInteractable>();
+        // Prevent XRI from moving the handle — animation is driven exclusively by coroutines.
+        grabInteractable.trackPosition = false;
+        grabInteractable.trackRotation = false;
+        grabInteractable.addDefaultGrabTransformers = false;
     }
 
     private void OnEnable()
@@ -78,55 +81,82 @@ public class ShredderLever : MonoBehaviour
         _pulledThisHold = false;
         _interactorTransform = (args.interactorObject as MonoBehaviour)?.transform;
         _grabStartControllerY = _interactorTransform != null ? _interactorTransform.position.y : 0f;
-        // Prevent XRI from overriding the handle transform — our LateUpdate drives it exclusively.
-        grabInteractable.trackPosition = false;
-        grabInteractable.trackRotation = false;
         if (_returnCoroutine != null) { StopCoroutine(_returnCoroutine); _returnCoroutine = null; }
     }
 
     private void HandleSelectExited(SelectExitEventArgs _)
     {
         _isHeld = false;
+        _pulledThisHold = false;
         _interactorTransform = null;
-        grabInteractable.trackPosition = true;
-        grabInteractable.trackRotation = true;
+        if (_autoPullCoroutine != null) { StopCoroutine(_autoPullCoroutine); _autoPullCoroutine = null; }
         if (_returnCoroutine != null) StopCoroutine(_returnCoroutine);
         _returnCoroutine = StartCoroutine(ReturnToRest());
     }
 
     private void LateUpdate()
     {
-        if (!_isHeld || _interactorTransform == null) return;
+        if (!_isHeld) return;
 
-        // Map downward controller travel [0, pullDistance] → Euler X [restEulerX, maxPullEulerX].
-        float t = Mathf.Clamp01((_grabStartControllerY - _interactorTransform.position.y) / pullDistance);
-        float eulerX = Mathf.Lerp(restEulerX, maxPullEulerX, t);
-
-        // Keep the handle fixed in space; only change its Euler X.
+        // Lock position every frame so XRI cannot drift the handle.
         transform.localPosition = _restLocalPosition;
-        transform.localRotation = Quaternion.Euler(eulerX, _restLocalEulerAngles.y, _restLocalEulerAngles.z);
 
-        float travelDeg = Mathf.Abs(eulerX - restEulerX);
-        if (!_pulledThisHold && travelDeg >= pullThresholdDeg)
+        // Lock rotation to rest while not yet animating — prevents XRI grab-transformer
+        // rotation corruption during the hold window before the pull threshold is met.
+        if (!_pulledThisHold && _autoPullCoroutine == null)
+            transform.localRotation = Quaternion.Euler(_restLocalEulerAngles);
+
+        // Wait for any slight downward movement to trigger the auto-pull animation.
+        if (!_pulledThisHold && _interactorTransform != null)
         {
-            _pulledThisHold = true;
-            if (audioSource != null && clickClip != null)
-                audioSource.PlayOneShot(clickClip, clickVolume);
-            OnPulled?.Invoke();
+            float yDelta = _grabStartControllerY - _interactorTransform.position.y;
+            if (yDelta >= triggerMovement)
+            {
+                _pulledThisHold = true;
+                if (_returnCoroutine != null) { StopCoroutine(_returnCoroutine); _returnCoroutine = null; }
+                _autoPullCoroutine = StartCoroutine(AutoPull());
+            }
         }
+    }
+
+    private IEnumerator AutoPull()
+    {
+        // Always start from the declared rest angle — never read the live transform,
+        // which may have been corrupted by XRI grab transformers.
+        float startX = restEulerX;
+
+        float elapsed = 0f;
+        while (elapsed < pullDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t     = Mathf.Clamp01(elapsed / pullDuration);
+            float eased = t * t * (3f - 2f * t); // smoothstep
+            float eulerX = Mathf.Lerp(startX, maxPullEulerX, eased);
+            transform.localRotation = Quaternion.Euler(eulerX, _restLocalEulerAngles.y, _restLocalEulerAngles.z);
+            yield return null;
+        }
+
+        transform.localRotation = Quaternion.Euler(maxPullEulerX, _restLocalEulerAngles.y, _restLocalEulerAngles.z);
+
+        if (audioSource != null && clickClip != null)
+            audioSource.PlayOneShot(clickClip, clickVolume);
+
+        _autoPullCoroutine = null;
+        // Fires PaperShredder.Pull() → disables grabInteractable → HandleSelectExited → ReturnToRest.
+        OnPulled?.Invoke();
     }
 
     private IEnumerator ReturnToRest()
     {
-        Quaternion fromRot  = transform.localRotation;
-        Quaternion restRot  = Quaternion.Euler(_restLocalEulerAngles);
+        Quaternion fromRot = transform.localRotation;
+        Quaternion restRot = Quaternion.Euler(_restLocalEulerAngles);
         float elapsed = 0f;
         float duration = Mathf.Max(0.01f, returnDuration);
 
         while (elapsed < duration)
         {
             elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
+            float t     = Mathf.Clamp01(elapsed / duration);
             float eased = t * t * (3f - 2f * t);
             transform.localRotation = Quaternion.Slerp(fromRot, restRot, eased);
             yield return null;
