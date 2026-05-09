@@ -427,10 +427,29 @@ public class JournalReviewController : MonoBehaviour
     {
         if (avatarRoot == null) return;
 
-        // Bedroom: waypoint controller already drives the avatar — do not add the island roamer.
+        // Bedroom: prefer the waypoint controller already on the avatar hierarchy.
         if (_waypointController == null)
-            _waypointController = avatarRoot.GetComponent<AzkiChatWaypointPatrolController>();
-        if (_waypointController != null) return;
+            _waypointController = avatarRoot.GetComponentInChildren<AzkiChatWaypointPatrolController>(true);
+        if (_waypointController == null)
+            _waypointController = FindFirstObjectByType<AzkiChatWaypointPatrolController>();
+
+        if (_waypointController != null)
+        {
+            if (avatarRoamingController != null)
+                avatarRoamingController.enabled = false;
+
+            var strayRoamer = avatarRoot.GetComponent<AzkiIslandRoamingController>();
+            if (strayRoamer != null)
+                strayRoamer.enabled = false;
+
+            return;
+        }
+
+        if (_mode == ReviewMode.BedroomPaper)
+        {
+            Debug.LogWarning("[JournalReview] Bedroom mode could not find AzkiChatWaypointPatrolController under avatarRoot or in the scene.");
+            return;
+        }
 
         // Beach fallback: free-roam on NavMesh.
         if (avatarRoamingController == null)

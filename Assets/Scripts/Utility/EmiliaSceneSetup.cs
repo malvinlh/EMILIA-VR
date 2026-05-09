@@ -165,6 +165,10 @@ public static class EmiliaSceneSetup
             if (avatarRootProp?.objectReferenceValue is Transform avatarXf)
             {
                 var wp = avatarXf.GetComponent<AzkiChatWaypointPatrolController>();
+                if (wp == null)
+                    wp = avatarXf.GetComponentInChildren<AzkiChatWaypointPatrolController>(true);
+                if (wp == null)
+                    wp = Object.FindFirstObjectByType<AzkiChatWaypointPatrolController>();
                 if (wp != null) wired += SetIfNull(so, "_waypointController", wp);
             }
 

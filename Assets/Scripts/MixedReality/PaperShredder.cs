@@ -57,7 +57,7 @@ public class PaperShredder : MonoBehaviour
     {
         if (paperPlaceholder != null)
             paperPlaceholder.gameObject.SetActive(false);
-        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = false;
+        if (_lever != null) _lever.SetInteractable(false);
     }
 
     // ── Public API ─────────────────────────────────────────────────────────
@@ -72,6 +72,7 @@ public class PaperShredder : MonoBehaviour
         if (col != null) col.enabled = true;
         _armed = true;
         // Lever stays disabled until paper has snapped to PaperPlaceholder (see SnapToSlot).
+        if (_lever != null) { _lever.ResetToRest(); _lever.SetInteractable(false); }
     }
 
     public void Disarm()
@@ -80,7 +81,7 @@ public class PaperShredder : MonoBehaviour
         _paperInSlot = null;
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
-        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = false;
+        if (_lever != null) { _lever.ResetToRest(); _lever.SetInteractable(false); }
     }
 
     /// <summary>
@@ -160,7 +161,7 @@ public class PaperShredder : MonoBehaviour
 
         _paperSnapped = true;
         _snapCoroutine = null;
-        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = true;
+        if (_lever != null) _lever.SetInteractable(true);
     }
 
     // ── Shred coroutine ────────────────────────────────────────────────────

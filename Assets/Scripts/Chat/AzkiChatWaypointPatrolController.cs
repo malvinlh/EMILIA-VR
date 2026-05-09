@@ -451,7 +451,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         ResetWaitingIdleCycle();
         if (_agent != null)
         {
-            if (_agent.isOnNavMesh) { _agent.isStopped = true; _agent.ResetPath(); }
+            if (_agent.isOnNavMesh) { _agent.isStopped = true; _agent.ResetPath(); _agent.velocity = Vector3.zero; }
             _agent.updateRotation = false;
         }
         EnforceAnimation(AnimState.Idle, force: true);
@@ -669,6 +669,8 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
         if (!_talkLoopStarted)
             StartTalkLoop();
 
+        if (_animator != null)
+            _animator.speed = 1f;
         EnforceAnimation(AnimState.Talk, force: false);
 
         if (_animator == null || _animator.IsInTransition(0))
@@ -676,7 +678,10 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
         var info = _animator.GetCurrentAnimatorStateInfo(0);
         if (StateMatches(info, _talkHash, _talkShortHash) && info.normalizedTime >= 1f)
+        {
             _animator.Play(_talkHash, 0, 0f);
+            _animator.Update(0f);
+        }
     }
 
     private void HandleWaitingMode()
