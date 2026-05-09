@@ -42,7 +42,6 @@ public class ShredderLever : MonoBehaviour
     public UnityEvent OnPulled;
 
     private Vector3   _restLocalEulerAngles;
-    private Vector3   _restLocalPosition;
     private bool      _isHeld;
     private bool      _pulledThisHold;
     private Coroutine _returnCoroutine;
@@ -52,13 +51,14 @@ public class ShredderLever : MonoBehaviour
 
     private void Awake()
     {
-        _restLocalEulerAngles = new Vector3(restEulerX, 0f, 0f);
-        _restLocalPosition    = transform.localPosition;
+        _restLocalEulerAngles = transform.localEulerAngles;
+        _restLocalEulerAngles.x = restEulerX;
         if (grabInteractable == null) grabInteractable = GetComponent<XRGrabInteractable>();
         // Prevent XRI from moving the handle — animation is driven exclusively by coroutines.
         grabInteractable.trackPosition = false;
         grabInteractable.trackRotation = false;
         grabInteractable.addDefaultGrabTransformers = false;
+        transform.localRotation = Quaternion.Euler(_restLocalEulerAngles);
     }
 
     private void OnEnable()
@@ -98,11 +98,7 @@ public class ShredderLever : MonoBehaviour
     {
         if (!_isHeld) return;
 
-        // Lock position every frame so XRI cannot drift the handle.
-        transform.localPosition = _restLocalPosition;
-
-        // Lock rotation to rest while not yet animating — prevents XRI grab-transformer
-        // rotation corruption during the hold window before the pull threshold is met.
+        // Keep the handle constrained to the authored rest pose until the pull begins.
         if (!_pulledThisHold && _autoPullCoroutine == null)
             transform.localRotation = Quaternion.Euler(_restLocalEulerAngles);
 
@@ -123,7 +119,7 @@ public class ShredderLever : MonoBehaviour
     {
         // Always start from the declared rest angle — never read the live transform,
         // which may have been corrupted by XRI grab transformers.
-        float startX = restEulerX;
+        float startX = _restLocalEulerAngles.x;
 
         float elapsed = 0f;
         while (elapsed < pullDuration)

@@ -27035,7 +27035,6 @@ GameObject:
   - component: {fileID: 6940490042060951284}
   - component: {fileID: 6940490042060951283}
   - component: {fileID: 6940490042060951282}
-  - component: {fileID: 6940490042060951281}
   - component: {fileID: 6940490042060951280}
   - component: {fileID: 6940490042060951279}
   m_Layer: 0
@@ -27425,19 +27424,6 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
---- !u!114 &6940490042060951281
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6854879681335583373}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4dd2e41114c62b44fbd334ca5b314352, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit.Samples.StarterAssets::UnityEngine.XR.Interaction.Toolkit.Samples.StarterAssets.RotationAxisLockGrabTransformer
-  m_PermittedRotationAxis: 1
 --- !u!114 &6940490042060951282
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -27560,7 +27546,6 @@ MonoBehaviour:
   m_ForceGravityOnDetach: 0
   m_RetainTransformParent: 1
   m_StartingSingleGrabTransformers:
-  - {fileID: 6940490042060951281}
   m_StartingMultipleGrabTransformers: []
   m_AddDefaultGrabTransformers: 0
   m_FarAttachMode: 0
