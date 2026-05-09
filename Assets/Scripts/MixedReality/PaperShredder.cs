@@ -47,7 +47,9 @@ public class PaperShredder : MonoBehaviour
 
     private bool _armed;
     private bool _fired;
+    private bool _paperSnapped;
     private Transform _paperInSlot;
+    private Coroutine _snapCoroutine;
 
     private void Awake()
     {
@@ -60,7 +62,9 @@ public class PaperShredder : MonoBehaviour
     public void Arm()
     {
         _fired = false;
+        _paperSnapped = false;
         _paperInSlot = null;
+        if (_snapCoroutine != null) { StopCoroutine(_snapCoroutine); _snapCoroutine = null; }
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = true;
         _armed = true;
@@ -96,7 +100,7 @@ public class PaperShredder : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
-        if (_paperInSlot == null) return;
+        if (_paperInSlot == null || _snapCoroutine != null || _fired || _paperSnapped) return;
 
         Transform t = other.transform;
         while (t != null)
@@ -114,36 +118,24 @@ public class PaperShredder : MonoBehaviour
         Transform t = other.transform;
         while (t != null)
         {
-            if (t.CompareTag(paperTag)) { _paperInSlot = t; return; }
+            if (t.CompareTag(paperTag))
+            {
+                _paperInSlot = t;
+                _snapCoroutine = StartCoroutine(SnapToSlot(t));
+                return;
+            }
             t = t.parent;
         }
     }
 
-    // ── Shred coroutine ────────────────────────────────────────────────────
-
-    private IEnumerator ShredRoutine(Transform paper)
+    private IEnumerator SnapToSlot(Transform paper)
     {
-        _armed = false;
-        _fired = true;
-        _paperInSlot = null;
-
-        // Disable grab so the player can't re-grab mid-animation.
         var grab = paper.GetComponent<XRGrabInteractable>();
         if (grab != null) grab.enabled = false;
 
         var rb = paper.GetComponent<Rigidbody>();
         if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
 
-        float feedbackDuration = ResolveGrindDuration();
-        if (grindSfx != null)
-        {
-            grindSfx.Stop();
-            grindSfx.Play();
-        }
-
-        StartCoroutine(ShakeRoutine(feedbackDuration));
-
-        // Phase 1: lerp position + rotation to paperPlaceholder
         if (paperPlaceholder != null)
         {
             Vector3 fromPos = paper.position;
@@ -161,7 +153,39 @@ public class PaperShredder : MonoBehaviour
             paper.SetPositionAndRotation(paperPlaceholder.position, paperPlaceholder.rotation);
         }
 
-        // Phase 2: slide only Y downward
+        _paperSnapped = true;
+        _snapCoroutine = null;
+    }
+
+    // ── Shred coroutine ────────────────────────────────────────────────────
+
+    private IEnumerator ShredRoutine(Transform paper)
+    {
+        _armed = false;
+        _fired = true;
+        _paperInSlot = null;
+
+        // Stop auto-snap if lever was pulled mid-snap.
+        if (_snapCoroutine != null) { StopCoroutine(_snapCoroutine); _snapCoroutine = null; }
+
+        // Ensure grab disabled and kinematic (SnapToSlot may have already done this).
+        var grab = paper.GetComponent<XRGrabInteractable>();
+        if (grab != null) grab.enabled = false;
+
+        var rb = paper.GetComponent<Rigidbody>();
+        if (rb != null) { rb.isKinematic = true; rb.linearVelocity = Vector3.zero; rb.angularVelocity = Vector3.zero; }
+
+        float feedbackDuration = ResolveGrindDuration();
+        if (grindSfx != null)
+        {
+            grindSfx.Stop();
+            grindSfx.Play();
+        }
+
+        StartCoroutine(ShakeRoutine(feedbackDuration));
+
+        // Paper is already at PaperPlaceholder (snapped by SnapToSlot).
+        // Slide only Y downward
         Vector3 slideOrigin = paper.position;
         float slideElapsed = 0f;
         float pullDuration = feedbackDuration > 0f ? feedbackDuration : pullDownDuration;

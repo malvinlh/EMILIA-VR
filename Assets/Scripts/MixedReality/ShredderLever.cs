@@ -5,17 +5,13 @@ using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
-/// Pull-lever for committal gestures (e.g. starting the paper shredder).
-/// Attach to a pivot empty parent of the lever mesh. The pivot must also have:
-///   - Rigidbody (kinematic, no gravity)
-///   - Collider (sized to the grippable handle)
-///   - XRGrabInteractable
-///   - RotationAxisLockGrabTransformer (configured to free only the chosen pull axis)
+/// Pull-lever for the paper shredder. Attach to the handle mesh GameObject.
+/// Rotation is driven entirely from the controller's downward Y-displacement —
+/// no RotationAxisLockGrabTransformer required.
 ///
-/// While held, this script tracks rotation around <see cref="rotationAxis"/>
-/// from the rest pose. Once the absolute angle exceeds
-/// <see cref="pullThresholdDeg"/>, <see cref="OnPulled"/> fires once per hold.
-/// Releasing the lever springs it back to rest.
+/// Usage: player grabs the handle and pulls the controller downward.
+/// At pullThresholdDeg from rest, OnPulled fires (→ PaperShredder.Pull()).
+/// Releasing springs the handle back to its rest rotation.
 /// </summary>
 [RequireComponent(typeof(XRGrabInteractable))]
 public class ShredderLever : MonoBehaviour
@@ -24,12 +20,16 @@ public class ShredderLever : MonoBehaviour
     public XRGrabInteractable grabInteractable;
 
     [Header("Rotation")]
-    [Tooltip("Local axis the lever pivots around. Must match the axis left free by RotationAxisLockGrabTransformer.")]
+    [Tooltip("Local axis the lever pivots around.")]
     public Vector3 rotationAxis = Vector3.right;
+    [Tooltip("Degrees of rotation per metre of downward hand travel. 400 = ~9 cm needed for a 35° pull.")]
+    [Range(50f, 800f)] public float rotationSensitivity = 400f;
+    [Tooltip("Check if pulling downward rotates the lever the wrong way.")]
+    public bool invertPullDirection = false;
     [Tooltip("Absolute angle (degrees) from rest at which the pull is committed.")]
     [Range(5f, 120f)] public float pullThresholdDeg = 35f;
-    [Tooltip("Hard clamp on how far the lever can rotate either side of rest.")]
-    [Range(10f, 180f)] public float maxPullDeg = 60f;
+    [Tooltip("Hard clamp on how far the lever can rotate from rest.")]
+    [Range(10f, 180f)] public float maxPullDeg = 110f;
 
     [Header("Spring-back")]
     [Tooltip("Seconds to return to rest pose after release.")]
@@ -44,13 +44,17 @@ public class ShredderLever : MonoBehaviour
     public UnityEvent OnPulled;
 
     private Quaternion _restLocalRotation;
-    private bool _isHeld;
-    private bool _pulledThisHold;
-    private Coroutine _returnCoroutine;
+    private Vector3    _restLocalPosition;
+    private bool       _isHeld;
+    private bool       _pulledThisHold;
+    private Coroutine  _returnCoroutine;
+    private Transform  _interactorTransform;
+    private float      _grabStartControllerY;
 
     private void Awake()
     {
         _restLocalRotation = transform.localRotation;
+        _restLocalPosition = transform.localPosition;
         if (grabInteractable == null) grabInteractable = GetComponent<XRGrabInteractable>();
     }
 
@@ -68,53 +72,47 @@ public class ShredderLever : MonoBehaviour
         grabInteractable.selectExited.RemoveListener(HandleSelectExited);
     }
 
-    private void HandleSelectEntered(SelectEnterEventArgs _)
+    private void HandleSelectEntered(SelectEnterEventArgs args)
     {
         _isHeld = true;
         _pulledThisHold = false;
+        _interactorTransform = (args.interactorObject as MonoBehaviour)?.transform;
+        _grabStartControllerY = _interactorTransform != null ? _interactorTransform.position.y : 0f;
         if (_returnCoroutine != null) { StopCoroutine(_returnCoroutine); _returnCoroutine = null; }
     }
 
     private void HandleSelectExited(SelectExitEventArgs _)
     {
         _isHeld = false;
+        _interactorTransform = null;
         if (_returnCoroutine != null) StopCoroutine(_returnCoroutine);
         _returnCoroutine = StartCoroutine(ReturnToRest());
     }
 
-    // Run after the XRI grab pipeline has applied its rotation for the frame.
+    // Runs after XRI has applied its own transform changes for the frame.
     private void LateUpdate()
     {
-        if (!_isHeld) return;
+        if (!_isHeld || _interactorTransform == null) return;
 
-        float signedAngle = SignedAngleFromRest();
+        // Positive yDelta = controller moved downward.
+        float yDelta = _grabStartControllerY - _interactorTransform.position.y;
+        float sign   = invertPullDirection ? 1f : -1f;
 
-        if (Mathf.Abs(signedAngle) > maxPullDeg)
-        {
-            float clamped = Mathf.Sign(signedAngle) * maxPullDeg;
-            ApplyAngleFromRest(clamped);
-            signedAngle = clamped;
-        }
+        // Map to a rotation angle clamped to [−maxPullDeg, 0].
+        // Negative angle rotates the handle from rest (+55°) toward the pulled position (−55°).
+        float angle = Mathf.Clamp(yDelta * rotationSensitivity * sign, -maxPullDeg, 0f);
 
-        if (!_pulledThisHold && Mathf.Abs(signedAngle) >= pullThresholdDeg)
+        // Override whatever XRI set this frame — keeps the handle fixed in space while rotating.
+        transform.localPosition = _restLocalPosition;
+        ApplyAngleFromRest(angle);
+
+        if (!_pulledThisHold && Mathf.Abs(angle) >= pullThresholdDeg)
         {
             _pulledThisHold = true;
             if (audioSource != null && clickClip != null)
                 audioSource.PlayOneShot(clickClip, clickVolume);
             OnPulled?.Invoke();
         }
-    }
-
-    private float SignedAngleFromRest()
-    {
-        Quaternion delta = Quaternion.Inverse(_restLocalRotation) * transform.localRotation;
-        delta.ToAngleAxis(out float angle, out Vector3 axis);
-
-        if (angle > 180f) { angle = 360f - angle; axis = -axis; }
-        if (rotationAxis.sqrMagnitude < 1e-6f) return angle;
-
-        float dot = Vector3.Dot(axis, rotationAxis.normalized);
-        return dot * angle;
     }
 
     private void ApplyAngleFromRest(float signedAngle)

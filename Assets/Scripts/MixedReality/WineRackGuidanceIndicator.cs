@@ -6,6 +6,8 @@ public class WineRackGuidanceIndicator : MonoBehaviour
     [SerializeField] private JournalReviewController _reviewController;
     [SerializeField] private GameObject _groundVisual;
     [SerializeField] private Transform _cameraTransform;
+    [Tooltip("When true, activates on DISCARD path (IsWaitingForShredder). When false (default), activates on KEEP path (IsWaitingForRack).")]
+    [SerializeField] private bool _isShredderMode;
 
     private bool _isVisible;
 
@@ -22,7 +24,8 @@ public class WineRackGuidanceIndicator : MonoBehaviour
 
     private void Update()
     {
-        bool shouldShow = _reviewController != null && _reviewController.IsWaitingForRack;
+        bool shouldShow = _reviewController != null &&
+            (_isShredderMode ? _reviewController.IsWaitingForShredder : _reviewController.IsWaitingForRack);
 
         if (shouldShow != _isVisible)
         {
