@@ -13,6 +13,8 @@ public class PaperShredder : MonoBehaviour
 {
     [Header("References")]
     public JournalReviewController reviewController;
+    [Tooltip("ShredderLever on the lever handle. Enabled only while armed; disabled after shredding.")]
+    [SerializeField] private ShredderLever _lever;
 
     [Header("Detection")]
     [Tooltip("Tag used on the paper object (and searched up hierarchy).")]
@@ -55,6 +57,7 @@ public class PaperShredder : MonoBehaviour
     {
         if (paperPlaceholder != null)
             paperPlaceholder.gameObject.SetActive(false);
+        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = false;
     }
 
     // ── Public API ─────────────────────────────────────────────────────────
@@ -68,6 +71,7 @@ public class PaperShredder : MonoBehaviour
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = true;
         _armed = true;
+        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = true;
     }
 
     public void Disarm()
@@ -76,6 +80,7 @@ public class PaperShredder : MonoBehaviour
         _paperInSlot = null;
         var col = GetComponent<Collider>();
         if (col != null) col.enabled = false;
+        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = false;
     }
 
     /// <summary>
@@ -167,6 +172,7 @@ public class PaperShredder : MonoBehaviour
 
         // Stop auto-snap if lever was pulled mid-snap.
         if (_snapCoroutine != null) { StopCoroutine(_snapCoroutine); _snapCoroutine = null; }
+        if (_lever?.grabInteractable != null) _lever.grabInteractable.enabled = false;
 
         // Ensure grab disabled and kinematic (SnapToSlot may have already done this).
         var grab = paper.GetComponent<XRGrabInteractable>();

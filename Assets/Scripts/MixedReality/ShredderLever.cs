@@ -6,12 +6,14 @@ using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
 /// Pull-lever for the paper shredder. Attach to the handle mesh GameObject.
-/// Rotation is driven entirely from the controller's downward Y-displacement —
-/// no RotationAxisLockGrabTransformer required.
+///
+/// Rotation is driven by mapping the controller's downward Y-displacement directly
+/// onto a clamped Euler X range (restEulerX → maxPullEulerX). This avoids quaternion
+/// direction ambiguity and keeps the handle visually between the two authored extremes.
 ///
 /// Usage: player grabs the handle and pulls the controller downward.
-/// At pullThresholdDeg from rest, OnPulled fires (→ PaperShredder.Pull()).
-/// Releasing springs the handle back to its rest rotation.
+/// At pullThresholdDeg of travel from rest, OnPulled fires (→ PaperShredder.Pull()).
+/// Releasing the lever springs the handle back to its rest rotation.
 /// </summary>
 [RequireComponent(typeof(XRGrabInteractable))]
 public class ShredderLever : MonoBehaviour
@@ -20,16 +22,14 @@ public class ShredderLever : MonoBehaviour
     public XRGrabInteractable grabInteractable;
 
     [Header("Rotation")]
-    [Tooltip("Local axis the lever pivots around.")]
-    public Vector3 rotationAxis = Vector3.right;
-    [Tooltip("Degrees of rotation per metre of downward hand travel. 400 = ~9 cm needed for a 35° pull.")]
-    [Range(50f, 800f)] public float rotationSensitivity = 400f;
-    [Tooltip("Check if pulling downward rotates the lever the wrong way.")]
-    public bool invertPullDirection = false;
-    [Tooltip("Absolute angle (degrees) from rest at which the pull is committed.")]
+    [Tooltip("Euler X of the handle at the rest (up) position. Must match the scene-authored value.")]
+    public float restEulerX = 55f;
+    [Tooltip("Euler X of the handle at the maximum pulled-down position.")]
+    public float maxPullEulerX = -55f;
+    [Tooltip("Controller must travel this many metres downward to reach maxPullEulerX.")]
+    [Range(0.05f, 0.5f)] public float pullDistance = 0.25f;
+    [Tooltip("Degrees of Euler X travel from rest at which the pull is committed.")]
     [Range(5f, 120f)] public float pullThresholdDeg = 35f;
-    [Tooltip("Hard clamp on how far the lever can rotate from rest.")]
-    [Range(10f, 180f)] public float maxPullDeg = 110f;
 
     [Header("Spring-back")]
     [Tooltip("Seconds to return to rest pose after release.")]
@@ -43,18 +43,18 @@ public class ShredderLever : MonoBehaviour
     [Header("Events")]
     public UnityEvent OnPulled;
 
-    private Quaternion _restLocalRotation;
-    private Vector3    _restLocalPosition;
-    private bool       _isHeld;
-    private bool       _pulledThisHold;
-    private Coroutine  _returnCoroutine;
-    private Transform  _interactorTransform;
-    private float      _grabStartControllerY;
+    private Vector3   _restLocalEulerAngles;
+    private Vector3   _restLocalPosition;
+    private bool      _isHeld;
+    private bool      _pulledThisHold;
+    private Coroutine _returnCoroutine;
+    private Transform _interactorTransform;
+    private float     _grabStartControllerY;
 
     private void Awake()
     {
-        _restLocalRotation = transform.localRotation;
-        _restLocalPosition = transform.localPosition;
+        _restLocalEulerAngles = transform.localEulerAngles;
+        _restLocalPosition    = transform.localPosition;
         if (grabInteractable == null) grabInteractable = GetComponent<XRGrabInteractable>();
     }
 
@@ -78,6 +78,9 @@ public class ShredderLever : MonoBehaviour
         _pulledThisHold = false;
         _interactorTransform = (args.interactorObject as MonoBehaviour)?.transform;
         _grabStartControllerY = _interactorTransform != null ? _interactorTransform.position.y : 0f;
+        // Prevent XRI from overriding the handle transform — our LateUpdate drives it exclusively.
+        grabInteractable.trackPosition = false;
+        grabInteractable.trackRotation = false;
         if (_returnCoroutine != null) { StopCoroutine(_returnCoroutine); _returnCoroutine = null; }
     }
 
@@ -85,28 +88,26 @@ public class ShredderLever : MonoBehaviour
     {
         _isHeld = false;
         _interactorTransform = null;
+        grabInteractable.trackPosition = true;
+        grabInteractable.trackRotation = true;
         if (_returnCoroutine != null) StopCoroutine(_returnCoroutine);
         _returnCoroutine = StartCoroutine(ReturnToRest());
     }
 
-    // Runs after XRI has applied its own transform changes for the frame.
     private void LateUpdate()
     {
         if (!_isHeld || _interactorTransform == null) return;
 
-        // Positive yDelta = controller moved downward.
-        float yDelta = _grabStartControllerY - _interactorTransform.position.y;
-        float sign   = invertPullDirection ? 1f : -1f;
+        // Map downward controller travel [0, pullDistance] → Euler X [restEulerX, maxPullEulerX].
+        float t = Mathf.Clamp01((_grabStartControllerY - _interactorTransform.position.y) / pullDistance);
+        float eulerX = Mathf.Lerp(restEulerX, maxPullEulerX, t);
 
-        // Map to a rotation angle clamped to [−maxPullDeg, 0].
-        // Negative angle rotates the handle from rest (+55°) toward the pulled position (−55°).
-        float angle = Mathf.Clamp(yDelta * rotationSensitivity * sign, -maxPullDeg, 0f);
-
-        // Override whatever XRI set this frame — keeps the handle fixed in space while rotating.
+        // Keep the handle fixed in space; only change its Euler X.
         transform.localPosition = _restLocalPosition;
-        ApplyAngleFromRest(angle);
+        transform.localRotation = Quaternion.Euler(eulerX, _restLocalEulerAngles.y, _restLocalEulerAngles.z);
 
-        if (!_pulledThisHold && Mathf.Abs(angle) >= pullThresholdDeg)
+        float travelDeg = Mathf.Abs(eulerX - restEulerX);
+        if (!_pulledThisHold && travelDeg >= pullThresholdDeg)
         {
             _pulledThisHold = true;
             if (audioSource != null && clickClip != null)
@@ -115,15 +116,10 @@ public class ShredderLever : MonoBehaviour
         }
     }
 
-    private void ApplyAngleFromRest(float signedAngle)
-    {
-        Vector3 axisN = rotationAxis.sqrMagnitude < 1e-6f ? Vector3.right : rotationAxis.normalized;
-        transform.localRotation = _restLocalRotation * Quaternion.AngleAxis(signedAngle, axisN);
-    }
-
     private IEnumerator ReturnToRest()
     {
-        Quaternion fromRot = transform.localRotation;
+        Quaternion fromRot  = transform.localRotation;
+        Quaternion restRot  = Quaternion.Euler(_restLocalEulerAngles);
         float elapsed = 0f;
         float duration = Mathf.Max(0.01f, returnDuration);
 
@@ -132,11 +128,11 @@ public class ShredderLever : MonoBehaviour
             elapsed += Time.deltaTime;
             float t = Mathf.Clamp01(elapsed / duration);
             float eased = t * t * (3f - 2f * t);
-            transform.localRotation = Quaternion.Slerp(fromRot, _restLocalRotation, eased);
+            transform.localRotation = Quaternion.Slerp(fromRot, restRot, eased);
             yield return null;
         }
 
-        transform.localRotation = _restLocalRotation;
+        transform.localRotation = restRot;
         _returnCoroutine = null;
     }
 }
