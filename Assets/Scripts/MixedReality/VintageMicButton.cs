@@ -104,6 +104,11 @@ public class VintageMicButton : MonoBehaviour
         _collider.isTrigger = false;   // must be non-trigger for NearFarInteractor raycasts
 
         _xrInteractable = GetComponent<XRSimpleInteractable>();
+        if (_xrInteractable != null)
+        {
+            _xrInteractable.colliders.Clear();
+            _xrInteractable.colliders.Add(_collider);
+        }
 
         if (buttonRenderer == null)
             buttonRenderer = GetComponent<Renderer>();

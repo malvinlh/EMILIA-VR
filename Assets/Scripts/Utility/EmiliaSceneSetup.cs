@@ -2,6 +2,7 @@
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 /// <summary>
@@ -60,6 +61,16 @@ public static class EmiliaSceneSetup
             Undo.RegisterCreatedObjectUndo(waxStamperGo, "Create WaxStamper");
             created++;
         }
+
+        // Ensure WaxStamper is grab-ready for both controller and hand pinches.
+        var waxCol = waxStamperGo.GetComponent<Collider>() ?? waxStamperGo.AddComponent<BoxCollider>();
+        var waxRb  = waxStamperGo.GetComponent<Rigidbody>() ?? waxStamperGo.AddComponent<Rigidbody>();
+        waxRb.useGravity = true; waxRb.isKinematic = false;
+
+        // Add XRGrabInteractable if missing so pinch-based NearFar/Direct interactors can pick it up.
+        var waxGrab = waxStamperGo.GetComponent<XRGrabInteractable>() ?? waxStamperGo.AddComponent<XRGrabInteractable>();
+        waxGrab.selectMode = InteractableSelectMode.Single;
+        EditorUtility.SetDirty(waxStamperGo);
 
         var stamperTipXf = FindOrCreateChild(waxStamperGo.transform, StamperTipName, ref created, () =>
         {
