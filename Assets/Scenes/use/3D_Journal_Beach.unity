@@ -8446,16 +8446,11 @@ MonoBehaviour:
   minSize: {x: 0.3, y: 0.2}
   maxSize: {x: 1.2, y: 0.8}
   buttonHeightAboveRect: 0.22
-  buttonSpacing: 0.18
-  buttonPokeDistance: 0.03
   buttonArmDelay: 0.4
   tipIndicatorRadius: 0.012
   tapMarkerRadius: 0.01
   instructionForward: 0.9
   instructionHeight: 0.18
-  fontSize: 0.3
-  buttonFontSize: 1
-  buttonLabelBoxSize: {x: 0.24, y: 0.12}
   logEvents: 0
 --- !u!64 &869365583
 MeshCollider:
@@ -9279,13 +9274,9 @@ MonoBehaviour:
   buttonForward: 0.5
   buttonBelowEye: 0.05
   buttonSideOffset: 0.18
-  buttonPokeDistance: 0.03
   nextArmDelay: 0.6
   instructionForward: 0.9
   instructionHeight: 0.2
-  fontSize: 0.3
-  buttonFontSize: 1
-  buttonLabelBoxSize: {x: 0.24, y: 0.12}
   logEvents: 0
 --- !u!1 &992886154
 GameObject:
@@ -13762,8 +13753,8 @@ MonoBehaviour:
   autoCreateMissingReferences: 0
   autoCreateComfortFadeCanvas: 0
   targetScene: Assets/Scenes/use/3D_Login.unity
-  loadDelay: 1.5
-  enterSpinDuration: 1.5
+  loadDelay: 0.75
+  enterSpinDuration: 0.75
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:
@@ -15222,7 +15213,7 @@ MonoBehaviour:
   - {fileID: 1617805447}
   portalTriggers:
   - {fileID: 1361628420}
-  penTogglePinchThreshold: 0.0075
+  penTogglePinchThreshold: 0.015
   skipToJournalingOnStart: 0
   stylusCalibrationController: {fileID: 990924403}
   stylusTipProvider: {fileID: 1672689253}
@@ -20206,8 +20197,9 @@ MonoBehaviour:
   hoverColor: {r: 1, g: 0.92, b: 0.6, a: 1}
   pressDepth: 0
   pulseDimFraction: 0.35
-  pulseSpeed: 2.5
+  pulseSpeed: 1
   hoverDistance: 0.06
+  pokeActivationDistance: 0.005
   cooldown: 0.25
   clickSfx: {fileID: 976333376}
 --- !u!114 &1953748146
@@ -20220,7 +20212,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8a35f6cfbfba9b548aaa00d52cfe8a50, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable
   m_InteractionManager: {fileID: 0}
   m_Colliders:
@@ -20304,8 +20296,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 5.9166064, y: 4.605876, z: 5.4858556}
-  m_Center: {x: 0.14859267, y: 1.8029379, z: 0.06794921}
+  m_Size: {x: 5.9166064, y: 8.9098215, z: 5.4858556}
+  m_Center: {x: 0.14859276, y: 3.9549117, z: 0.06794929}
 --- !u!1 &1969381466
 GameObject:
   m_ObjectHideFlags: 0

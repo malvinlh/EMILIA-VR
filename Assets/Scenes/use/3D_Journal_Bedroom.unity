@@ -2153,8 +2153,9 @@ MonoBehaviour:
   hoverColor: {r: 1, g: 0.92, b: 0.6, a: 1}
   pressDepth: 0
   pulseDimFraction: 0.35
-  pulseSpeed: 2.5
+  pulseSpeed: 1
   hoverDistance: 0.06
+  pokeActivationDistance: 0.005
   cooldown: 0.25
   clickSfx: {fileID: 882360340}
 --- !u!114 &250726527
@@ -2251,8 +2252,8 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 5.9166064, y: 4.605876, z: 5.4858556}
-  m_Center: {x: 0.14859267, y: 1.8029379, z: 0.06794921}
+  m_Size: {x: 5.9166064, y: 8.090981, z: 5.4858556}
+  m_Center: {x: 0.14859283, y: 3.5454903, z: 0.06794914}
 --- !u!224 &253008264 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 5695563688027091985, guid: a5b4ba3029e570348b95a00d48322fe1, type: 3}
@@ -2977,7 +2978,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 3.9
+      value: 3.5
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode
@@ -5221,13 +5222,9 @@ MonoBehaviour:
   buttonForward: 0.5
   buttonBelowEye: 0.05
   buttonSideOffset: 0.18
-  buttonPokeDistance: 0.03
   nextArmDelay: 0.6
   instructionForward: 0.9
   instructionHeight: 0.2
-  fontSize: 0.3
-  buttonFontSize: 1
-  buttonLabelBoxSize: {x: 0.24, y: 0.12}
   logEvents: 0
 --- !u!4 &602012318
 Transform:
@@ -7958,8 +7955,8 @@ MonoBehaviour:
   autoCreateMissingReferences: 0
   autoCreateComfortFadeCanvas: 0
   targetScene: Assets/Scenes/use/3D_Login.unity
-  loadDelay: 1.5
-  enterSpinDuration: 1.5
+  loadDelay: 0.75
+  enterSpinDuration: 0.75
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:
@@ -12325,7 +12322,7 @@ MonoBehaviour:
   - {fileID: 1900400644}
   portalTriggers:
   - {fileID: 1176094223}
-  penTogglePinchThreshold: 0.0075
+  penTogglePinchThreshold: 0.015
   skipToJournalingOnStart: 0
   stylusCalibrationController: {fileID: 602012317}
   stylusTipProvider: {fileID: 1022418237}
@@ -14837,16 +14834,11 @@ MonoBehaviour:
   minSize: {x: 0.3, y: 0.2}
   maxSize: {x: 1.2, y: 0.8}
   buttonHeightAboveRect: 0.22
-  buttonSpacing: 0.18
-  buttonPokeDistance: 0.03
   buttonArmDelay: 0.4
   tipIndicatorRadius: 0.012
   tapMarkerRadius: 0.01
   instructionForward: 0.9
   instructionHeight: 0.18
-  fontSize: 0.3
-  buttonFontSize: 1
-  buttonLabelBoxSize: {x: 0.24, y: 0.12}
   logEvents: 0
 --- !u!4 &2127075500
 Transform:

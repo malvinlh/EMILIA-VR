@@ -980,8 +980,8 @@ MonoBehaviour:
   autoCreateMissingReferences: 0
   autoCreateComfortFadeCanvas: 0
   targetScene: Assets/Scenes/use/3D_Journal_Beach.unity
-  loadDelay: 1.5
-  enterSpinDuration: 1.5
+  loadDelay: 0.75
+  enterSpinDuration: 0.75
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:
@@ -1528,8 +1528,8 @@ MonoBehaviour:
   autoCreateMissingReferences: 0
   autoCreateComfortFadeCanvas: 0
   targetScene: Assets/Scenes/use/3D_Journal_Bedroom.unity
-  loadDelay: 1.5
-  enterSpinDuration: 1.5
+  loadDelay: 0.75
+  enterSpinDuration: 0.75
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:
@@ -6833,6 +6833,9 @@ PrefabInstance:
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1717954561962503725, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1528008428}
     - targetCorrespondingSourceObject: {fileID: 1767192433, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1528008426}
@@ -6886,6 +6889,23 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!1 &1528008427 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1717954561962503725, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
+  m_PrefabInstance: {fileID: 1528008424}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1528008428
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1528008427}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d574a3e35db2414aa64ca71c5b9e237, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LoginSceneXRSetup
 --- !u!1 &1561861569
 GameObject:
   m_ObjectHideFlags: 0
@@ -7266,6 +7286,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   loginCanvas: {fileID: 572921137}
+  canvasFadeDuration: 0.5
 --- !u!4 &1754051868
 Transform:
   m_ObjectHideFlags: 0

@@ -298,6 +298,24 @@ public class PassthroughManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        // If the scene unloads while passthrough is active or mid-transition,
+        // synchronously restore camera state and disable the AR render feature
+        // so the next scene's camera is not corrupted by the leftover AR compositing pass.
+        StopAllCoroutines();
+
+        if (arCameraBackground != null)
+            arCameraBackground.enabled = false;
+
+        if (mainCamera != null && IsPassthroughActive)
+        {
+            mainCamera.clearFlags      = savedClearFlags;
+            mainCamera.backgroundColor = savedBackgroundColor;
+            mainCamera.cullingMask     = savedCullingMask;
+        }
+
+        IsPassthroughActive = false;
+        IsTransitioning     = false;
+
         if (fadeMaterial != null)
             Destroy(fadeMaterial);
     }

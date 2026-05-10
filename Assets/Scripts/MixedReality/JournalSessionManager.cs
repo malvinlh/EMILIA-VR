@@ -60,7 +60,7 @@ public class JournalSessionManager : MonoBehaviour
     [Tooltip("Left-hand ThumbTip-to-MiddleTip distance (metres) required to fire the pen on/off toggle. " +
              "Lower = requires a tighter, more deliberate pinch. Tune on device if the toggle fires accidentally.")]
     [Range(0.005f, 0.04f)]
-    public float penTogglePinchThreshold = 0.015f;
+    public float penTogglePinchThreshold = 0.02f;
 
     [Header("Detection Mode")]
     [Tooltip("Editor / testing only. Skip all MR calibration and jump directly to the " +

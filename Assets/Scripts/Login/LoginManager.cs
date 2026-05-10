@@ -34,10 +34,10 @@ public class LoginManager : MonoBehaviour
     [Header("Login UI")]
     [Tooltip("Root Canvas or parent GameObject for the login UI to hide on successful login.")]
     [SerializeField] private GameObject loginCanvas;
+    [SerializeField] [Range(0f, 2f)] private float canvasFadeDuration = 0.5f;
 
     private const string PrefKeyNickname = "Nickname";
     private const string PrefKeyFullName  = "PlayerFullName";
-    private const string PrefKeyIsLoggedIn = "IsLoggedIn";
 
     // Static fields survive scene loads but reset on app restart.
     private static bool   _sessionLoggedIn;
@@ -76,7 +76,6 @@ public class LoginManager : MonoBehaviour
 
         PlayerPrefs.SetString(PrefKeyNickname, nickname);
         PlayerPrefs.SetString(PrefKeyFullName,  fullName);
-        PlayerPrefs.SetInt(PrefKeyIsLoggedIn, 1);
         PlayerPrefs.Save();
 
         _sessionLoggedIn = true;
@@ -93,20 +92,12 @@ public class LoginManager : MonoBehaviour
 
         yield return new WaitForSeconds(portalFadeInDuration);
 
-        // Hide the login UI (canvas) now that the VFX finished and login succeeded.
-        if (loginCanvas != null)
-            loginCanvas.SetActive(false);
+        yield return StartCoroutine(FadeOutCanvas());
 
         onLoginSuccess?.Invoke();
     }
 
-    private bool IsLoggedIn()
-    {
-        if (_sessionLoggedIn)
-            return true;
-
-        return PlayerPrefs.GetInt(PrefKeyIsLoggedIn, 0) == 1;
-    }
+    private bool IsLoggedIn() => _sessionLoggedIn;
 
     private void RestoreLoggedInState()
     {
@@ -135,6 +126,29 @@ public class LoginManager : MonoBehaviour
 
         if (loginCanvas != null)
             loginCanvas.SetActive(false);
+
+        onLoginSuccess?.Invoke();
+        StartCoroutine(FadeInPortalVfx(beachPortalVfx,   portalFadeInDuration));
+        StartCoroutine(FadeInPortalVfx(bedroomPortalVfx, portalFadeInDuration));
+    }
+
+    private IEnumerator FadeOutCanvas()
+    {
+        if (loginCanvas == null) yield break;
+
+        var cg = loginCanvas.GetComponent<CanvasGroup>();
+        if (cg == null) cg = loginCanvas.AddComponent<CanvasGroup>();
+
+        cg.alpha = 1f;
+        float elapsed = 0f;
+        while (elapsed < canvasFadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            cg.alpha = 1f - Mathf.Clamp01(elapsed / canvasFadeDuration);
+            yield return null;
+        }
+        cg.alpha = 0f;
+        loginCanvas.SetActive(false);
     }
 
     private IEnumerator FadeInPortalVfx(GameObject vfx, float duration)
