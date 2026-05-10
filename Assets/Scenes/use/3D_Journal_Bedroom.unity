@@ -2962,7 +2962,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 810019319561094050, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_MoveSpeed
-      value: 2.5
+      value: 5
       objectReference: {fileID: 0}
     - target: {fileID: 810019319561094050, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_UseGravity
@@ -5225,6 +5225,7 @@ MonoBehaviour:
   nextArmDelay: 0.6
   instructionForward: 0.9
   instructionHeight: 0.2
+  calibrationVideo: {fileID: 32900000, guid: 161c3c7d1d655004aaddfc2b38cb6015, type: 3}
   logEvents: 0
 --- !u!4 &602012318
 Transform:
@@ -14839,6 +14840,7 @@ MonoBehaviour:
   tapMarkerRadius: 0.01
   instructionForward: 0.9
   instructionHeight: 0.18
+  calibrationVideo: {fileID: 32900000, guid: 4253a5139a3b32a428319ee5633fe132, type: 3}
   logEvents: 0
 --- !u!4 &2127075500
 Transform:

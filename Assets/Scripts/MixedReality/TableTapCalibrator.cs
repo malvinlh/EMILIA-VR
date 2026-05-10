@@ -5,6 +5,7 @@ using UnityEngine.UI;
 using UnityEngine.XR.Hands;
 using UnityEngine.XR.Interaction.Toolkit.UI;
 using TMPro;
+using UnityEngine.Video;
 
 /// <summary>
 /// Interactive table calibration — 1 tap + 1 diagonal drag protocol.
@@ -94,6 +95,9 @@ public class TableTapCalibrator : MonoBehaviour
     [Header("Instruction Text")]
     public float instructionForward = 0.90f;
     public float instructionHeight = 0.18f;
+
+    [Header("Video")]
+    [SerializeField] VideoClip calibrationVideo;
 
     [Header("Diagnostics")]
     public bool logEvents = true;
@@ -192,6 +196,10 @@ public class TableTapCalibrator : MonoBehaviour
     private Button     confirmBtn;
     private Button     redoBtn;
 
+    // 2D Canvas UI — Video panel
+    private GameObject    videoCanvas;
+    private RenderTexture _videoRT;
+
     private XRHandSubsystem handSubsystem;
 
     // Tip / marker colors (3D spatial elements)
@@ -240,6 +248,11 @@ public class TableTapCalibrator : MonoBehaviour
 
         SetInstruction("Tap the near-left corner of your writing area.\nHold still" +
                        (requirePinchToCapture ? ", then pinch to capture." : " to capture."));
+        if (videoCanvas != null)
+        {
+            videoCanvas.GetComponent<VideoPlayer>()?.Play();
+            videoCanvas.SetActive(true);
+        }
         if (logEvents) Debug.Log("[TableTapCalibrator] BeginCalibration — waiting for first tap + drag.");
     }
 
@@ -252,6 +265,11 @@ public class TableTapCalibrator : MonoBehaviour
         if (previewRectangleObj != null) previewRectangleObj.SetActive(false);
         if (dragPathObj         != null) dragPathObj.SetActive(false);
         if (tapMarker           != null) tapMarker.SetActive(false);
+        if (videoCanvas != null)
+        {
+            videoCanvas.GetComponent<VideoPlayer>()?.Stop();
+            videoCanvas.SetActive(false);
+        }
     }
 
     public void ResetState() => BeginCalibration();
@@ -782,6 +800,57 @@ public class TableTapCalibrator : MonoBehaviour
             instructionCanvas.SetActive(false);
         }
 
+        // ── Video canvas ───────────────────────────────────────────────
+        if (videoCanvas == null && calibrationVideo != null)
+        {
+            _videoRT = new RenderTexture(512, 288, 0);
+            _videoRT.Create();
+
+            var root   = new GameObject("TableTapVideo");
+            var canvas = root.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            root.GetComponent<RectTransform>().sizeDelta = new Vector2(480f, 300f);
+            root.AddComponent<CanvasScaler>();
+            root.transform.localScale = Vector3.one * 0.001f;
+            PassthroughManager.SetLayerRecursive(root, passthroughLayer);
+
+            var bg    = new GameObject("Background");
+            bg.transform.SetParent(root.transform, false);
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = s_PanelBg;
+            bg.GetComponent<RectTransform>().sizeDelta = new Vector2(480f, 300f);
+
+            var bar    = new GameObject("AccentBar");
+            bar.transform.SetParent(bg.transform, false);
+            var barImg = bar.AddComponent<Image>();
+            barImg.color = s_AccentMauve;
+            var barRect = bar.GetComponent<RectTransform>();
+            barRect.anchorMin = new Vector2(0f, 1f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot     = new Vector2(0.5f, 1f);
+            barRect.sizeDelta = new Vector2(0f, 26f);
+
+            var videoGO  = new GameObject("VideoDisplay");
+            videoGO.transform.SetParent(bg.transform, false);
+            var raw = videoGO.AddComponent<RawImage>();
+            raw.texture = _videoRT;
+            var videoRect = videoGO.GetComponent<RectTransform>();
+            videoRect.anchorMin = new Vector2(0.04f, 0.04f);
+            videoRect.anchorMax = new Vector2(0.96f, 0.92f);
+            videoRect.offsetMin = videoRect.offsetMax = Vector2.zero;
+
+            var vp = root.AddComponent<VideoPlayer>();
+            vp.renderMode      = VideoRenderMode.RenderTexture;
+            vp.targetTexture   = _videoRT;
+            vp.clip            = calibrationVideo;
+            vp.isLooping       = true;
+            vp.playOnAwake     = false;
+            vp.audioOutputMode = VideoAudioOutputMode.None;
+
+            videoCanvas = root;
+            videoCanvas.SetActive(false);
+        }
+
         // ── Choice canvas (Confirm + Redo side-by-side) ────────────────
         if (choiceCanvas == null)
         {
@@ -913,8 +982,19 @@ public class TableTapCalibrator : MonoBehaviour
         if (fwd.sqrMagnitude < 1e-3f) fwd = Vector3.forward;
         fwd.Normalize();
 
-        instructionCanvas.transform.position =
-            cam.transform.position + fwd * instructionForward + Vector3.up * instructionHeight;
+        Vector3 basePos = cam.transform.position + fwd * instructionForward + Vector3.up * instructionHeight;
+
+        if (videoCanvas != null)
+        {
+            Vector3 right = Vector3.Cross(Vector3.up, fwd).normalized;
+            instructionCanvas.transform.position = basePos + right * 0.250f;
+            videoCanvas.transform.position       = basePos - right * 0.330f;
+            videoCanvas.transform.rotation       = Quaternion.LookRotation(fwd);
+        }
+        else
+        {
+            instructionCanvas.transform.position = basePos;
+        }
         instructionCanvas.transform.rotation = Quaternion.LookRotation(fwd);
         instructionCanvas.SetActive(true);
     }
@@ -991,8 +1071,10 @@ public class TableTapCalibrator : MonoBehaviour
         if (dragPathObj         != null) Destroy(dragPathObj);
         if (choiceCanvas        != null) Destroy(choiceCanvas);
         if (instructionCanvas   != null) Destroy(instructionCanvas);
+        if (videoCanvas         != null) Destroy(videoCanvas);
 
         if (tipIndicatorMat != null) Destroy(tipIndicatorMat);
         if (tapMarkerMat    != null) Destroy(tapMarkerMat);
+        if (_videoRT        != null) _videoRT.Release();
     }
 }

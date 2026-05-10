@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using UnityEngine.XR.Hands;
 using UnityEngine.XR.Interaction.Toolkit.UI;
 using TMPro;
+using UnityEngine.Video;
 
 /// <summary>
 /// DIY stylus calibration — prescribed-rotation pinch mode (plan B-2.A).
@@ -80,6 +81,9 @@ public class StylusCalibrationController : MonoBehaviour
     public float instructionForward = 0.90f;
     public float instructionHeight = 0.18f;
 
+    [Header("Video")]
+    [SerializeField] VideoClip calibrationVideo;
+
     [Header("Diagnostics")]
     [Tooltip("Log sample captures, dwell state, and solve results.")]
     public bool logEvents = true;
@@ -148,6 +152,10 @@ public class StylusCalibrationController : MonoBehaviour
     private GameObject nextCanvas;
     private Button     nextBtn;
 
+    // 2D Canvas UI — Video panel
+    private GameObject    videoCanvas;
+    private RenderTexture _videoRT;
+
     private int passthroughLayer = 31;
 
     // Target sphere colors
@@ -177,6 +185,11 @@ public class StylusCalibrationController : MonoBehaviour
         if (instructionCanvas != null) instructionCanvas.SetActive(true);
         if (targetSphere      != null) targetSphere.SetActive(true);
         if (nextCanvas        != null) nextCanvas.SetActive(false);
+        if (videoCanvas != null)
+        {
+            videoCanvas.GetComponent<VideoPlayer>()?.Play();
+            videoCanvas.SetActive(true);
+        }
 
         isActive = true;
         calibrationDone = false;
@@ -225,6 +238,11 @@ public class StylusCalibrationController : MonoBehaviour
         if (targetSphere      != null) targetSphere.SetActive(false);
         if (nextCanvas        != null) nextCanvas.SetActive(false);
         if (instructionCanvas != null) instructionCanvas.SetActive(false);
+        if (videoCanvas != null)
+        {
+            videoCanvas.GetComponent<VideoPlayer>()?.Stop();
+            videoCanvas.SetActive(false);
+        }
     }
 
     /// <summary>
@@ -553,6 +571,57 @@ public class StylusCalibrationController : MonoBehaviour
             instructionCanvas.SetActive(false);
         }
 
+        // ── Video canvas ──────────────────────────────────────────────
+        if (videoCanvas == null && calibrationVideo != null)
+        {
+            _videoRT = new RenderTexture(512, 288, 0);
+            _videoRT.Create();
+
+            var root   = new GameObject("StylusCalibVideo");
+            var canvas = root.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            root.GetComponent<RectTransform>().sizeDelta = new Vector2(480f, 300f);
+            root.AddComponent<CanvasScaler>();
+            root.transform.localScale = Vector3.one * 0.001f;
+            PassthroughManager.SetLayerRecursive(root, passthroughLayer);
+
+            var bg    = new GameObject("Background");
+            bg.transform.SetParent(root.transform, false);
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = s_PanelBg;
+            bg.GetComponent<RectTransform>().sizeDelta = new Vector2(480f, 300f);
+
+            var bar    = new GameObject("AccentBar");
+            bar.transform.SetParent(bg.transform, false);
+            var barImg = bar.AddComponent<Image>();
+            barImg.color = s_AccentMauve;
+            var barRect = bar.GetComponent<RectTransform>();
+            barRect.anchorMin = new Vector2(0f, 1f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot     = new Vector2(0.5f, 1f);
+            barRect.sizeDelta = new Vector2(0f, 26f);
+
+            var videoGO  = new GameObject("VideoDisplay");
+            videoGO.transform.SetParent(bg.transform, false);
+            var raw = videoGO.AddComponent<RawImage>();
+            raw.texture = _videoRT;
+            var videoRect = videoGO.GetComponent<RectTransform>();
+            videoRect.anchorMin = new Vector2(0.04f, 0.04f);
+            videoRect.anchorMax = new Vector2(0.96f, 0.92f);
+            videoRect.offsetMin = videoRect.offsetMax = Vector2.zero;
+
+            var vp = root.AddComponent<VideoPlayer>();
+            vp.renderMode      = VideoRenderMode.RenderTexture;
+            vp.targetTexture   = _videoRT;
+            vp.clip            = calibrationVideo;
+            vp.isLooping       = true;
+            vp.playOnAwake     = false;
+            vp.audioOutputMode = VideoAudioOutputMode.None;
+
+            videoCanvas = root;
+            videoCanvas.SetActive(false);
+        }
+
         // ── Next button canvas ────────────────────────────────────────
         if (nextCanvas == null)
         {
@@ -626,8 +695,19 @@ public class StylusCalibrationController : MonoBehaviour
         if (fwd.sqrMagnitude < 0.001f) fwd = Vector3.forward;
         fwd.Normalize();
 
-        instructionCanvas.transform.position =
-            cam.transform.position + fwd * instructionForward + Vector3.up * instructionHeight;
+        Vector3 basePos = cam.transform.position + fwd * instructionForward + Vector3.up * instructionHeight;
+
+        if (videoCanvas != null)
+        {
+            Vector3 right = Vector3.Cross(Vector3.up, fwd).normalized;
+            instructionCanvas.transform.position = basePos + right * 0.250f;
+            videoCanvas.transform.position       = basePos - right * 0.330f;
+            videoCanvas.transform.rotation       = Quaternion.LookRotation(fwd);
+        }
+        else
+        {
+            instructionCanvas.transform.position = basePos;
+        }
         instructionCanvas.transform.rotation = Quaternion.LookRotation(fwd);
         instructionCanvas.SetActive(true);
     }
@@ -679,5 +759,7 @@ public class StylusCalibrationController : MonoBehaviour
         if (nextCanvas        != null) Destroy(nextCanvas);
         if (instructionCanvas != null) Destroy(instructionCanvas);
         if (targetMaterial    != null) Destroy(targetMaterial);
+        if (videoCanvas       != null) Destroy(videoCanvas);
+        if (_videoRT          != null) _videoRT.Release();
     }
 }
