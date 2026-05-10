@@ -980,8 +980,8 @@ MonoBehaviour:
   autoCreateMissingReferences: 0
   autoCreateComfortFadeCanvas: 0
   targetScene: Assets/Scenes/use/3D_Journal_Beach.unity
-  loadDelay: 3
-  enterSpinDuration: 3
+  loadDelay: 1.5
+  enterSpinDuration: 1.5
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:
@@ -1528,8 +1528,8 @@ MonoBehaviour:
   autoCreateMissingReferences: 0
   autoCreateComfortFadeCanvas: 0
   targetScene: Assets/Scenes/use/3D_Journal_Bedroom.unity
-  loadDelay: 3
-  enterSpinDuration: 3
+  loadDelay: 1.5
+  enterSpinDuration: 1.5
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:
@@ -7265,6 +7265,7 @@ MonoBehaviour:
   onLoginSuccess:
     m_PersistentCalls:
       m_Calls: []
+  loginCanvas: {fileID: 572921137}
 --- !u!4 &1754051868
 Transform:
   m_ObjectHideFlags: 0

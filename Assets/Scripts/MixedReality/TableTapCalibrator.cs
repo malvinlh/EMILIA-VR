@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.XR.Hands;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 using TMPro;
 
 /// <summary>
@@ -15,7 +17,7 @@ using TMPro;
 ///      table to the far-right corner.  The drag path is recorded as a polyline at
 ///      ~50 Hz.  Dragging ends when the pen lifts &gt; <see cref="dragLiftThresholdM"/>
 ///      above surface Y for &gt; <see cref="dragLiftDurationSec"/> seconds.
-///   3. CONFIRM: existing Confirm / Redo buttons appear above the preview rectangle.
+///   3. CONFIRM: Confirm / Redo Canvas buttons appear above the preview rectangle.
 ///
 /// Solver (from drag data):
 ///   • surfaceY   = first-tap Y (single dwell tap = sub-mm accuracy).
@@ -80,11 +82,7 @@ public class TableTapCalibrator : MonoBehaviour
     [Header("Confirm / Redo Buttons")]
     [Tooltip("Height above the rectangle centre where the buttons float.")]
     public float buttonHeightAboveRect = 0.22f;
-    [Tooltip("Horizontal spacing between Confirm and Redo buttons.")]
-    public float buttonSpacing = 0.18f;
-    [Tooltip("Proximity (m) at which an index-tip poke triggers a button.")]
-    public float buttonPokeDistance = 0.030f;
-    [Tooltip("Cooldown before the buttons respond to a poke after appearing.")]
+    [Tooltip("Cooldown before the buttons respond to a click after appearing.")]
     public float buttonArmDelay = 0.4f;
 
     [Header("Visuals")]
@@ -96,13 +94,6 @@ public class TableTapCalibrator : MonoBehaviour
     [Header("Instruction Text")]
     public float instructionForward = 0.90f;
     public float instructionHeight = 0.18f;
-    public float fontSize = 0.28f;
-
-    [Header("Button Label")]
-    [Tooltip("Font size for button labels (e.g. Confirm, Redo). Default 1.")]
-    public float buttonFontSize = 1f;
-    [Tooltip("Text box size for button labels. Increase width/height if text wraps or clips.")]
-    public Vector2 buttonLabelBoxSize = new Vector2(0.16f, 0.08f);
 
     [Header("Diagnostics")]
     public bool logEvents = true;
@@ -179,42 +170,44 @@ public class TableTapCalibrator : MonoBehaviour
 
     private int passthroughLayer = 31;
 
+    // 3D spatial — kept as-is (track real pen tip in world space)
     private GameObject tipIndicator;
-    private Material tipIndicatorMat;
+    private Material   tipIndicatorMat;
 
     private GameObject tapMarker;
-    private Material tapMarkerMat;
+    private Material   tapMarkerMat;
 
     private LineRenderer previewRectangle;
-    private GameObject previewRectangleObj;
+    private GameObject  previewRectangleObj;
 
     private LineRenderer dragPathRenderer;
-    private GameObject dragPathObj;
+    private GameObject  dragPathObj;
 
-    private GameObject confirmButton;
-    private Material confirmButtonMat;
-    private TextMeshPro confirmLabel;
-    private Vector3 confirmButtonPos;
+    // 2D Canvas UI — instruction panel
+    private GameObject      instructionCanvas;
+    private TextMeshProUGUI instructionTmp;
 
-    private GameObject redoButton;
-    private Material redoButtonMat;
-    private TextMeshPro redoLabel;
-    private Vector3 redoButtonPos;
-
-    private TextMeshPro instructionText;
-    private GameObject instructionObj;
+    // 2D Canvas UI — Confirm / Redo choice panel
+    private GameObject choiceCanvas;
+    private Button     confirmBtn;
+    private Button     redoBtn;
 
     private XRHandSubsystem handSubsystem;
 
+    // Tip / marker colors (3D spatial elements)
     private static readonly Color ColorTipIdle      = new Color(0.20f, 0.90f, 0.30f, 0.85f);
     private static readonly Color ColorTipDwelling  = new Color(1.00f, 0.95f, 0.25f, 0.95f);
-    private static readonly Color ColorTipOnSurface = new Color(0.20f, 0.95f, 0.95f, 0.95f); // cyan = on surface during drag
+    private static readonly Color ColorTipOnSurface = new Color(0.20f, 0.95f, 0.95f, 0.95f);
     private static readonly Color ColorTapMarker    = new Color(0.30f, 0.85f, 1.00f, 0.95f);
     private static readonly Color ColorPreview      = new Color(0.30f, 0.85f, 1.00f, 0.85f);
     private static readonly Color ColorDragPath     = new Color(0.20f, 0.95f, 0.95f, 0.70f);
-    private static readonly Color ColorConfirm      = new Color(0.20f, 0.80f, 0.30f, 0.95f);
-    private static readonly Color ColorRedo         = new Color(0.85f, 0.40f, 0.40f, 0.95f);
-    private static readonly Color ColorBtnDisabled  = new Color(0.40f, 0.40f, 0.45f, 0.60f);
+
+    // 2D Canvas palette — mirrors JournalReviewController / CalibrationConfirmPanel
+    private static readonly Color s_PanelBg     = new Color(0.969f, 0.918f, 0.918f, 1.00f);
+    private static readonly Color s_AccentMauve = new Color(0.780f, 0.663f, 0.722f, 1.00f);
+    private static readonly Color s_TextDark    = new Color(0.369f, 0.329f, 0.349f, 1.00f);
+    private static readonly Color s_BtnConfirm  = new Color(0.490f, 0.730f, 0.560f, 1.00f); // sage green
+    private static readonly Color s_BtnRedo     = new Color(0.790f, 0.470f, 0.450f, 1.00f); // warm coral
 
     // ================================================================
     // PUBLIC API
@@ -243,8 +236,7 @@ public class TableTapCalibrator : MonoBehaviour
         ClearTapMarker();
         HidePreviewRectangle();
         HideDragPath();
-        if (confirmButton != null) confirmButton.SetActive(false);
-        if (redoButton    != null) redoButton.SetActive(false);
+        if (choiceCanvas != null) choiceCanvas.SetActive(false);
 
         SetInstruction("Tap the near-left corner of your writing area.\nHold still" +
                        (requirePinchToCapture ? ", then pinch to capture." : " to capture."));
@@ -255,9 +247,8 @@ public class TableTapCalibrator : MonoBehaviour
     {
         phase = Phase.Inactive;
         if (tipIndicator        != null) tipIndicator.SetActive(false);
-        if (confirmButton       != null) confirmButton.SetActive(false);
-        if (redoButton          != null) redoButton.SetActive(false);
-        if (instructionObj      != null) instructionObj.SetActive(false);
+        if (choiceCanvas        != null) choiceCanvas.SetActive(false);
+        if (instructionCanvas   != null) instructionCanvas.SetActive(false);
         if (previewRectangleObj != null) previewRectangleObj.SetActive(false);
         if (dragPathObj         != null) dragPathObj.SetActive(false);
         if (tapMarker           != null) tapMarker.SetActive(false);
@@ -282,8 +273,8 @@ public class TableTapCalibrator : MonoBehaviour
 
         switch (phase)
         {
-            case Phase.FirstTap:       UpdateFirstTapPhase();   break;
-            case Phase.Dragging:       UpdateDraggingPhase();   break;
+            case Phase.FirstTap:        UpdateFirstTapPhase();   break;
+            case Phase.Dragging:        UpdateDraggingPhase();   break;
             case Phase.AwaitingConfirm: UpdateAwaitingConfirm(); break;
         }
     }
@@ -354,7 +345,6 @@ public class TableTapCalibrator : MonoBehaviour
         lastTapTime = Time.time;
         dwellAccum = 0f;
 
-        // Drop a marker at the tapped corner
         if (tapMarker != null)
         {
             tapMarker.transform.position = tipPos;
@@ -397,10 +387,8 @@ public class TableTapCalibrator : MonoBehaviour
         float aboveY = tipPos.y - surfaceYLocked;
         bool onSurface = Mathf.Abs(aboveY) <= dragLiftThresholdM;
 
-        // Tip indicator colour: cyan = on surface, green = off surface
         SetTipColor(onSurface ? ColorTipOnSurface : ColorTipIdle);
 
-        // Record drag sample at ~50 Hz when tip is on-surface
         float now = Time.time;
         if (onSurface && (now - lastDragRecordTime) >= dragRecordIntervalSec)
         {
@@ -416,7 +404,6 @@ public class TableTapCalibrator : MonoBehaviour
             UpdateDragPathVisual();
         }
 
-        // Update instruction with progress
         int pts = dragPolyline.Count;
         bool enoughDrag = dragPathLength >= minDragLengthM;
         if (pts < 3)
@@ -425,7 +412,6 @@ public class TableTapCalibrator : MonoBehaviour
             SetInstruction($"Dragging... {dragPathLength * 100f:F0} cm covered.\n" +
                            (enoughDrag ? "Lift the pen to finish." : "Keep going."));
 
-        // Lift detection: pen above surface for dragLiftDurationSec
         if (aboveY > dragLiftThresholdM)
         {
             dragLiftAccum += Time.deltaTime;
@@ -484,7 +470,6 @@ public class TableTapCalibrator : MonoBehaviour
         Vector3 firstPt = dragPolyline.Count > 0 ? dragPolyline[0] : firstTapPos;
         Vector3 lastPt  = dragPolyline.Count > 1 ? dragPolyline[dragPolyline.Count - 1] : firstPt;
 
-        // Forward direction: first drag point → last drag point (XZ only).
         Vector3 fwdXZ = new Vector3(lastPt.x - firstPt.x, 0f, lastPt.z - firstPt.z);
         if (fwdXZ.sqrMagnitude < 1e-4f)
         {
@@ -494,14 +479,11 @@ public class TableTapCalibrator : MonoBehaviour
         }
         fwdXZ.Normalize();
 
-        // Right direction: 90° CW from forward in XZ plane.
         Vector3 rightXZ = new Vector3(-fwdXZ.z, 0f, fwdXZ.x);
 
-        // Depth: projected drag length along the forward axis.
         Vector3 dragDelta = new Vector3(lastPt.x - firstPt.x, 0f, lastPt.z - firstPt.z);
         float depth = Mathf.Abs(Vector3.Dot(dragDelta, fwdXZ));
 
-        // Width: max perpendicular span of the polyline.
         float minPerp = 0f, maxPerp = 0f;
         foreach (Vector3 pt in dragPolyline)
         {
@@ -518,8 +500,6 @@ public class TableTapCalibrator : MonoBehaviour
             ? perpSpan
             : depth * aspectRatio;
 
-        // Centre: centroid offset from firstPt by half depth along forward and
-        // half perpendicular span along right.
         float centerDepth = depth * 0.5f;
         float centerPerp  = (minPerp + maxPerp) * 0.5f;
         Vector3 center = new Vector3(
@@ -550,8 +530,6 @@ public class TableTapCalibrator : MonoBehaviour
         };
     }
 
-    // Populate the preview taps list with 4 computed corners so UpdatePreviewRectangle
-    // can draw the rectangle outline without changes.
     private readonly List<Vector3> previewTaps = new List<Vector3>(4);
 
     private void PopulateComputedCornersIntoPreview(DetectedTable t)
@@ -563,10 +541,10 @@ public class TableTapCalibrator : MonoBehaviour
         float sy = t.avgTapSurfaceY;
 
         previewTaps.Clear();
-        previewTaps.Add(Y(t.position - right * hw - fwd * hd, sy)); // near-left
-        previewTaps.Add(Y(t.position + right * hw - fwd * hd, sy)); // near-right
-        previewTaps.Add(Y(t.position + right * hw + fwd * hd, sy)); // far-right
-        previewTaps.Add(Y(t.position - right * hw + fwd * hd, sy)); // far-left
+        previewTaps.Add(Y(t.position - right * hw - fwd * hd, sy));
+        previewTaps.Add(Y(t.position + right * hw - fwd * hd, sy));
+        previewTaps.Add(Y(t.position + right * hw + fwd * hd, sy));
+        previewTaps.Add(Y(t.position - right * hw + fwd * hd, sy));
     }
 
     private static Vector3 Y(Vector3 v, float y) => new Vector3(v.x, y, v.z);
@@ -579,35 +557,27 @@ public class TableTapCalibrator : MonoBehaviour
     {
         UpdatePreviewRectangle();
 
+        if (confirmBtn == null) return;
         bool armed = Time.time - awaitConfirmEnterTime >= buttonArmDelay;
-        SetButtonColor(confirmButtonMat, armed ? ColorConfirm : ColorBtnDisabled);
-        SetButtonColor(redoButtonMat,    armed ? ColorRedo    : ColorBtnDisabled);
-        if (!armed) return;
-
-        if (!EnsureHandSubsystem()) return;
-
-        Vector3 leftTip  = GetIndexTipOr(Handedness.Left);
-        Vector3 rightTip = GetIndexTipOr(Handedness.Right);
-
-        float dConfirm = Mathf.Min(
-            Vector3.Distance(leftTip,  confirmButtonPos),
-            Vector3.Distance(rightTip, confirmButtonPos));
-        float dRedo = Mathf.Min(
-            Vector3.Distance(leftTip,  redoButtonPos),
-            Vector3.Distance(rightTip, redoButtonPos));
-
-        if (dRedo <= buttonPokeDistance)
+        if (!confirmBtn.interactable && armed)
         {
-            if (logEvents) Debug.Log("[TableTapCalibrator] Redo pressed.");
-            BeginCalibration();
-            return;
+            confirmBtn.interactable = true;
+            redoBtn.interactable    = true;
         }
+    }
 
-        if (dConfirm <= buttonPokeDistance)
-        {
-            if (logEvents) Debug.Log("[TableTapCalibrator] Confirm pressed.");
-            FinalizeConfirm();
-        }
+    private void OnConfirmClicked()
+    {
+        if (phase != Phase.AwaitingConfirm) return;
+        if (logEvents) Debug.Log("[TableTapCalibrator] Confirm pressed.");
+        FinalizeConfirm();
+    }
+
+    private void OnRedoClicked()
+    {
+        if (phase != Phase.AwaitingConfirm) return;
+        if (logEvents) Debug.Log("[TableTapCalibrator] Redo pressed.");
+        BeginCalibration();
     }
 
     private void FinalizeConfirm()
@@ -623,7 +593,7 @@ public class TableTapCalibrator : MonoBehaviour
     }
 
     // ================================================================
-    // PINCH HELPERS (reused from original)
+    // PINCH HELPERS
     // ================================================================
 
     private bool EnsureHandSubsystem()
@@ -706,6 +676,7 @@ public class TableTapCalibrator : MonoBehaviour
 
     private void EnsureVisuals()
     {
+        // ── Tip indicator sphere (3D spatial) ─────────────────────────
         if (tipIndicator == null)
         {
             tipIndicator = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -718,6 +689,7 @@ public class TableTapCalibrator : MonoBehaviour
             tipIndicator.SetActive(false);
         }
 
+        // ── Tap marker sphere (3D spatial) ────────────────────────────
         if (tapMarker == null)
         {
             tapMarker = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -730,6 +702,7 @@ public class TableTapCalibrator : MonoBehaviour
             tapMarker.SetActive(false);
         }
 
+        // ── Preview rectangle (3D LineRenderer) ───────────────────────
         if (previewRectangleObj == null)
         {
             previewRectangleObj = new GameObject("TableTapPreviewRect");
@@ -748,6 +721,7 @@ public class TableTapCalibrator : MonoBehaviour
             previewRectangleObj.SetActive(false);
         }
 
+        // ── Drag path (3D LineRenderer) ────────────────────────────────
         if (dragPathObj == null)
         {
             dragPathObj = new GameObject("TableTapDragPath");
@@ -764,40 +738,116 @@ public class TableTapCalibrator : MonoBehaviour
             dragPathObj.SetActive(false);
         }
 
-        if (confirmButton == null)
+        // ── Instruction canvas ─────────────────────────────────────────
+        if (instructionCanvas == null)
         {
-            confirmButton = MakeButton("TableTapConfirm", "Confirm", out confirmButtonMat, out confirmLabel);
-            confirmButton.SetActive(false);
+            var root   = new GameObject("TableTapInstruction");
+            var canvas = root.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            root.GetComponent<RectTransform>().sizeDelta = new Vector2(640f, 300f);
+            root.AddComponent<CanvasScaler>();
+            root.AddComponent<TrackedDeviceGraphicRaycaster>();
+            root.transform.localScale = Vector3.one * 0.001f;
+            PassthroughManager.SetLayerRecursive(root, passthroughLayer);
+
+            var bg    = new GameObject("Background");
+            bg.transform.SetParent(root.transform, false);
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = s_PanelBg;
+            bg.GetComponent<RectTransform>().sizeDelta = new Vector2(640f, 300f);
+
+            var bar    = new GameObject("AccentBar");
+            bar.transform.SetParent(bg.transform, false);
+            var barImg = bar.AddComponent<Image>();
+            barImg.color = s_AccentMauve;
+            var barRect = bar.GetComponent<RectTransform>();
+            barRect.anchorMin = new Vector2(0f, 1f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot     = new Vector2(0.5f, 1f);
+            barRect.sizeDelta = new Vector2(0f, 26f);
+
+            var qGO  = new GameObject("InstructionText");
+            qGO.transform.SetParent(bg.transform, false);
+            instructionTmp = qGO.AddComponent<TextMeshProUGUI>();
+            instructionTmp.fontSize  = 24f;
+            instructionTmp.alignment = TextAlignmentOptions.Center;
+            instructionTmp.color     = s_TextDark;
+            instructionTmp.textWrappingMode = TextWrappingModes.Normal;
+            var qRect = qGO.GetComponent<RectTransform>();
+            qRect.anchorMin = new Vector2(0.05f, 0.05f);
+            qRect.anchorMax = new Vector2(0.95f, 0.92f);
+            qRect.offsetMin = qRect.offsetMax = Vector2.zero;
+
+            instructionCanvas = root;
+            instructionCanvas.SetActive(false);
         }
 
-        if (redoButton == null)
+        // ── Choice canvas (Confirm + Redo side-by-side) ────────────────
+        if (choiceCanvas == null)
         {
-            redoButton = MakeButton("TableTapRedo", "Redo", out redoButtonMat, out redoLabel);
-            redoButton.SetActive(false);
+            var panelSize = new Vector2(640f, 120f);
+
+            var root   = new GameObject("TableTapChoicePanel");
+            var canvas = root.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            root.GetComponent<RectTransform>().sizeDelta = panelSize;
+            root.AddComponent<CanvasScaler>();
+            root.AddComponent<TrackedDeviceGraphicRaycaster>();
+            root.transform.localScale = Vector3.one * 0.001f;
+            PassthroughManager.SetLayerRecursive(root, passthroughLayer);
+
+            var bg    = new GameObject("Background");
+            bg.transform.SetParent(root.transform, false);
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = s_PanelBg;
+            bg.GetComponent<RectTransform>().sizeDelta = panelSize;
+
+            var row     = new GameObject("Buttons");
+            row.transform.SetParent(bg.transform, false);
+            var rowRect = row.AddComponent<RectTransform>();
+            rowRect.anchorMin = new Vector2(0.03f, 0.1f);
+            rowRect.anchorMax = new Vector2(0.97f, 0.9f);
+            rowRect.offsetMin = rowRect.offsetMax = Vector2.zero;
+
+            confirmBtn = MakeCanvasButton("Confirm", s_BtnConfirm, Color.white,
+                row.transform, new Vector2(0f, 0f), new Vector2(0.44f, 1f));
+            confirmBtn.onClick.AddListener(OnConfirmClicked);
+
+            redoBtn = MakeCanvasButton("Redo", s_BtnRedo, Color.white,
+                row.transform, new Vector2(0.56f, 0f), new Vector2(1f, 1f));
+            redoBtn.onClick.AddListener(OnRedoClicked);
+
+            choiceCanvas = root;
+            choiceCanvas.SetActive(false);
         }
+    }
 
-        if (instructionObj == null)
-        {
-            instructionObj = new GameObject("TableTapInstruction");
-            instructionObj.layer = passthroughLayer;
-
-            var bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            bg.name = "BG";
-            bg.transform.SetParent(instructionObj.transform, false);
-            bg.transform.localScale = new Vector3(1.6f, 0.52f, 1f);
-            bg.transform.localPosition = new Vector3(0f, 0f, 0.001f);
-            bg.layer = passthroughLayer;
-            Destroy(bg.GetComponent<Collider>());
-            ApplyMat(bg, MakeMat(new Color(0f, 0f, 0f, 0.65f)));
-
-            instructionText = instructionObj.AddComponent<TextMeshPro>();
-            instructionText.fontSize = fontSize;
-            instructionText.alignment = TextAlignmentOptions.Center;
-            instructionText.color = Color.white;
-            instructionText.rectTransform.sizeDelta = new Vector2(1.5f, 0.56f);
-            instructionText.textWrappingMode = TextWrappingModes.Normal;
-            instructionText.sortingOrder = 1;
-        }
+    private static Button MakeCanvasButton(string label, Color bgColor, Color textColor,
+        Transform parent, Vector2 anchorMin, Vector2 anchorMax)
+    {
+        var go  = new GameObject(label.Replace(' ', '_'));
+        go.transform.SetParent(parent, false);
+        var img = go.AddComponent<Image>();
+        img.color = bgColor;
+        var btn = go.AddComponent<Button>();
+        btn.targetGraphic = img;
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.offsetMin = rect.offsetMax = Vector2.zero;
+        var lblGO = new GameObject("Label");
+        lblGO.transform.SetParent(go.transform, false);
+        var tmp = lblGO.AddComponent<TextMeshProUGUI>();
+        tmp.text      = label;
+        tmp.fontSize  = 28f;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color     = textColor;
+        tmp.fontStyle = FontStyles.Bold;
+        var lblRect = lblGO.GetComponent<RectTransform>();
+        lblRect.anchorMin = Vector2.zero;
+        lblRect.anchorMax = Vector2.one;
+        lblRect.offsetMin = lblRect.offsetMax = Vector2.zero;
+        return btn;
     }
 
     private void ClearTapMarker()
@@ -817,7 +867,7 @@ public class TableTapCalibrator : MonoBehaviour
         previewRectangle.positionCount = 5;
         for (int i = 0; i < 4; i++)
             previewRectangle.SetPosition(i, previewTaps[i]);
-        previewRectangle.SetPosition(4, previewTaps[0]); // close the loop
+        previewRectangle.SetPosition(4, previewTaps[0]);
         previewRectangle.startColor = previewRectangle.endColor = ColorPreview;
     }
 
@@ -833,12 +883,11 @@ public class TableTapCalibrator : MonoBehaviour
 
     private void ShowConfirmAndRedo()
     {
-        if (confirmButton == null || redoButton == null) return;
+        if (choiceCanvas == null) return;
 
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        // Position buttons above the centre of the computed table.
         Vector3 centre = computedTable.position + Vector3.up * buttonHeightAboveRect;
 
         Vector3 toUser = cam.transform.position - centre;
@@ -846,24 +895,17 @@ public class TableTapCalibrator : MonoBehaviour
         if (toUser.sqrMagnitude < 1e-4f) toUser = -cam.transform.forward;
         toUser.Normalize();
 
-        Quaternion rot   = Quaternion.LookRotation(-toUser, Vector3.up);
-        Vector3 right    = Vector3.Cross(Vector3.up, -toUser).normalized;
+        choiceCanvas.transform.position = centre;
+        choiceCanvas.transform.rotation = Quaternion.LookRotation(-toUser, Vector3.up);
 
-        confirmButtonPos = centre + right * (buttonSpacing * 0.5f);
-        redoButtonPos    = centre - right * (buttonSpacing * 0.5f);
-
-        confirmButton.transform.position = confirmButtonPos;
-        confirmButton.transform.rotation = rot;
-        confirmButton.SetActive(true);
-
-        redoButton.transform.position = redoButtonPos;
-        redoButton.transform.rotation = rot;
-        redoButton.SetActive(true);
+        if (confirmBtn != null) confirmBtn.interactable = false;
+        if (redoBtn    != null) redoBtn.interactable    = false;
+        choiceCanvas.SetActive(true);
     }
 
     private void BillboardInstruction()
     {
-        if (instructionObj == null) return;
+        if (instructionCanvas == null) return;
         Camera cam = Camera.main;
         if (cam == null) return;
 
@@ -871,25 +913,20 @@ public class TableTapCalibrator : MonoBehaviour
         if (fwd.sqrMagnitude < 1e-3f) fwd = Vector3.forward;
         fwd.Normalize();
 
-        instructionObj.transform.position =
+        instructionCanvas.transform.position =
             cam.transform.position + fwd * instructionForward + Vector3.up * instructionHeight;
-        instructionObj.transform.rotation = Quaternion.LookRotation(fwd);
-        instructionObj.SetActive(true);
+        instructionCanvas.transform.rotation = Quaternion.LookRotation(fwd);
+        instructionCanvas.SetActive(true);
     }
 
     private void SetInstruction(string msg)
     {
-        if (instructionText != null) instructionText.text = msg;
+        if (instructionTmp != null) instructionTmp.text = msg;
     }
 
     private void SetTipColor(Color c)
     {
         if (tipIndicatorMat != null) tipIndicatorMat.color = c;
-    }
-
-    private static void SetButtonColor(Material mat, Color c)
-    {
-        if (mat != null) mat.color = c;
     }
 
     // ================================================================
@@ -919,37 +956,8 @@ public class TableTapCalibrator : MonoBehaviour
     }
 
     // ================================================================
-    // MATERIAL / BUTTON HELPERS
+    // MATERIAL HELPERS (for 3D spatial elements only)
     // ================================================================
-
-    private GameObject MakeButton(string objName, string label,
-                                   out Material mat, out TextMeshPro tmp)
-    {
-        var btn = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        btn.name = objName;
-        Destroy(btn.GetComponent<Collider>());
-        btn.transform.localScale = new Vector3(0.12f, 0.055f, 0.02f);
-        mat = MakeMat(Color.white);
-        ApplyMat(btn, mat);
-        PassthroughManager.SetLayerRecursive(btn, passthroughLayer);
-
-        var labelObj = new GameObject("Label");
-        labelObj.transform.SetParent(btn.transform, false);
-        labelObj.layer = passthroughLayer;
-        tmp = labelObj.AddComponent<TextMeshPro>();
-        tmp.text = label;
-        tmp.fontSize = buttonFontSize;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = Color.white;
-        tmp.rectTransform.sizeDelta = buttonLabelBoxSize;
-        labelObj.transform.localScale = new Vector3(
-            1f / 0.12f * 0.10f,
-            1f / 0.055f * 0.045f,
-            1f / 0.02f * 0.01f);
-        labelObj.transform.localPosition = new Vector3(0f, 0f, -0.6f);
-
-        return btn;
-    }
 
     private static Material MakeMat(Color color)
     {
@@ -981,13 +989,10 @@ public class TableTapCalibrator : MonoBehaviour
         if (tapMarker           != null) Destroy(tapMarker);
         if (previewRectangleObj != null) Destroy(previewRectangleObj);
         if (dragPathObj         != null) Destroy(dragPathObj);
-        if (confirmButton       != null) Destroy(confirmButton);
-        if (redoButton          != null) Destroy(redoButton);
-        if (instructionObj      != null) Destroy(instructionObj);
+        if (choiceCanvas        != null) Destroy(choiceCanvas);
+        if (instructionCanvas   != null) Destroy(instructionCanvas);
 
-        if (tipIndicatorMat  != null) Destroy(tipIndicatorMat);
-        if (tapMarkerMat     != null) Destroy(tapMarkerMat);
-        if (confirmButtonMat != null) Destroy(confirmButtonMat);
-        if (redoButtonMat    != null) Destroy(redoButtonMat);
+        if (tipIndicatorMat != null) Destroy(tipIndicatorMat);
+        if (tapMarkerMat    != null) Destroy(tapMarkerMat);
     }
 }

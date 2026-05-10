@@ -1,52 +1,33 @@
 using System;
 using TMPro;
 using UnityEngine;
-using UnityEngine.XR.Hands;
-using UnityEngine.XR.Interaction.Toolkit;
-using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.UI;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 
 /// <summary>
-/// Floating confirmation panel shown on 2nd+ journaling sessions in the same
-/// scene visit. Asks "Apakah kamu ingin kalibrasi ulang?" with two buttons:
+/// Floating confirmation panel shown on 2nd+ journaling sessions (same-scene or cross-scene).
+/// Asks "Apakah kamu ingin kalibrasi ulang?" with two buttons:
 ///   • "Ya, Kalibrasi Ulang"  → fires onRecalibrate callback
 ///   • "Tidak, Lanjutkan"     → fires onSkip callback
 ///
+/// Built as a world-space Canvas (matching JournalReviewController's choice panel style)
+/// with TrackedDeviceGraphicRaycaster so both controller ray and hand ray interaction work.
 /// Procedurally created at runtime — no prefab or scene changes required.
-/// Attach to an empty GameObject owned by JournalSessionManager.
-/// Call Show() to display and Hide() to dismiss.
 /// </summary>
 public class CalibrationConfirmPanel : MonoBehaviour
 {
-    // ================================================================
-    // CONSTANTS
-    // ================================================================
+    private const float kForwardDist = 0.60f; // metres in front of camera
 
-    private const float kForwardDist  = 0.60f;  // metres in front of camera
-    private const float kPokeCooldown = 0.50f;  // brief grace period after Show()
+    // Color palette — mirrors JournalReviewController / VRDialoguePanel visual identity
+    private static readonly Color s_PanelBg     = new Color(0.969f, 0.918f, 0.918f, 1.00f); // warm blush
+    private static readonly Color s_AccentMauve = new Color(0.780f, 0.663f, 0.722f, 1.00f); // dusty rose
+    private static readonly Color s_TextDark    = new Color(0.369f, 0.329f, 0.349f, 1.00f); // dark brownish-purple
+    private static readonly Color s_BtnYa       = new Color(0.490f, 0.730f, 0.560f, 1.00f); // sage green
+    private static readonly Color s_BtnTidak    = new Color(0.790f, 0.470f, 0.450f, 1.00f); // warm coral
 
-    private static readonly Color kBgColor    = new Color(0.05f, 0.05f, 0.10f, 0.82f);
-    private static readonly Color kBtnYaColor = new Color(0.18f, 0.72f, 0.35f, 0.95f); // green
-    private static readonly Color kBtnNoColor = new Color(0.25f, 0.45f, 0.85f, 0.95f); // blue
-
-    // ================================================================
-    // STATE
-    // ================================================================
-
-    private Action _onRecalibrate;
-    private Action _onSkip;
-    private XRHandSubsystem _handSubsystem;
-    private float _pokeCooldown;
-
-    // Runtime-created child root. Destroyed and rebuilt each Show() call.
-    private GameObject _panelRoot;
-
-    private struct BtnData
-    {
-        public BoxCollider col;
-        public XRSimpleInteractable xri;
-    }
-    private BtnData _btnYa;
-    private BtnData _btnTidak;
+    private Action      _onRecalibrate;
+    private Action      _onSkip;
+    private GameObject  _panelRoot;
 
     // ================================================================
     // PUBLIC API
@@ -60,11 +41,10 @@ public class CalibrationConfirmPanel : MonoBehaviour
     {
         _onRecalibrate = onRecalibrate;
         _onSkip        = onSkip;
-        _pokeCooldown  = kPokeCooldown;
         DestroyVisuals();
-        BuildVisuals();
-        PositionInFrontOfCamera();
-        gameObject.SetActive(true);
+        _panelRoot = BuildPanel();
+        PositionInFrontOfCamera(_panelRoot.transform);
+        _panelRoot.SetActive(true);
         enabled = true;
     }
 
@@ -90,135 +70,123 @@ public class CalibrationConfirmPanel : MonoBehaviour
 
         // Billboard toward camera every frame.
         Camera cam = Camera.main;
-        if (cam != null)
-        {
-            Vector3 fwd = cam.transform.forward;
-            fwd.y = 0f;
-            if (fwd.sqrMagnitude > 0.001f)
-                transform.rotation = Quaternion.LookRotation(fwd.normalized);
-        }
+        if (cam == null) return;
 
-        if (_pokeCooldown > 0f) { _pokeCooldown -= Time.deltaTime; return; }
-
-        if (_handSubsystem == null || !_handSubsystem.running)
-            _handSubsystem = WhiteboardPen.GetHandSubsystem();
-        if (_handSubsystem == null) return;
-
-        CheckPoke(_handSubsystem.leftHand);
-        CheckPoke(_handSubsystem.rightHand);
+        Vector3 lookDir = _panelRoot.transform.position - cam.transform.position;
+        if (lookDir.sqrMagnitude > 0.001f)
+            _panelRoot.transform.rotation = Quaternion.LookRotation(lookDir);
     }
 
     private void OnDestroy() => DestroyVisuals();
 
     // ================================================================
-    // INTERACTION
+    // PANEL CONSTRUCTION  (mirrors JournalReviewController.BuildChoicePanel)
     // ================================================================
 
-    private void CheckPoke(XRHand hand)
+    private GameObject BuildPanel()
     {
-        if (!hand.isTracked) return;
-        if (!hand.GetJoint(XRHandJointID.IndexTip).TryGetPose(out Pose tip)) return;
+        Vector2 panelSize  = new Vector2(640f, 300f);
+        float   panelScale = 0.001f;
 
-        if (_btnYa.col != null && _btnYa.col.bounds.Contains(tip.position))
-        { FireYa(); return; }
+        // Root — world-space canvas
+        var root   = new GameObject("CalibrationChoicePanel");
+        var canvas = root.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.WorldSpace;
+        root.GetComponent<RectTransform>().sizeDelta = panelSize;
+        root.AddComponent<CanvasScaler>();
+        root.AddComponent<TrackedDeviceGraphicRaycaster>(); // XRI-compatible raycaster
+        root.transform.localScale = Vector3.one * panelScale;
 
-        if (_btnTidak.col != null && _btnTidak.col.bounds.Contains(tip.position))
-        { FireTidak(); }
-    }
+        // Background panel
+        var bg    = new GameObject("Background");
+        bg.transform.SetParent(root.transform, false);
+        var bgImg = bg.AddComponent<Image>();
+        bgImg.color = s_PanelBg;
+        bg.GetComponent<RectTransform>().sizeDelta = panelSize;
 
-    private void FireYa()
-    {
-        var cb = _onRecalibrate;
-        Hide();
-        cb?.Invoke();
-    }
-
-    private void FireTidak()
-    {
-        var cb = _onSkip;
-        Hide();
-        cb?.Invoke();
-    }
-
-    private void OnYaSelected(SelectEnterEventArgs _)    => FireYa();
-    private void OnTidakSelected(SelectEnterEventArgs _) => FireTidak();
-
-    // ================================================================
-    // PANEL CONSTRUCTION
-    // ================================================================
-
-    private void BuildVisuals()
-    {
-        _panelRoot = new GameObject("ConfirmPanelRoot");
-        _panelRoot.transform.SetParent(transform, false);
-
-        // Background
-        var bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        bg.name = "BG";
-        Destroy(bg.GetComponent<Collider>());
-        bg.transform.SetParent(_panelRoot.transform, false);
-        bg.transform.localScale    = new Vector3(0.80f, 0.44f, 1f);
-        bg.transform.localPosition = Vector3.zero;
-        var bgRend = bg.GetComponent<Renderer>();
-        bgRend.material            = MakeMat(kBgColor);
-        bgRend.shadowCastingMode   = UnityEngine.Rendering.ShadowCastingMode.Off;
-        bgRend.receiveShadows      = false;
+        // Top accent bar (mauve, like the VRDialoguePanel border)
+        var bar    = new GameObject("AccentBar");
+        bar.transform.SetParent(bg.transform, false);
+        var barImg = bar.AddComponent<Image>();
+        barImg.color = s_AccentMauve;
+        var barRect = bar.GetComponent<RectTransform>();
+        barRect.anchorMin = new Vector2(0f, 1f);
+        barRect.anchorMax = new Vector2(1f, 1f);
+        barRect.pivot     = new Vector2(0.5f, 1f);
+        barRect.sizeDelta = new Vector2(0f, 26f);
 
         // Question text
-        var qtGo = new GameObject("QuestionText");
-        qtGo.transform.SetParent(_panelRoot.transform, false);
-        qtGo.transform.localPosition = new Vector3(0f, 0.10f, -0.002f);
-        var qt = qtGo.AddComponent<TextMeshPro>();
-        qt.text                    = "Apakah kamu ingin\nkalibrasi ulang?";
-        qt.fontSize                = 0.055f;
-        qt.alignment               = TextAlignmentOptions.Center;
-        qt.color                   = Color.white;
-        qt.rectTransform.sizeDelta = new Vector2(0.74f, 0.22f);
+        var qGO  = new GameObject("Question");
+        qGO.transform.SetParent(bg.transform, false);
+        var qTmp = qGO.AddComponent<TextMeshProUGUI>();
+        qTmp.text      = "Apakah kamu ingin kalibrasi ulang?";
+        qTmp.fontSize  = 28f;
+        qTmp.alignment = TextAlignmentOptions.Center;
+        qTmp.color     = s_TextDark;
+        qTmp.fontStyle = FontStyles.Bold;
+        var qRect = qGO.GetComponent<RectTransform>();
+        qRect.anchorMin = new Vector2(0.05f, 0.42f);
+        qRect.anchorMax = new Vector2(0.95f, 0.88f);
+        qRect.offsetMin = qRect.offsetMax = Vector2.zero;
 
-        // Buttons
-        _btnYa    = SpawnButton("ButtonYa",    "Ya,\nKalibrasi Ulang", kBtnYaColor, new Vector3(-0.21f, -0.10f, -0.004f));
-        _btnTidak = SpawnButton("ButtonTidak", "Tidak,\nLanjutkan",    kBtnNoColor, new Vector3( 0.21f, -0.10f, -0.004f));
+        // Button row
+        var row     = new GameObject("Buttons");
+        row.transform.SetParent(bg.transform, false);
+        var rowRect = row.AddComponent<RectTransform>();
+        rowRect.anchorMin = new Vector2(0.05f, 0.06f);
+        rowRect.anchorMax = new Vector2(0.95f, 0.36f);
+        rowRect.offsetMin = rowRect.offsetMax = Vector2.zero;
 
-        _btnYa.xri.selectEntered.AddListener(OnYaSelected);
-        _btnTidak.xri.selectEntered.AddListener(OnTidakSelected);
+        var yaBtn = MakeButton("Ya, Kalibrasi Ulang", s_BtnYa, Color.white,
+            row.transform, new Vector2(0f, 0f), new Vector2(0.44f, 1f));
+        yaBtn.onClick.AddListener(OnYaClicked);
+
+        var tidakBtn = MakeButton("Tidak, Lanjutkan", s_BtnTidak, Color.white,
+            row.transform, new Vector2(0.56f, 0f), new Vector2(1f, 1f));
+        tidakBtn.onClick.AddListener(OnTidakClicked);
+
+        root.SetActive(false);
+        return root;
     }
 
-    private BtnData SpawnButton(string objName, string label, Color color, Vector3 localPos)
+    private static Button MakeButton(string label, Color bgColor, Color textColor,
+        Transform parent, Vector2 anchorMin, Vector2 anchorMax)
     {
-        var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        go.name = objName;
-        go.transform.SetParent(_panelRoot.transform, false);
-        go.transform.localScale    = new Vector3(0.34f, 0.10f, 0.02f);
-        go.transform.localPosition = localPos;
+        var go   = new GameObject(label.Replace(' ', '_'));
+        go.transform.SetParent(parent, false);
 
-        var col       = go.GetComponent<BoxCollider>();
-        col.isTrigger = false;
+        var img  = go.AddComponent<Image>();
+        img.color = bgColor;
 
-        var rend = go.GetComponent<Renderer>();
-        rend.material          = MakeMat(color);
-        rend.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        rend.receiveShadows    = false;
+        var btn  = go.AddComponent<Button>();
+        btn.targetGraphic = img;
 
-        var xri = go.AddComponent<XRSimpleInteractable>();
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.offsetMin = rect.offsetMax = Vector2.zero;
 
-        // Label
-        var lblGo = new GameObject("Label");
-        lblGo.transform.SetParent(go.transform, false);
-        var tmp = lblGo.AddComponent<TextMeshPro>();
-        tmp.text                    = label;
-        tmp.fontSize                = 0.55f;
-        tmp.alignment               = TextAlignmentOptions.Center;
-        tmp.color                   = Color.white;
-        tmp.enableWordWrapping      = true;
-        tmp.rectTransform.sizeDelta = new Vector2(0.30f, 0.09f);
-        // Scale label so it fits inside the button cube's face (cube is 0.34 × 0.10 × 0.02 m)
-        lblGo.transform.localScale    = new Vector3(1f / 0.34f * 0.28f, 1f / 0.10f * 0.08f, 1f);
-        lblGo.transform.localPosition = new Vector3(0f, 0f, -0.6f);
+        var lblGO = new GameObject("Label");
+        lblGO.transform.SetParent(go.transform, false);
+        var tmp   = lblGO.AddComponent<TextMeshProUGUI>();
+        tmp.text      = label;
+        tmp.fontSize  = 22f;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.color     = textColor;
+        tmp.fontStyle = FontStyles.Bold;
+        var lblRect   = lblGO.GetComponent<RectTransform>();
+        lblRect.anchorMin = Vector2.zero;
+        lblRect.anchorMax = Vector2.one;
+        lblRect.offsetMin = lblRect.offsetMax = Vector2.zero;
 
-        return new BtnData { col = col, xri = xri };
+        return btn;
     }
 
-    private void PositionInFrontOfCamera()
+    // ================================================================
+    // POSITIONING
+    // ================================================================
+
+    private static void PositionInFrontOfCamera(Transform panel)
     {
         Camera cam = Camera.main;
         if (cam == null) return;
@@ -228,33 +196,34 @@ public class CalibrationConfirmPanel : MonoBehaviour
         if (fwd.sqrMagnitude < 0.001f) fwd = cam.transform.forward;
         fwd.Normalize();
 
-        transform.position = cam.transform.position + fwd * kForwardDist + Vector3.down * 0.05f;
-        transform.rotation = Quaternion.LookRotation(fwd);
+        panel.position = cam.transform.position + fwd * kForwardDist + Vector3.down * 0.05f;
+        panel.rotation = Quaternion.LookRotation(fwd);
     }
+
+    // ================================================================
+    // BUTTON HANDLERS
+    // ================================================================
+
+    private void OnYaClicked()
+    {
+        var cb = _onRecalibrate;
+        Hide();
+        cb?.Invoke();
+    }
+
+    private void OnTidakClicked()
+    {
+        var cb = _onSkip;
+        Hide();
+        cb?.Invoke();
+    }
+
+    // ================================================================
+    // CLEANUP
+    // ================================================================
 
     private void DestroyVisuals()
     {
-        if (_btnYa.xri    != null) { _btnYa.xri.selectEntered.RemoveListener(OnYaSelected);       _btnYa    = default; }
-        if (_btnTidak.xri != null) { _btnTidak.xri.selectEntered.RemoveListener(OnTidakSelected); _btnTidak = default; }
-        if (_panelRoot    != null) { Destroy(_panelRoot); _panelRoot = null; }
-    }
-
-    // ================================================================
-    // MATERIAL HELPER
-    // ================================================================
-
-    private static Material MakeMat(Color color)
-    {
-        var shader = Shader.Find("Universal Render Pipeline/Unlit");
-        var mat    = new Material(shader != null ? shader : Shader.Find("Unlit/Color"));
-        mat.SetFloat("_Surface", 1f);
-        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        mat.SetFloat("_Blend",    0f);
-        mat.SetFloat("_ZWrite",   0f);
-        mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        mat.color = color;
-        return mat;
+        if (_panelRoot != null) { Destroy(_panelRoot); _panelRoot = null; }
     }
 }

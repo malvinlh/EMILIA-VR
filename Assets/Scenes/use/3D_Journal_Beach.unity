@@ -13762,8 +13762,8 @@ MonoBehaviour:
   autoCreateMissingReferences: 0
   autoCreateComfortFadeCanvas: 0
   targetScene: Assets/Scenes/use/3D_Login.unity
-  loadDelay: 3
-  enterSpinDuration: 3
+  loadDelay: 1.5
+  enterSpinDuration: 1.5
   playerTag: MainCamera
   allowCharacterControllerTrigger: 1
   triggeringLayers:

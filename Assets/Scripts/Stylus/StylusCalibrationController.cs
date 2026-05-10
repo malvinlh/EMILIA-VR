@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.XR.Hands;
+using UnityEngine.XR.Interaction.Toolkit.UI;
 using TMPro;
 
 /// <summary>
@@ -71,21 +73,12 @@ public class StylusCalibrationController : MonoBehaviour
     public float buttonBelowEye = 0.05f;
     [Tooltip("Horizontal offset from centre — positive goes toward the stylus side so the opposite hand can poke it.")]
     public float buttonSideOffset = 0.18f;
-    [Tooltip("Proximity (m) at which an index-tip poke triggers the Next button.")]
-    public float buttonPokeDistance = 0.030f;
-    [Tooltip("Cooldown after calibration before Next becomes pokeable.")]
+    [Tooltip("Cooldown after calibration before Next becomes clickable.")]
     public float nextArmDelay = 0.6f;
 
     [Header("Instruction Text")]
     public float instructionForward = 0.90f;
     public float instructionHeight = 0.18f;
-    public float fontSize = 0.28f;
-
-    [Header("Button Label")]
-    [Tooltip("Font size for button labels (e.g. Next). Default 1.")]
-    public float buttonFontSize = 1f;
-    [Tooltip("Text box size for button labels. Increase width/height if text wraps or clips.")]
-    public Vector2 buttonLabelBoxSize = new Vector2(0.16f, 0.08f);
 
     [Header("Diagnostics")]
     [Tooltip("Log sample captures, dwell state, and solve results.")]
@@ -143,25 +136,31 @@ public class StylusCalibrationController : MonoBehaviour
     // VISUALS (runtime-created)
     // ================================================================
 
+    // 3D spatial — kept as-is (rides on real fingertip position)
     private GameObject targetSphere;
-    private Material targetMaterial;
+    private Material    targetMaterial;
 
-    private GameObject nextButton;
-    private Material nextMaterial;
-    private TextMeshPro nextLabel;
+    // 2D Canvas UI — instruction panel
+    private GameObject       instructionCanvas;
+    private TextMeshProUGUI  instructionTmp;
 
-    private TextMeshPro instructionText;
-    private GameObject instructionObj;
+    // 2D Canvas UI — Next button
+    private GameObject nextCanvas;
+    private Button     nextBtn;
 
     private int passthroughLayer = 31;
-    private Vector3 nextButtonPos;
 
-    private static readonly Color ColorTargetIdle      = new Color(0.20f, 0.90f, 0.30f, 0.85f); // green
-    private static readonly Color ColorTargetCaptured  = new Color(0.30f, 0.85f, 1.00f, 1.00f); // blue flash after capture
-    private static readonly Color ColorTargetCapturing = new Color(1.00f, 0.90f, 0.20f, 0.95f); // yellow — verify dwell
-    private static readonly Color ColorTargetDone      = new Color(1.00f, 0.85f, 0.20f, 1.00f); // gold
-    private static readonly Color ColorBtnArmed        = new Color(0.20f, 0.80f, 1.00f, 0.95f);
-    private static readonly Color ColorBtnDisabled     = new Color(0.40f, 0.40f, 0.45f, 0.60f);
+    // Target sphere colors
+    private static readonly Color ColorTargetIdle      = new Color(0.20f, 0.90f, 0.30f, 0.85f);
+    private static readonly Color ColorTargetCaptured  = new Color(0.30f, 0.85f, 1.00f, 1.00f);
+    private static readonly Color ColorTargetCapturing = new Color(1.00f, 0.90f, 0.20f, 0.95f);
+    private static readonly Color ColorTargetDone      = new Color(1.00f, 0.85f, 0.20f, 1.00f);
+
+    // 2D Canvas palette — mirrors JournalReviewController / CalibrationConfirmPanel
+    private static readonly Color s_PanelBg     = new Color(0.969f, 0.918f, 0.918f, 1.00f);
+    private static readonly Color s_AccentMauve = new Color(0.780f, 0.663f, 0.722f, 1.00f);
+    private static readonly Color s_TextDark    = new Color(0.369f, 0.329f, 0.349f, 1.00f);
+    private static readonly Color s_BtnNext     = new Color(0.490f, 0.730f, 0.560f, 1.00f); // sage green
 
     // ================================================================
     // PUBLIC API
@@ -175,8 +174,9 @@ public class StylusCalibrationController : MonoBehaviour
         EnsureVisuals();
 
         // Cleanup() from a prior run leaves these inactive — re-show now.
-        if (instructionObj != null) instructionObj.SetActive(true);
-        if (targetSphere   != null) targetSphere.SetActive(true);
+        if (instructionCanvas != null) instructionCanvas.SetActive(true);
+        if (targetSphere      != null) targetSphere.SetActive(true);
+        if (nextCanvas        != null) nextCanvas.SetActive(false);
 
         isActive = true;
         calibrationDone = false;
@@ -216,16 +216,15 @@ public class StylusCalibrationController : MonoBehaviour
         else
             UpdateInstructionForProgress();
 
-        if (nextButton != null) nextButton.SetActive(false);
         if (logEvents) Debug.Log("[StylusCalibration] BeginCalibration.");
     }
 
     public void Cleanup()
     {
         isActive = false;
-        if (targetSphere   != null) targetSphere.SetActive(false);
-        if (nextButton     != null) nextButton.SetActive(false);
-        if (instructionObj != null) instructionObj.SetActive(false);
+        if (targetSphere      != null) targetSphere.SetActive(false);
+        if (nextCanvas        != null) nextCanvas.SetActive(false);
+        if (instructionCanvas != null) instructionCanvas.SetActive(false);
     }
 
     /// <summary>
@@ -325,8 +324,6 @@ public class StylusCalibrationController : MonoBehaviour
         }
 
         // 4. Pinch rising edge = explicit "capture now" signal.
-        //    The index finger stays extended (holding the target), so only thumb
-        //    and middle move — the target position is undisturbed at capture instant.
         bool hasPinchReading = wristTracker.TryGetPinchGap(oppositeHand, out float pinchGap);
         bool isPinchedNow    = hasPinchReading && pinchGap < pinchThreshold;
         bool risingPinch     = isPinchedNow && !wasPinched;
@@ -370,7 +367,6 @@ public class StylusCalibrationController : MonoBehaviour
         // Dwell near the predicted tip position to accept the prior.
         if (wristTracker.TryGetTipPosition(out Vector3 tipWorld, out _))
         {
-            // Use the proximity gate from the prior offset.
             const float kVerifyProximity = 0.025f;
             if (Vector3.Distance(tipWorld, targetPos) < kVerifyProximity)
             {
@@ -422,7 +418,6 @@ public class StylusCalibrationController : MonoBehaviour
         int have = wristTracker != null ? wristTracker.SampleCount : 0;
         string hand = OppositeHand() == Handedness.Left ? "left" : "right";
 
-        // Pick the instruction for the NEXT pose to capture.
         int poseIdx = Mathf.Clamp(have, 0, samplesRequired - 1);
         string poseText = GetPoseInstruction(poseIdx);
 
@@ -468,38 +463,32 @@ public class StylusCalibrationController : MonoBehaviour
         SetInstruction($"Calibrated! Residual {rms * 1000f:F1} mm.\nPress Next to continue.");
 
         PositionNextButton();
-        if (nextButton != null)
+        if (nextCanvas != null)
         {
-            nextButton.SetActive(true);
-            SetButtonColor(nextMaterial, ColorBtnDisabled);
+            nextCanvas.SetActive(true);
+            if (nextBtn != null) nextBtn.interactable = false; // armed after nextArmDelay
         }
 
         OnCalibrationComplete?.Invoke();
     }
 
     // ================================================================
-    // POST-CALIBRATION: wait for Next poke
+    // POST-CALIBRATION: arm the Next button after the delay
     // ================================================================
 
     private void UpdatePostCalibration()
     {
-        bool nextArmed = Time.time - calibrationDoneTime >= nextArmDelay;
-        SetButtonColor(nextMaterial, nextArmed ? ColorBtnArmed : ColorBtnDisabled);
-        if (!nextArmed || wristTracker == null) return;
+        if (nextBtn == null || nextBtn.interactable) return;
+        if (Time.time - calibrationDoneTime >= nextArmDelay)
+            nextBtn.interactable = true;
+    }
 
-        if (!wristTracker.TryGetIndexTipForHand(Handedness.Left,  out Vector3 leftTip))  leftTip  = new Vector3(1e6f, 1e6f, 1e6f);
-        if (!wristTracker.TryGetIndexTipForHand(Handedness.Right, out Vector3 rightTip)) rightTip = new Vector3(1e6f, 1e6f, 1e6f);
-
-        float d = Mathf.Min(
-            Vector3.Distance(leftTip,  nextButtonPos),
-            Vector3.Distance(rightTip, nextButtonPos));
-
-        if (d <= buttonPokeDistance)
-        {
-            if (logEvents) Debug.Log("[StylusCalibration] Next pressed.");
-            isActive = false;
-            OnNextButtonPressed?.Invoke();
-        }
+    private void OnNextButtonPokeDetected()
+    {
+        if (!calibrationDone) return;
+        if (logEvents) Debug.Log("[StylusCalibration] Next pressed.");
+        isActive = false;
+        OnNextButtonPressed?.Invoke();
     }
 
     // ================================================================
@@ -508,6 +497,7 @@ public class StylusCalibrationController : MonoBehaviour
 
     private void EnsureVisuals()
     {
+        // ── Target sphere (3D spatial — rides on real fingertip) ──────
         if (targetSphere == null)
         {
             targetSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -519,40 +509,95 @@ public class StylusCalibrationController : MonoBehaviour
             PassthroughManager.SetLayerRecursive(targetSphere, passthroughLayer);
         }
 
-        if (nextButton == null)
+        // ── Instruction canvas ────────────────────────────────────────
+        if (instructionCanvas == null)
         {
-            nextButton = MakeButton("StylusCalibNext", "Next", out nextMaterial, out nextLabel);
-            nextButton.SetActive(false);
+            var root   = new GameObject("StylusCalibInstruction");
+            var canvas = root.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            root.GetComponent<RectTransform>().sizeDelta = new Vector2(640f, 300f);
+            root.AddComponent<CanvasScaler>();
+            root.AddComponent<TrackedDeviceGraphicRaycaster>();
+            root.transform.localScale = Vector3.one * 0.001f;
+            PassthroughManager.SetLayerRecursive(root, passthroughLayer);
+
+            var bg    = new GameObject("Background");
+            bg.transform.SetParent(root.transform, false);
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = s_PanelBg;
+            bg.GetComponent<RectTransform>().sizeDelta = new Vector2(640f, 300f);
+
+            var bar    = new GameObject("AccentBar");
+            bar.transform.SetParent(bg.transform, false);
+            var barImg = bar.AddComponent<Image>();
+            barImg.color = s_AccentMauve;
+            var barRect = bar.GetComponent<RectTransform>();
+            barRect.anchorMin = new Vector2(0f, 1f);
+            barRect.anchorMax = new Vector2(1f, 1f);
+            barRect.pivot     = new Vector2(0.5f, 1f);
+            barRect.sizeDelta = new Vector2(0f, 26f);
+
+            var qGO  = new GameObject("InstructionText");
+            qGO.transform.SetParent(bg.transform, false);
+            instructionTmp = qGO.AddComponent<TextMeshProUGUI>();
+            instructionTmp.fontSize  = 24f;
+            instructionTmp.alignment = TextAlignmentOptions.Center;
+            instructionTmp.color     = s_TextDark;
+            instructionTmp.textWrappingMode = TextWrappingModes.Normal;
+            var qRect = qGO.GetComponent<RectTransform>();
+            qRect.anchorMin = new Vector2(0.05f, 0.05f);
+            qRect.anchorMax = new Vector2(0.95f, 0.92f);
+            qRect.offsetMin = qRect.offsetMax = Vector2.zero;
+
+            instructionCanvas = root;
+            instructionCanvas.SetActive(false);
         }
 
-        if (instructionObj == null)
+        // ── Next button canvas ────────────────────────────────────────
+        if (nextCanvas == null)
         {
-            instructionObj = new GameObject("StylusCalibInstruction");
-            instructionObj.layer = passthroughLayer;
+            var root   = new GameObject("StylusCalibNext");
+            var canvas = root.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            root.GetComponent<RectTransform>().sizeDelta = new Vector2(220f, 80f);
+            root.AddComponent<CanvasScaler>();
+            root.AddComponent<TrackedDeviceGraphicRaycaster>();
+            root.transform.localScale = Vector3.one * 0.001f;
+            PassthroughManager.SetLayerRecursive(root, passthroughLayer);
 
-            var bg = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            bg.name = "BG";
-            bg.transform.SetParent(instructionObj.transform, false);
-            bg.transform.localScale = new Vector3(1.6f, 0.56f, 1f);
-            bg.transform.localPosition = new Vector3(0f, 0f, 0.001f);
-            bg.layer = passthroughLayer;
-            Destroy(bg.GetComponent<Collider>());
-            ApplyMat(bg, MakeMat(new Color(0f, 0f, 0f, 0.65f)));
+            var bg    = new GameObject("Background");
+            bg.transform.SetParent(root.transform, false);
+            var bgImg = bg.AddComponent<Image>();
+            bgImg.color = s_BtnNext;
+            bg.GetComponent<RectTransform>().sizeDelta = new Vector2(220f, 80f);
 
-            instructionText = instructionObj.AddComponent<TextMeshPro>();
-            instructionText.fontSize = fontSize;
-            instructionText.alignment = TextAlignmentOptions.Center;
-            instructionText.color = Color.white;
-            instructionText.rectTransform.sizeDelta = new Vector2(1.5f, 0.60f);
-            instructionText.textWrappingMode = TextWrappingModes.Normal;
-            instructionText.sortingOrder = 1;
+            nextBtn = bg.AddComponent<Button>();
+            nextBtn.targetGraphic = bgImg;
+            nextBtn.onClick.AddListener(OnNextButtonPokeDetected);
+            nextBtn.interactable = false;
+
+            var lblGO = new GameObject("Label");
+            lblGO.transform.SetParent(bg.transform, false);
+            var tmp   = lblGO.AddComponent<TextMeshProUGUI>();
+            tmp.text      = "Next";
+            tmp.fontSize  = 28f;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color     = Color.white;
+            tmp.fontStyle = FontStyles.Bold;
+            var lblRect   = lblGO.GetComponent<RectTransform>();
+            lblRect.anchorMin = Vector2.zero;
+            lblRect.anchorMax = Vector2.one;
+            lblRect.offsetMin = lblRect.offsetMax = Vector2.zero;
+
+            nextCanvas = root;
+            nextCanvas.SetActive(false);
         }
     }
 
     private void PositionNextButton()
     {
         Camera cam = Camera.main;
-        if (cam == null || nextButton == null) return;
+        if (cam == null || nextCanvas == null) return;
 
         Vector3 forward = cam.transform.forward; forward.y = 0f;
         if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
@@ -564,18 +609,16 @@ public class StylusCalibrationController : MonoBehaviour
         if (side.sqrMagnitude < 0.001f) side = Vector3.right;
         side.Normalize();
 
-        nextButtonPos = cam.transform.position
-                        + forward * buttonForward
-                        + Vector3.down * buttonBelowEye
-                        + side * buttonSideOffset;
-
-        nextButton.transform.position = nextButtonPos;
-        nextButton.transform.rotation = Quaternion.LookRotation(forward);
+        nextCanvas.transform.position = cam.transform.position
+                                        + forward * buttonForward
+                                        + Vector3.down * buttonBelowEye
+                                        + side * buttonSideOffset;
+        nextCanvas.transform.rotation = Quaternion.LookRotation(forward);
     }
 
     private void BillboardInstruction()
     {
-        if (instructionObj == null) return;
+        if (instructionCanvas == null) return;
         Camera cam = Camera.main;
         if (cam == null) return;
 
@@ -583,15 +626,15 @@ public class StylusCalibrationController : MonoBehaviour
         if (fwd.sqrMagnitude < 0.001f) fwd = Vector3.forward;
         fwd.Normalize();
 
-        instructionObj.transform.position =
+        instructionCanvas.transform.position =
             cam.transform.position + fwd * instructionForward + Vector3.up * instructionHeight;
-        instructionObj.transform.rotation = Quaternion.LookRotation(fwd);
-        instructionObj.SetActive(true);
+        instructionCanvas.transform.rotation = Quaternion.LookRotation(fwd);
+        instructionCanvas.SetActive(true);
     }
 
     private void SetInstruction(string msg)
     {
-        if (instructionText != null) instructionText.text = msg;
+        if (instructionTmp != null) instructionTmp.text = msg;
     }
 
     private void SetTargetColor(Color c)
@@ -599,46 +642,12 @@ public class StylusCalibrationController : MonoBehaviour
         if (targetMaterial != null) targetMaterial.color = c;
     }
 
-    private static void SetButtonColor(Material mat, Color c)
-    {
-        if (mat != null) mat.color = c;
-    }
-
     private Handedness OppositeHand() =>
         stylusHand == Handedness.Right ? Handedness.Left : Handedness.Right;
 
     // ================================================================
-    // HELPERS
+    // MATERIAL HELPERS (for target sphere only)
     // ================================================================
-
-    private GameObject MakeButton(string objName, string label,
-                                   out Material mat, out TextMeshPro tmp)
-    {
-        var btn = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        btn.name = objName;
-        Destroy(btn.GetComponent<Collider>());
-        btn.transform.localScale = new Vector3(0.12f, 0.055f, 0.02f);
-        mat = MakeMat(ColorBtnArmed);
-        ApplyMat(btn, mat);
-        PassthroughManager.SetLayerRecursive(btn, passthroughLayer);
-
-        var labelObj = new GameObject("Label");
-        labelObj.transform.SetParent(btn.transform, false);
-        labelObj.layer = passthroughLayer;
-        tmp = labelObj.AddComponent<TextMeshPro>();
-        tmp.text = label;
-        tmp.fontSize = buttonFontSize;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.color = Color.white;
-        tmp.rectTransform.sizeDelta = buttonLabelBoxSize;
-        labelObj.transform.localScale = new Vector3(
-            1f / 0.12f * 0.10f,
-            1f / 0.055f * 0.045f,
-            1f / 0.02f * 0.01f);
-        labelObj.transform.localPosition = new Vector3(0f, 0f, -0.6f);
-
-        return btn;
-    }
 
     private static Material MakeMat(Color color)
     {
@@ -666,10 +675,9 @@ public class StylusCalibrationController : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (targetSphere    != null) Destroy(targetSphere);
-        if (nextButton      != null) Destroy(nextButton);
-        if (instructionObj  != null) Destroy(instructionObj);
-        if (targetMaterial  != null) Destroy(targetMaterial);
-        if (nextMaterial    != null) Destroy(nextMaterial);
+        if (targetSphere      != null) Destroy(targetSphere);
+        if (nextCanvas        != null) Destroy(nextCanvas);
+        if (instructionCanvas != null) Destroy(instructionCanvas);
+        if (targetMaterial    != null) Destroy(targetMaterial);
     }
 }

@@ -31,9 +31,13 @@ public class LoginManager : MonoBehaviour
 
     [Header("On Success")]
     [SerializeField] private UnityEvent onLoginSuccess;
+    [Header("Login UI")]
+    [Tooltip("Root Canvas or parent GameObject for the login UI to hide on successful login.")]
+    [SerializeField] private GameObject loginCanvas;
 
     private const string PrefKeyNickname = "Nickname";
     private const string PrefKeyFullName  = "PlayerFullName";
+    private const string PrefKeyIsLoggedIn = "IsLoggedIn";
 
     // Static fields survive scene loads but reset on app restart.
     private static bool   _sessionLoggedIn;
@@ -47,13 +51,10 @@ public class LoginManager : MonoBehaviour
         beachPortalVfx?.SetActive(false);
         bedroomPortalVfx?.SetActive(false);
 
-        if (_sessionLoggedIn)
+        if (IsLoggedIn())
         {
-            if (nicknameInput != null) { nicknameInput.text = _sessionNickname; nicknameInput.interactable = false; }
-            if (fullNameInput  != null) { fullNameInput.text  = _sessionFullName;  fullNameInput.interactable  = false; }
-            if (continueButton != null)   continueButton.interactable = false;
-            beachPortalVfx?.SetActive(true);
-            bedroomPortalVfx?.SetActive(true);
+            RestoreLoggedInState();
+            return;
         }
     }
 
@@ -75,6 +76,7 @@ public class LoginManager : MonoBehaviour
 
         PlayerPrefs.SetString(PrefKeyNickname, nickname);
         PlayerPrefs.SetString(PrefKeyFullName,  fullName);
+        PlayerPrefs.SetInt(PrefKeyIsLoggedIn, 1);
         PlayerPrefs.Save();
 
         _sessionLoggedIn = true;
@@ -91,7 +93,48 @@ public class LoginManager : MonoBehaviour
 
         yield return new WaitForSeconds(portalFadeInDuration);
 
+        // Hide the login UI (canvas) now that the VFX finished and login succeeded.
+        if (loginCanvas != null)
+            loginCanvas.SetActive(false);
+
         onLoginSuccess?.Invoke();
+    }
+
+    private bool IsLoggedIn()
+    {
+        if (_sessionLoggedIn)
+            return true;
+
+        return PlayerPrefs.GetInt(PrefKeyIsLoggedIn, 0) == 1;
+    }
+
+    private void RestoreLoggedInState()
+    {
+        _sessionLoggedIn = true;
+
+        if (string.IsNullOrEmpty(_sessionNickname))
+            _sessionNickname = PlayerPrefs.GetString(PrefKeyNickname, string.Empty);
+
+        if (string.IsNullOrEmpty(_sessionFullName))
+            _sessionFullName = PlayerPrefs.GetString(PrefKeyFullName, string.Empty);
+
+        if (nicknameInput != null)
+        {
+            nicknameInput.text = _sessionNickname;
+            nicknameInput.interactable = false;
+        }
+
+        if (fullNameInput != null)
+        {
+            fullNameInput.text = _sessionFullName;
+            fullNameInput.interactable = false;
+        }
+
+        if (continueButton != null)
+            continueButton.interactable = false;
+
+        if (loginCanvas != null)
+            loginCanvas.SetActive(false);
     }
 
     private IEnumerator FadeInPortalVfx(GameObject vfx, float duration)
