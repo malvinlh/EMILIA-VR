@@ -34,44 +34,34 @@ public static class EmiliaHandInteractorSetup
                 continue;
             }
 
+            var existing = FindExistingHandsRig(scene, prefab);
+            if (existing != null)
+            {
+                Debug.Log($"Emilia: Hands rig already present in {scenePath} (root '{existing.name}').");
+                EnsureVintageMicButtons(scene);
+                EditorSceneManager.SaveScene(scene);
+                continue;
+            }
+
             var xrOrigin = UnityEngine.Object.FindObjectOfType<XROrigin>();
-            if (xrOrigin == null)
-            {
-                // No XROrigin found: instantiate prefab at root of scene
-                var instRoot = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-                EditorSceneManager.MarkSceneDirty(scene);
-                EditorSceneManager.SaveScene(scene);
-                Debug.Log($"Emilia: Instantiated hands prefab at scene root in {scenePath}");
-                EnsureVintageMicButtons(scene);
-                EditorSceneManager.SaveScene(scene);
-                continue;
-            }
-
-            // If the xrOrigin already has a child that looks like hands, skip
-            bool hasHandsChild = false;
-            foreach (Transform child in xrOrigin.transform)
-            {
-                if (child.name.Contains("Hands") || child.name.Contains("Hand"))
-                {
-                    hasHandsChild = true; break;
-                }
-            }
-
-            if (hasHandsChild)
-            {
-                Debug.Log($"Emilia: Hands already present under XROrigin in {scenePath}");
-                EnsureVintageMicButtons(scene);
-                EditorSceneManager.SaveScene(scene);
-                continue;
-            }
-
-            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-            go.transform.SetParent(xrOrigin.transform, false);
+            var inst = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            if (xrOrigin != null)
+                inst.transform.SetParent(xrOrigin.transform, false);
             EditorSceneManager.MarkSceneDirty(scene);
             EnsureVintageMicButtons(scene);
             EditorSceneManager.SaveScene(scene);
-            Debug.Log($"Emilia: Added hands prefab under XROrigin in {scenePath}");
+            Debug.Log($"Emilia: Instantiated hands rig in {scenePath} (xrOrigin? {xrOrigin != null}).");
         }
+    }
+
+    static GameObject FindExistingHandsRig(Scene scene, GameObject sourcePrefab)
+    {
+        foreach (var root in scene.GetRootGameObjects())
+        {
+            var src = PrefabUtility.GetCorrespondingObjectFromSource(root) as GameObject;
+            if (src == sourcePrefab) return root;
+        }
+        return null;
     }
 
     static void EnsureVintageMicButtons(Scene scene)

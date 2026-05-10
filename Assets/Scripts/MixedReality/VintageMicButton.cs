@@ -55,6 +55,10 @@ public class VintageMicButton : MonoBehaviour
     [Range(0.02f, 0.15f)]
     public float hoverDistance = 0.06f;
 
+    [Tooltip("Distance (metres) at which a fingertip counts as 'pressing' the button. Should be smaller than hoverDistance.")]
+    [Range(0.001f, 0.05f)]
+    public float pokeActivationDistance = 0.005f;
+
     [Header("Cooldown")]
     [Tooltip("Minimum seconds between activations. Prevents double-fire from hand gestures.")]
     [Range(0.1f, 2f)]
@@ -240,7 +244,11 @@ public class VintageMicButton : MonoBehaviour
         if (!hand.isTracked) return false;
         var joint = hand.GetJoint(XRHandJointID.IndexTip);
         if (!joint.TryGetPose(out Pose tip)) return false;
-        if (!_collider.bounds.Contains(tip.position)) return false;
+        // Activate when the fingertip is within a small distance of the collider surface,
+        // not only when it's strictly inside the AABB — hand-tracked tips typically stop at
+        // the visible surface and never penetrate.
+        float surfaceDist = Vector3.Distance(tip.position, _collider.ClosestPoint(tip.position));
+        if (surfaceDist > pokeActivationDistance) return false;
         TriggerActivation();
         return true;
     }
