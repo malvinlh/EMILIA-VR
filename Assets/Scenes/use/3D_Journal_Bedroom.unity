@@ -3976,8 +3976,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Unity.XR.Interaction.Toolkit::UnityEngine.XR.Interaction.Toolkit.Interactables.XRSimpleInteractable
   m_InteractionManager: {fileID: 0}
-  m_Colliders:
-  - {fileID: 250726528}
+  m_Colliders: []
   m_InteractionLayers:
     m_Bits: 1
   m_DistanceCalculationMode: 1
@@ -7787,7 +7786,7 @@ MonoBehaviour:
   stamperTipLocalOffset: {x: 0, y: -0.015, z: 0}
   paperSurface: {fileID: 949426658}
   stampDistance: 0.05
-  stampDuration: 2
+  stampDuration: 1
   rollbackPerSecond: 0.5
   sealColor: {r: 0.75, g: 0.1, b: 0.1, a: 1}
   sealDiameter: 0.5
@@ -7795,8 +7794,8 @@ MonoBehaviour:
   sealSurfaceOffset: 0.0015
   stampSfx: {fileID: 2076500235}
   feedbackCircleDiameter: 0.5
-  feedbackFadeDuration: 0.5
-  feedbackCircleColor: {r: 1, g: 0.2, b: 0.2, a: 1}
+  feedbackFadeDuration: 0.25
+  feedbackCircleColor: {r: 0.6666667, g: 0.6666667, b: 0.6666667, a: 1}
   completionDelay: 0.45
 --- !u!23 &1139446835
 MeshRenderer:

@@ -927,6 +927,8 @@ public class PortalSceneTransition : MonoBehaviour
 
         onTransitionStarted?.Invoke();
 
+        SceneXROriginEnforcer.PrepareForSceneTransition();
+
         if (stopIdleLoopOnEnter && idleLoopVfx != null)
             idleLoopVfx.Stop(true, ParticleSystemStopBehavior.StopEmitting);
 

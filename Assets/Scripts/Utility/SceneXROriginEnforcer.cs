@@ -7,73 +7,105 @@ using Unity.XR.CoreUtils;
 [DefaultExecutionOrder(-1000)]
 public class SceneXROriginEnforcer : MonoBehaviour
 {
+    private static SceneXROriginEnforcer instance;
+
     [Tooltip("Enable debug logging for scene origin enforcement.")]
     public bool debugLogs = true;
 
     [Tooltip("Destroy XROrigin instances that belong to other scenes (e.g. DontDestroyOnLoad leftovers).")]
     public bool destroyPersistentOrigins = true;
 
-    // Ensure one persistent enforcer exists at runtime startup
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    // Ensure one persistent enforcer exists before any scene objects begin their startup work.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void InitializeEnforcer()
     {
+        if (instance != null) return;
+
         if (GameObject.Find("SceneXROriginEnforcer") != null) return;
+
         var go = new GameObject("SceneXROriginEnforcer");
         DontDestroyOnLoad(go);
         go.AddComponent<SceneXROriginEnforcer>();
     }
 
-    void Awake()
+    private void Awake()
     {
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
         DontDestroyOnLoad(gameObject);
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
+        if (instance == this)
+            instance = null;
+
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
-    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    public static void PrepareForSceneTransition()
+    {
+        if (instance == null)
+            return;
+
+        instance.CleanupOriginsOutsideScene(SceneManager.GetActiveScene(), "pre-transition");
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (debugLogs) Debug.Log($"[SceneXROriginEnforcer] Scene loaded: {scene.name}, enforcing XROrigins.");
 
-        var origins = FindObjectsOfType<XROrigin>(true).ToList();
-        if (debugLogs) Debug.Log($"[SceneXROriginEnforcer] Found {origins.Count} XROrigins.");
+        CleanupOriginsOutsideScene(scene, "scene-loaded");
 
-        // Destroy any origins that do NOT belong to the newly loaded scene (likely DontDestroyOnLoad leftovers)
+        // Ensure the scene-local origin is enabled and active after a short delay (let scene objects initialize)
+        StartCoroutine(ActivateSceneOriginNextFrame(scene));
+    }
+
+    private void CleanupOriginsOutsideScene(Scene scene, string reason)
+    {
+        var origins = Object.FindObjectsOfType<XROrigin>(true).ToList();
+
+        if (debugLogs)
+            Debug.Log($"[SceneXROriginEnforcer] Cleanup '{reason}': found {origins.Count} XROrigins.");
+
         foreach (var origin in origins)
         {
-            if (origin == null) continue;
+            if (origin == null)
+                continue;
+
             var originScene = origin.gameObject.scene;
             bool isSceneLocal = originScene == scene;
             if (!isSceneLocal)
             {
                 if (destroyPersistentOrigins)
                 {
-                    if (debugLogs) Debug.Log($"[SceneXROriginEnforcer] Destroying persistent XROrigin '{origin.gameObject.name}' (scene '{originScene.name}').");
+                    if (debugLogs)
+                        Debug.Log($"[SceneXROriginEnforcer] Destroying stale XROrigin '{origin.gameObject.name}' (scene '{originScene.name}', reason '{reason}').");
                     Destroy(origin.gameObject);
                 }
                 else if (debugLogs)
                 {
-                    Debug.Log($"[SceneXROriginEnforcer] Would destroy persistent XROrigin '{origin.gameObject.name}' (scene '{originScene.name}').");
+                    Debug.Log($"[SceneXROriginEnforcer] Would destroy stale XROrigin '{origin.gameObject.name}' (scene '{originScene.name}', reason '{reason}').");
                 }
             }
             else if (debugLogs)
             {
-                Debug.Log($"[SceneXROriginEnforcer] Keeping scene-local XROrigin '{origin.gameObject.name}'.");
+                Debug.Log($"[SceneXROriginEnforcer] Keeping scene-local XROrigin '{origin.gameObject.name}' (reason '{reason}').");
             }
         }
-
-        // Ensure the scene-local origin is enabled and active after a short delay (let scene objects initialize)
-        StartCoroutine(ActivateSceneOriginNextFrame(scene));
     }
 
-    IEnumerator ActivateSceneOriginNextFrame(Scene scene)
+    private IEnumerator ActivateSceneOriginNextFrame(Scene scene)
     {
         yield return null;
 
-        var remainingOrigins = FindObjectsOfType<XROrigin>(true)
+        var remainingOrigins = Object.FindObjectsOfType<XROrigin>(true)
             .Where(o => o != null && o.gameObject.scene == scene).ToList();
 
         if (remainingOrigins.Count == 0)
@@ -103,5 +135,46 @@ public class SceneXROriginEnforcer : MonoBehaviour
             var names = string.Join(", ", remainingOrigins.Select(o => o.gameObject.name));
             Debug.Log($"[SceneXROriginEnforcer] Scene '{scene.name}' XROrigin(s): {names}");
         }
+
+        TryRefreshLoginSceneBindings(scene);
+    }
+
+    private void TryRefreshLoginSceneBindings(Scene scene)
+    {
+        if (!scene.IsValid())
+            return;
+
+        if (scene.name.IndexOf("Login", System.StringComparison.OrdinalIgnoreCase) < 0)
+            return;
+
+        var loginSetup = Object.FindObjectOfType<LoginSceneXRSetup>(true);
+        if (loginSetup != null)
+            loginSetup.enabled = true;
+
+        var bridges = Object.FindObjectsOfType<VRLoginHandwritingBridge>(true);
+        foreach (var bridge in bridges)
+        {
+            if (bridge == null)
+                continue;
+
+            InvokePrivateNoArg(bridge, "EnforceControllerOnlyInteractionMode");
+            InvokePrivateNoArg(bridge, "ResolveInputReferences");
+            InvokePrivateNoArg(bridge, "ResolveCameraOffsetTransform");
+        }
+    }
+
+    private static void InvokePrivateNoArg(Object target, string methodName)
+    {
+        if (target == null || string.IsNullOrEmpty(methodName))
+            return;
+
+        var method = target.GetType().GetMethod(
+            methodName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        if (method == null || method.GetParameters().Length != 0)
+            return;
+
+        method.Invoke(target, null);
     }
 }

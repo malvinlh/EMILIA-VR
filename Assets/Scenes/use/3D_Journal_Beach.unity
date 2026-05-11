@@ -8163,7 +8163,7 @@ MonoBehaviour:
   tapMarkerRadius: 0.01
   instructionForward: 0.9
   instructionHeight: 0.18
-  calibrationVideo: {fileID: 32900000, guid: 4253a5139a3b32a428319ee5633fe132, type: 3}
+  calibrationVideoFilename: TableCalib.mp4
   logEvents: 0
 --- !u!64 &869365583
 MeshCollider:
@@ -14885,7 +14885,7 @@ MonoBehaviour:
   outsideDelay: 1.5
   bottleHole: {fileID: 250107118}
   bottleHoleLocalOffset: {x: 0, y: 0.08, z: 0.02}
-  suctionDuration: 5
+  suctionDuration: 2.5
   nearWhiteboardDistance: 0.03
   rollbackPerSecond: 0.5
   useSceneProgressVisual: 1
