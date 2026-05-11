@@ -4,7 +4,6 @@ using UnityEngine.UI;
 using UnityEngine.XR.Hands;
 using UnityEngine.XR.Interaction.Toolkit.UI;
 using TMPro;
-using UnityEngine.Video;
 
 /// <summary>
 /// DIY stylus calibration — prescribed-rotation pinch mode (plan B-2.A).
@@ -81,8 +80,9 @@ public class StylusCalibrationController : MonoBehaviour
     public float instructionForward = 0.90f;
     public float instructionHeight = 0.18f;
 
-    [Header("Video")]
-    [SerializeField] VideoClip calibrationVideo;
+    [Header("Panduan Visual")]
+    [Tooltip("6 gambar panduan: [0,1]=langkah 1, [2,3]=langkah 2, [4,5]=langkah 3.")]
+    [SerializeField] Sprite[] stepGuideImages;
 
     [Header("Diagnostics")]
     [Tooltip("Log sample captures, dwell state, and solve results.")]
@@ -101,13 +101,13 @@ public class StylusCalibrationController : MonoBehaviour
 
     private string GetPoseInstruction(int poseIndex)
     {
-        string penHand = stylusHand == Handedness.Right ? "right" : "left";
+        string penHand = stylusHand == Handedness.Right ? "kanan" : "kiri";
         switch (poseIndex)
         {
-            case 0:  return $"Hold pen flat on sphere,\n{penHand} (pen) wrist neutral.";
-            case 1:  return $"Tilt your {penHand} (pen) wrist DOWN ~30°,\nhold pen on sphere.";
-            case 2:  return $"Tilt your {penHand} (pen) wrist SIDEWAYS ~30°,\nhold pen on sphere.";
-            default: return "Hold pen on sphere and pinch to capture.";
+            case 0:  return $"Tahan pena mendatar di atas bola,\npergelangan tangan {penHand} (pena) netral.";
+            case 1:  return $"Miringkan pergelangan tangan {penHand} (pena) ke BAWAH ~30°,\ntahan pena di atas bola.";
+            case 2:  return $"Miringkan pergelangan tangan {penHand} (pena) ke SAMPING ~30°,\ntahan pena di atas bola.";
+            default: return "Tahan pena di atas bola dan cubit untuk merekam.";
         }
     }
 
@@ -152,9 +152,11 @@ public class StylusCalibrationController : MonoBehaviour
     private GameObject nextCanvas;
     private Button     nextBtn;
 
-    // 2D Canvas UI — Video panel
-    private GameObject    videoCanvas;
-    private RenderTexture _videoRT;
+    // 2D Canvas UI — Guide image panel
+    private GameObject      guideCanvas;
+    private Image           guideImg1;
+    private Image           guideImg2;
+    private TextMeshProUGUI stepLabel;
 
     private int passthroughLayer = 31;
 
@@ -185,10 +187,10 @@ public class StylusCalibrationController : MonoBehaviour
         if (instructionCanvas != null) instructionCanvas.SetActive(true);
         if (targetSphere      != null) targetSphere.SetActive(true);
         if (nextCanvas        != null) nextCanvas.SetActive(false);
-        if (videoCanvas != null)
+        if (guideCanvas != null)
         {
-            videoCanvas.GetComponent<VideoPlayer>()?.Play();
-            videoCanvas.SetActive(true);
+            SetGuideStep(0);
+            guideCanvas.SetActive(true);
         }
 
         isActive = true;
@@ -225,7 +227,7 @@ public class StylusCalibrationController : MonoBehaviour
         SetTargetColor(ColorTargetIdle);
 
         if (isVerifyMode)
-            SetInstruction("Previous calibration loaded.\nTouch sphere to confirm,\nor rotate wrist to recalibrate.");
+            SetInstruction("Kalibrasi sebelumnya ditemukan.\nSentuh bola untuk konfirmasi,\natau putar pergelangan untuk kalibrasi ulang.");
         else
             UpdateInstructionForProgress();
 
@@ -238,11 +240,7 @@ public class StylusCalibrationController : MonoBehaviour
         if (targetSphere      != null) targetSphere.SetActive(false);
         if (nextCanvas        != null) nextCanvas.SetActive(false);
         if (instructionCanvas != null) instructionCanvas.SetActive(false);
-        if (videoCanvas != null)
-        {
-            videoCanvas.GetComponent<VideoPlayer>()?.Stop();
-            videoCanvas.SetActive(false);
-        }
+        if (guideCanvas != null) guideCanvas.SetActive(false);
     }
 
     /// <summary>
@@ -300,8 +298,8 @@ public class StylusCalibrationController : MonoBehaviour
         }
         if (!hasTarget)
         {
-            SetInstruction("Show your " + (oppositeHand == Handedness.Left ? "left" : "right") +
-                           " hand so the target can appear.");
+            SetInstruction("Tunjukkan tangan " + (oppositeHand == Handedness.Left ? "kiri" : "kanan") +
+                           " Anda agar target muncul.");
             wasPinched = true;
             return;
         }
@@ -310,8 +308,8 @@ public class StylusCalibrationController : MonoBehaviour
         if (wristTracker == null ||
             !wristTracker.TryGetWristPose(out Vector3 wristPos, out Quaternion wristRot))
         {
-            SetInstruction("Stylus hand not tracked.\nShow your " +
-                           (stylusHand == Handedness.Left ? "left" : "right") + " hand.");
+            SetInstruction("Tangan stylus tidak terdeteksi.\nTunjukkan tangan " +
+                           (stylusHand == Handedness.Left ? "kiri" : "kanan") + " Anda.");
             wasPinched = true;
             hasLastWristPose = false;
             hasLastWristRot = false;
@@ -390,8 +388,8 @@ public class StylusCalibrationController : MonoBehaviour
             {
                 verifyDwellAccum += Time.deltaTime;
                 SetTargetColor(ColorTargetCapturing);
-                SetInstruction($"Hold still to confirm prior calibration...\n" +
-                               $"({verifyDwellAccum:F1} / {verifyDwellSeconds:F1} s)");
+                SetInstruction($"Tahan posisi untuk konfirmasi...\n" +
+                               $"({verifyDwellAccum:F1} / {verifyDwellSeconds:F1} dtk)");
 
                 if (verifyDwellAccum >= verifyDwellSeconds)
                 {
@@ -403,7 +401,7 @@ public class StylusCalibrationController : MonoBehaviour
             {
                 verifyDwellAccum = 0f;
                 SetTargetColor(ColorTargetIdle);
-                SetInstruction("Previous calibration loaded.\nTouch sphere to confirm,\nor rotate wrist to recalibrate.");
+                SetInstruction("Kalibrasi sebelumnya ditemukan.\nSentuh bola untuk konfirmasi,\natau putar pergelangan untuk kalibrasi ulang.");
             }
         }
         else
@@ -434,13 +432,14 @@ public class StylusCalibrationController : MonoBehaviour
     private void UpdateInstructionForProgress()
     {
         int have = wristTracker != null ? wristTracker.SampleCount : 0;
-        string hand = OppositeHand() == Handedness.Left ? "left" : "right";
+        string hand = OppositeHand() == Handedness.Left ? "kiri" : "kanan";
 
         int poseIdx = Mathf.Clamp(have, 0, samplesRequired - 1);
         string poseText = GetPoseInstruction(poseIdx);
+        SetGuideStep(poseIdx);
 
         SetInstruction($"{poseText}\n" +
-                       $"Pinch {hand} thumb + middle to capture.\n" +
+                       $"Cubit ibu jari + jari tengah tangan {hand} untuk merekam.\n" +
                        $"{have}/{samplesRequired}");
     }
 
@@ -449,7 +448,7 @@ public class StylusCalibrationController : MonoBehaviour
         if (wristTracker == null) return;
         if (!wristTracker.FinalizeOffset(out float rms))
         {
-            SetInstruction("Calibration failed.\nPlease retry.");
+            SetInstruction("Kalibrasi gagal.\nCoba lagi.");
             wristTracker.ClearSamples();
             return;
         }
@@ -463,8 +462,8 @@ public class StylusCalibrationController : MonoBehaviour
 
         if (!passed)
         {
-            SetInstruction($"Residual {rms * 1000f:F0} mm — quality low.\n" +
-                           "Tap the sphere again from\nmore varied wrist angles.");
+            SetInstruction($"Residual {rms * 1000f:F0} mm — kualitas rendah.\n" +
+                           "Sentuh bola lagi dari\nsudut pergelangan lebih bervariasi.");
             wristTracker.ClearSamples();
             return;
         }
@@ -478,7 +477,7 @@ public class StylusCalibrationController : MonoBehaviour
         calibrationDoneTime = Time.time;
 
         SetTargetColor(ColorTargetDone);
-        SetInstruction($"Calibrated! Residual {rms * 1000f:F1} mm.\nPress Next to continue.");
+        SetInstruction($"Kalibrasi selesai! Residual {rms * 1000f:F1} mm.\nTekan Lanjut untuk melanjutkan.");
 
         PositionNextButton();
         if (nextCanvas != null)
@@ -571,13 +570,10 @@ public class StylusCalibrationController : MonoBehaviour
             instructionCanvas.SetActive(false);
         }
 
-        // ── Video canvas ──────────────────────────────────────────────
-        if (videoCanvas == null && calibrationVideo != null)
+        // ── Guide canvas ──────────────────────────────────────────────
+        if (guideCanvas == null && stepGuideImages != null && stepGuideImages.Length >= 6)
         {
-            _videoRT = new RenderTexture(512, 288, 0);
-            _videoRT.Create();
-
-            var root   = new GameObject("StylusCalibVideo");
+            var root   = new GameObject("StylusCalibGuide");
             var canvas = root.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
             root.GetComponent<RectTransform>().sizeDelta = new Vector2(480f, 300f);
@@ -601,25 +597,38 @@ public class StylusCalibrationController : MonoBehaviour
             barRect.pivot     = new Vector2(0.5f, 1f);
             barRect.sizeDelta = new Vector2(0f, 26f);
 
-            var videoGO  = new GameObject("VideoDisplay");
-            videoGO.transform.SetParent(bg.transform, false);
-            var raw = videoGO.AddComponent<RawImage>();
-            raw.texture = _videoRT;
-            var videoRect = videoGO.GetComponent<RectTransform>();
-            videoRect.anchorMin = new Vector2(0.04f, 0.04f);
-            videoRect.anchorMax = new Vector2(0.96f, 0.92f);
-            videoRect.offsetMin = videoRect.offsetMax = Vector2.zero;
+            var labelGO = new GameObject("StepLabel");
+            labelGO.transform.SetParent(bar.transform, false);
+            stepLabel = labelGO.AddComponent<TextMeshProUGUI>();
+            stepLabel.fontSize  = 13f;
+            stepLabel.alignment = TextAlignmentOptions.Center;
+            stepLabel.color     = Color.white;
+            stepLabel.fontStyle = FontStyles.Bold;
+            var labelRect = labelGO.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = labelRect.offsetMax = Vector2.zero;
 
-            var vp = root.AddComponent<VideoPlayer>();
-            vp.renderMode      = VideoRenderMode.RenderTexture;
-            vp.targetTexture   = _videoRT;
-            vp.clip            = calibrationVideo;
-            vp.isLooping       = true;
-            vp.playOnAwake     = false;
-            vp.audioOutputMode = VideoAudioOutputMode.None;
+            var img1GO = new GameObject("GuideImage1");
+            img1GO.transform.SetParent(bg.transform, false);
+            guideImg1 = img1GO.AddComponent<Image>();
+            guideImg1.preserveAspect = true;
+            var img1Rect = img1GO.GetComponent<RectTransform>();
+            img1Rect.anchorMin = new Vector2(0.02f, 0.05f);
+            img1Rect.anchorMax = new Vector2(0.48f, 0.92f);
+            img1Rect.offsetMin = img1Rect.offsetMax = Vector2.zero;
 
-            videoCanvas = root;
-            videoCanvas.SetActive(false);
+            var img2GO = new GameObject("GuideImage2");
+            img2GO.transform.SetParent(bg.transform, false);
+            guideImg2 = img2GO.AddComponent<Image>();
+            guideImg2.preserveAspect = true;
+            var img2Rect = img2GO.GetComponent<RectTransform>();
+            img2Rect.anchorMin = new Vector2(0.52f, 0.05f);
+            img2Rect.anchorMax = new Vector2(0.98f, 0.92f);
+            img2Rect.offsetMin = img2Rect.offsetMax = Vector2.zero;
+
+            guideCanvas = root;
+            guideCanvas.SetActive(false);
         }
 
         // ── Next button canvas ────────────────────────────────────────
@@ -648,7 +657,7 @@ public class StylusCalibrationController : MonoBehaviour
             var lblGO = new GameObject("Label");
             lblGO.transform.SetParent(bg.transform, false);
             var tmp   = lblGO.AddComponent<TextMeshProUGUI>();
-            tmp.text      = "Next";
+            tmp.text      = "Lanjut";
             tmp.fontSize  = 28f;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.color     = Color.white;
@@ -697,12 +706,12 @@ public class StylusCalibrationController : MonoBehaviour
 
         Vector3 basePos = cam.transform.position + fwd * instructionForward + Vector3.up * instructionHeight;
 
-        if (videoCanvas != null)
+        if (guideCanvas != null)
         {
             Vector3 right = Vector3.Cross(Vector3.up, fwd).normalized;
             instructionCanvas.transform.position = basePos + right * 0.250f;
-            videoCanvas.transform.position       = basePos - right * 0.330f;
-            videoCanvas.transform.rotation       = Quaternion.LookRotation(fwd);
+            guideCanvas.transform.position       = basePos - right * 0.330f;
+            guideCanvas.transform.rotation       = Quaternion.LookRotation(fwd);
         }
         else
         {
@@ -715,6 +724,16 @@ public class StylusCalibrationController : MonoBehaviour
     private void SetInstruction(string msg)
     {
         if (instructionTmp != null) instructionTmp.text = msg;
+    }
+
+    private void SetGuideStep(int stepIndex)
+    {
+        if (guideImg1 == null || guideImg2 == null || stepGuideImages == null) return;
+        int baseIdx = stepIndex * 2;
+        if (baseIdx + 1 >= stepGuideImages.Length) return;
+        guideImg1.sprite = stepGuideImages[baseIdx];
+        guideImg2.sprite = stepGuideImages[baseIdx + 1];
+        if (stepLabel != null) stepLabel.text = $"Langkah {stepIndex + 1}/{samplesRequired}";
     }
 
     private void SetTargetColor(Color c)
@@ -759,7 +778,6 @@ public class StylusCalibrationController : MonoBehaviour
         if (nextCanvas        != null) Destroy(nextCanvas);
         if (instructionCanvas != null) Destroy(instructionCanvas);
         if (targetMaterial    != null) Destroy(targetMaterial);
-        if (videoCanvas       != null) Destroy(videoCanvas);
-        if (_videoRT          != null) _videoRT.Release();
+        if (guideCanvas       != null) Destroy(guideCanvas);
     }
 }

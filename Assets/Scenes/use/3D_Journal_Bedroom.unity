@@ -2962,7 +2962,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 810019319561094050, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_MoveSpeed
-      value: 5
+      value: 2.75
       objectReference: {fileID: 0}
     - target: {fileID: 810019319561094050, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_UseGravity
@@ -4414,7 +4414,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 615b36356c9347845b149a60ff163631, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 244314e1c3cc9054796dbe3f43a4a6fd, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -4441,7 +4441,7 @@ RectTransform:
   m_GameObject: {fileID: 544667581}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.4, y: 0.4, z: 0.4}
+  m_LocalScale: {x: 0.23, y: 0.23, z: 0.23}
   m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 677361816}
@@ -5225,7 +5225,13 @@ MonoBehaviour:
   nextArmDelay: 0.6
   instructionForward: 0.9
   instructionHeight: 0.2
-  calibrationVideo: {fileID: 32900000, guid: 161c3c7d1d655004aaddfc2b38cb6015, type: 3}
+  stepGuideImages:
+  - {fileID: 21300000, guid: 8b3a64ed0d97e94428d7dd3b78695a18, type: 3}
+  - {fileID: 21300000, guid: 7c77fe9aa7f49a845badff2761572ea6, type: 3}
+  - {fileID: 21300000, guid: a5da403e4dd9a5641959459904b46272, type: 3}
+  - {fileID: 21300000, guid: ffab4b6bad7cc684cb8466af28e41254, type: 3}
+  - {fileID: 21300000, guid: 481d751a5f49a9b4a9bd27627e616205, type: 3}
+  - {fileID: 21300000, guid: f479279f200032f4ab189f957321d42a, type: 3}
   logEvents: 0
 --- !u!4 &602012318
 Transform:

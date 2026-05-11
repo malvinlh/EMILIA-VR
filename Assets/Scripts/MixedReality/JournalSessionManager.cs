@@ -404,8 +404,8 @@ public class JournalSessionManager : MonoBehaviour
         bool willCalibrateStylus = !skipStylusCalibration && stylusCalibrationController != null;
 
         ShowInstruction(willCalibrateStylus
-            ? "Hold your pen and prepare to calibrate\nwhen the target appears."
-            : "Tap the four corners of your writing\narea with your index fingertip.");
+            ? "Pegang pena Anda dan bersiap untuk kalibrasi\nsaat target muncul."
+            : "Ketuk empat sudut area menulis Anda\ndengan ujung jari telunjuk.");
 
         if (passthroughManager != null)
             passthroughManager.EnterPassthrough(() =>
@@ -514,11 +514,11 @@ public class JournalSessionManager : MonoBehaviour
     {
         SpawnWhiteboardForPreview(table);
 
-        ShowInstruction("Calibrating...");
+        ShowInstruction("Mengkalibrasi...");
 
         yield return new WaitForSeconds(previewDuration * 0.6f);
 
-        ShowInstruction("Done, returning to the game world.");
+        ShowInstruction("Selesai, kembali ke dunia virtual.");
         yield return new WaitForSeconds(previewDuration * 0.4f);
 
         CurrentState = SessionState.TransitionToVR;

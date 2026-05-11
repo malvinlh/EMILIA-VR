@@ -246,8 +246,8 @@ public class TableTapCalibrator : MonoBehaviour
         HideDragPath();
         if (choiceCanvas != null) choiceCanvas.SetActive(false);
 
-        SetInstruction("Tap the near-left corner of your writing area.\nHold still" +
-                       (requirePinchToCapture ? ", then pinch to capture." : " to capture."));
+        SetInstruction("Ketuk sudut kiri-depan area menulis Anda.\nTahan posisi" +
+                       (requirePinchToCapture ? ", lalu cubit untuk merekam." : " untuk merekam."));
         if (videoCanvas != null)
         {
             videoCanvas.GetComponent<VideoPlayer>()?.Play();
@@ -313,7 +313,7 @@ public class TableTapCalibrator : MonoBehaviour
             !stylusTipProvider.TipWorldPosition.HasValue)
         {
             if (tipIndicator != null) tipIndicator.SetActive(false);
-            SetInstruction("Waiting for stylus tracking...");
+            SetInstruction("Menunggu pelacakan stylus...");
             dwellAccum = 0f;
             hasLastTip = false;
             return;
@@ -381,8 +381,8 @@ public class TableTapCalibrator : MonoBehaviour
         HideDragPath();
         dragPathObj.SetActive(true);
 
-        SetInstruction("Now slide the pen across the table\nto the far-right corner.\n" +
-                       "Lift the pen when done.");
+        SetInstruction("Geser pena melintasi meja\nke sudut kanan-belakang.\n" +
+                       "Angkat pena jika selesai.");
     }
 
     // ================================================================
@@ -394,7 +394,7 @@ public class TableTapCalibrator : MonoBehaviour
         if (stylusTipProvider == null || !stylusTipProvider.IsCalibrated ||
             !stylusTipProvider.TipWorldPosition.HasValue)
         {
-            SetInstruction("Stylus lost — please show the pen.");
+            SetInstruction("Stylus hilang — tunjukkan pena.");
             return;
         }
 
@@ -425,10 +425,10 @@ public class TableTapCalibrator : MonoBehaviour
         int pts = dragPolyline.Count;
         bool enoughDrag = dragPathLength >= minDragLengthM;
         if (pts < 3)
-            SetInstruction("Slide the pen along the table surface\nto the far-right corner.");
+            SetInstruction("Geser pena di permukaan meja\nke sudut kanan-belakang.");
         else
-            SetInstruction($"Dragging... {dragPathLength * 100f:F0} cm covered.\n" +
-                           (enoughDrag ? "Lift the pen to finish." : "Keep going."));
+            SetInstruction($"Menggeser... {dragPathLength * 100f:F0} cm.\n" +
+                           (enoughDrag ? "Angkat pena untuk selesai." : "Teruskan."));
 
         if (aboveY > dragLiftThresholdM)
         {
@@ -457,7 +457,7 @@ public class TableTapCalibrator : MonoBehaviour
     {
         if (dragPolyline.Count < 2)
         {
-            SetInstruction("Drag too short — please try again.");
+            SetInstruction("Geseran terlalu pendek — coba lagi.");
             BeginCalibration();
             return;
         }
@@ -685,7 +685,7 @@ public class TableTapCalibrator : MonoBehaviour
 
     private void SetInstructionForConfirm()
     {
-        SetInstruction("Press Confirm to place your whiteboard,\nor Redo to start over.");
+        SetInstruction("Tekan Konfirmasi untuk menempatkan papan tulis,\natau Ulangi untuk mulai lagi.");
     }
 
     // ================================================================
@@ -878,11 +878,11 @@ public class TableTapCalibrator : MonoBehaviour
             rowRect.anchorMax = new Vector2(0.97f, 0.9f);
             rowRect.offsetMin = rowRect.offsetMax = Vector2.zero;
 
-            confirmBtn = MakeCanvasButton("Confirm", s_BtnConfirm, Color.white,
+            confirmBtn = MakeCanvasButton("Konfirmasi", s_BtnConfirm, Color.white,
                 row.transform, new Vector2(0f, 0f), new Vector2(0.44f, 1f));
             confirmBtn.onClick.AddListener(OnConfirmClicked);
 
-            redoBtn = MakeCanvasButton("Redo", s_BtnRedo, Color.white,
+            redoBtn = MakeCanvasButton("Ulangi", s_BtnRedo, Color.white,
                 row.transform, new Vector2(0.56f, 0f), new Vector2(1f, 1f));
             redoBtn.onClick.AddListener(OnRedoClicked);
 
@@ -1071,10 +1071,9 @@ public class TableTapCalibrator : MonoBehaviour
         if (dragPathObj         != null) Destroy(dragPathObj);
         if (choiceCanvas        != null) Destroy(choiceCanvas);
         if (instructionCanvas   != null) Destroy(instructionCanvas);
-        if (videoCanvas         != null) Destroy(videoCanvas);
-
         if (tipIndicatorMat != null) Destroy(tipIndicatorMat);
         if (tapMarkerMat    != null) Destroy(tapMarkerMat);
-        if (_videoRT        != null) _videoRT.Release();
+        if (videoCanvas     != null) Destroy(videoCanvas);
+        _videoRT?.Release();
     }
 }
