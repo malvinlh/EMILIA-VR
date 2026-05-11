@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.XR.Hands;
@@ -104,10 +105,10 @@ public class StylusCalibrationController : MonoBehaviour
         string penHand = stylusHand == Handedness.Right ? "kanan" : "kiri";
         switch (poseIndex)
         {
-            case 0:  return $"Tahan pena mendatar di atas bola,\npergelangan tangan {penHand} (pena) netral.";
-            case 1:  return $"Miringkan pergelangan tangan {penHand} (pena) ke BAWAH ~30°,\ntahan pena di atas bola.";
-            case 2:  return $"Miringkan pergelangan tangan {penHand} (pena) ke SAMPING ~30°,\ntahan pena di atas bola.";
-            default: return "Tahan pena di atas bola dan cubit untuk merekam.";
+            case 0:  return $"Tahan ujung pena mendatar menyentuh bola,\npergelangan tangan {penHand} (pena) netral.";
+            case 1:  return $"Miringkan pergelangan tangan {penHand} (pena) ke BAWAH ~30°,\ntahan ujung pena menyentuh bola.";
+            case 2:  return $"Miringkan pergelangan tangan {penHand} (pena) ke SAMPING ~30°,\ntahan ujung pena menyentuh bola.";
+            default: return "Tahan ujung pena menyentuh bola dan cubit untuk merekam.";
         }
     }
 
@@ -135,6 +136,9 @@ public class StylusCalibrationController : MonoBehaviour
     // Verify mode.
     private bool isVerifyMode;
     private float verifyDwellAccum;
+
+    // Low-quality warning pause.
+    private Coroutine _lowQualityCoroutine;
 
     // ================================================================
     // VISUALS (runtime-created)
@@ -237,6 +241,11 @@ public class StylusCalibrationController : MonoBehaviour
     public void Cleanup()
     {
         isActive = false;
+        if (_lowQualityCoroutine != null)
+        {
+            StopCoroutine(_lowQualityCoroutine);
+            _lowQualityCoroutine = null;
+        }
         if (targetSphere      != null) targetSphere.SetActive(false);
         if (nextCanvas        != null) nextCanvas.SetActive(false);
         if (instructionCanvas != null) instructionCanvas.SetActive(false);
@@ -462,9 +471,12 @@ public class StylusCalibrationController : MonoBehaviour
 
         if (!passed)
         {
+            guideCanvas?.SetActive(false);
             SetInstruction($"Residual {rms * 1000f:F0} mm — kualitas rendah.\n" +
                            "Sentuh bola lagi dari\nsudut pergelangan lebih bervariasi.");
             wristTracker.ClearSamples();
+            if (_lowQualityCoroutine != null) StopCoroutine(_lowQualityCoroutine);
+            _lowQualityCoroutine = StartCoroutine(ResumeFromLowQuality());
             return;
         }
 
@@ -724,6 +736,15 @@ public class StylusCalibrationController : MonoBehaviour
     private void SetInstruction(string msg)
     {
         if (instructionTmp != null) instructionTmp.text = msg;
+    }
+
+    private IEnumerator ResumeFromLowQuality()
+    {
+        yield return new WaitForSeconds(2f);
+        if (!isActive) yield break;
+        UpdateInstructionForProgress();
+        guideCanvas?.SetActive(true);
+        _lowQualityCoroutine = null;
     }
 
     private void SetGuideStep(int stepIndex)

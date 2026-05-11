@@ -2978,7 +2978,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 3.5
+      value: 3.55
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode
@@ -14846,7 +14846,7 @@ MonoBehaviour:
   tapMarkerRadius: 0.01
   instructionForward: 0.9
   instructionHeight: 0.18
-  calibrationVideo: {fileID: 32900000, guid: 4253a5139a3b32a428319ee5633fe132, type: 3}
+  calibrationVideoFilename: TableCalib.mp4
   logEvents: 0
 --- !u!4 &2127075500
 Transform:

@@ -97,7 +97,8 @@ public class TableTapCalibrator : MonoBehaviour
     public float instructionHeight = 0.18f;
 
     [Header("Video")]
-    [SerializeField] VideoClip calibrationVideo;
+    [Tooltip("Filename inside StreamingAssets/ (e.g. TableCalib.mp4). Leave empty to disable.")]
+    [SerializeField] string calibrationVideoFilename = "TableCalib.mp4";
 
     [Header("Diagnostics")]
     public bool logEvents = true;
@@ -226,6 +227,8 @@ public class TableTapCalibrator : MonoBehaviour
         if (passthroughManager != null)
             passthroughLayer = passthroughManager.GetPassthroughUILayer();
 
+        stylusTipProvider?.SetPenEnabled(true);
+
         EnsureVisuals();
 
         phase = Phase.FirstTap;
@@ -250,8 +253,15 @@ public class TableTapCalibrator : MonoBehaviour
                        (requirePinchToCapture ? ", lalu cubit untuk merekam." : " untuk merekam."));
         if (videoCanvas != null)
         {
-            videoCanvas.GetComponent<VideoPlayer>()?.Play();
             videoCanvas.SetActive(true);
+            var vp = videoCanvas.GetComponent<VideoPlayer>();
+            if (vp != null)
+            {
+                vp.prepareCompleted -= OnVideoReady;
+                vp.prepareCompleted += OnVideoReady;
+                vp.Stop();
+                vp.Prepare();
+            }
         }
         if (logEvents) Debug.Log("[TableTapCalibrator] BeginCalibration — waiting for first tap + drag.");
     }
@@ -267,9 +277,20 @@ public class TableTapCalibrator : MonoBehaviour
         if (tapMarker           != null) tapMarker.SetActive(false);
         if (videoCanvas != null)
         {
-            videoCanvas.GetComponent<VideoPlayer>()?.Stop();
+            var vp = videoCanvas.GetComponent<VideoPlayer>();
+            if (vp != null)
+            {
+                vp.prepareCompleted -= OnVideoReady;
+                vp.Stop();
+            }
             videoCanvas.SetActive(false);
         }
+    }
+
+    private void OnVideoReady(VideoPlayer source)
+    {
+        source.prepareCompleted -= OnVideoReady;
+        if (phase != Phase.Inactive) source.Play();
     }
 
     public void ResetState() => BeginCalibration();
@@ -801,7 +822,7 @@ public class TableTapCalibrator : MonoBehaviour
         }
 
         // ── Video canvas ───────────────────────────────────────────────
-        if (videoCanvas == null && calibrationVideo != null)
+        if (videoCanvas == null && !string.IsNullOrEmpty(calibrationVideoFilename))
         {
             _videoRT = new RenderTexture(512, 288, 0);
             _videoRT.Create();
@@ -842,7 +863,8 @@ public class TableTapCalibrator : MonoBehaviour
             var vp = root.AddComponent<VideoPlayer>();
             vp.renderMode      = VideoRenderMode.RenderTexture;
             vp.targetTexture   = _videoRT;
-            vp.clip            = calibrationVideo;
+            vp.source          = VideoSource.Url;
+            vp.url             = Application.streamingAssetsPath + "/" + calibrationVideoFilename;
             vp.isLooping       = true;
             vp.playOnAwake     = false;
             vp.audioOutputMode = VideoAudioOutputMode.None;
