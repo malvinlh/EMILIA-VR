@@ -12349,7 +12349,7 @@ MonoBehaviour:
   boundaryCreateOuterBox: 1
   calibrateUserEyeHeight: 1
   tableWritingSurface: {fileID: 949426658}
-  calibrationHeightBias: 0.0015
+  calibrationHeightBias: 0
   realEyeAboveTableClamp: {x: 0.25, y: 1.7}
   applySceneHeightCorrection: 0
   maxHeightCorrection: 0.45

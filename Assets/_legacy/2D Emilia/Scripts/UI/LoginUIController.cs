@@ -47,7 +47,7 @@ public class LoginUIController : MonoBehaviour
 
     #region Constants
 
-    private const string NicknameRequiredMessage = "Nickname is required.";
+    private const string NicknameRequiredMessage = "Nama panggilan diperlukan.";
 
     #endregion
 

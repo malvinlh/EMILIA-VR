@@ -36,18 +36,16 @@ public class LoginManager : MonoBehaviour
     [SerializeField] private GameObject loginCanvas;
     [SerializeField] [Range(0f, 2f)] private float canvasFadeDuration = 0.5f;
 
-    private const string PrefKeyNickname = "Nickname";
-    private const string PrefKeyFullName  = "PlayerFullName";
+    private const string NicknameRequiredMessage = "Nama panggilan diperlukan.";
+    private const string LoginServiceUnavailableMessage = "Layanan login tidak tersedia.";
 
     // Static fields survive scene loads but reset on app restart.
     private static bool   _sessionLoggedIn;
     private static string _sessionNickname;
-    private static string _sessionFullName;
 
     private void Start()
     {
-        SetErrorVisible(errorTextNickname, false);
-        SetErrorVisible(errorTextFullName, false);
+        ClearAllErrors();
         beachPortalVfx?.SetActive(false);
         bedroomPortalVfx?.SetActive(false);
 
@@ -63,24 +61,50 @@ public class LoginManager : MonoBehaviour
         string nickname = nicknameInput != null ? nicknameInput.text.Trim() : string.Empty;
         string fullName = fullNameInput != null ? fullNameInput.text.Trim() : string.Empty;
 
-        bool nickEmpty = string.IsNullOrEmpty(nickname);
-        bool nameEmpty = string.IsNullOrEmpty(fullName);
+        bool nickEmpty = string.IsNullOrWhiteSpace(nickname);
 
-        SetErrorVisible(errorTextNickname, nickEmpty);
-        SetErrorVisible(errorTextFullName, nameEmpty);
+        ClearAllErrors();
 
-        if (nickEmpty || nameEmpty) return;
+        if (nickEmpty)
+        {
+            ShowNicknameError(NicknameRequiredMessage);
+            return;
+        }
+
+        if (ServiceManager.Instance == null || ServiceManager.Instance.UserService == null)
+        {
+            ShowNicknameError(LoginServiceUnavailableMessage);
+            return;
+        }
 
         if (clickAudioSource != null && clickSfx != null)
             clickAudioSource.PlayOneShot(clickSfx);
 
-        PlayerPrefs.SetString(PrefKeyNickname, nickname);
-        PlayerPrefs.SetString(PrefKeyFullName,  fullName);
-        PlayerPrefs.Save();
+        StartCoroutine(UpsertAndContinue(nickname, fullName));
+    }
+
+    private IEnumerator UpsertAndContinue(string nickname, string fullName)
+    {
+        bool isSuccess = false;
+        string serviceError = null;
+
+        yield return StartCoroutine(ServiceManager.Instance.UserService.UpsertUser(
+            nickname,
+            fullName,
+            onSuccess: () => isSuccess = true,
+            onError: message => serviceError = message
+        ));
+
+        if (!isSuccess)
+        {
+            HandleServiceError(serviceError);
+            yield break;
+        }
 
         _sessionLoggedIn = true;
         _sessionNickname = nickname;
-        _sessionFullName = fullName;
+
+        DisableInputUI();
 
         StartCoroutine(LoginVfxSequence());
     }
@@ -103,26 +127,15 @@ public class LoginManager : MonoBehaviour
     {
         _sessionLoggedIn = true;
 
-        if (string.IsNullOrEmpty(_sessionNickname))
-            _sessionNickname = PlayerPrefs.GetString(PrefKeyNickname, string.Empty);
-
-        if (string.IsNullOrEmpty(_sessionFullName))
-            _sessionFullName = PlayerPrefs.GetString(PrefKeyFullName, string.Empty);
-
         if (nicknameInput != null)
         {
             nicknameInput.text = _sessionNickname;
-            nicknameInput.interactable = false;
         }
 
         if (fullNameInput != null)
-        {
-            fullNameInput.text = _sessionFullName;
-            fullNameInput.interactable = false;
-        }
+            fullNameInput.text = string.Empty;
 
-        if (continueButton != null)
-            continueButton.interactable = false;
+        DisableInputUI();
 
         if (loginCanvas != null)
             loginCanvas.SetActive(false);
@@ -183,8 +196,58 @@ public class LoginManager : MonoBehaviour
         }
     }
 
-    private static void SetErrorVisible(TMP_Text label, bool visible)
+    private void HandleServiceError(string message)
     {
-        label?.gameObject.SetActive(visible);
+        if (!string.IsNullOrEmpty(message) &&
+            (message.ToLower().Contains("full name") || message.ToLower().Contains("nama lengkap")))
+        {
+            ShowFullNameError(message);
+        }
+        else
+        {
+            ShowNicknameError(string.IsNullOrEmpty(message) ? LoginServiceUnavailableMessage : message);
+        }
+    }
+
+    private void ShowNicknameError(string message)
+    {
+        SetErrorText(errorTextNickname, message);
+    }
+
+    private void ShowFullNameError(string message)
+    {
+        SetErrorText(errorTextFullName, message);
+    }
+
+    private void ClearAllErrors()
+    {
+        SetErrorText(errorTextNickname, string.Empty);
+        SetErrorText(errorTextFullName, string.Empty);
+    }
+
+    private static void SetErrorText(TMP_Text label, string message)
+    {
+        if (label == null) return;
+
+        label.text = message ?? string.Empty;
+        label.gameObject.SetActive(!string.IsNullOrEmpty(label.text));
+    }
+
+    private void DisableInputUI()
+    {
+        if (nicknameInput != null)
+        {
+            nicknameInput.interactable = false;
+            nicknameInput.DeactivateInputField();
+        }
+
+        if (fullNameInput != null)
+        {
+            fullNameInput.interactable = false;
+            fullNameInput.DeactivateInputField();
+        }
+
+        if (continueButton != null)
+            continueButton.interactable = false;
     }
 }
