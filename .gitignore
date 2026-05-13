@@ -62,3 +62,5 @@ crashlytics-build.properties
 Assets/OpenCVForUnity/
 
 .utmp/
+.claude/
+.log/
