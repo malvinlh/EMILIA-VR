@@ -61,6 +61,7 @@ crashlytics-build.properties
 # Ignore entire OpenCVForUnity plugin
 Assets/OpenCVForUnity/
 
+# Ignore entire utmp, claude, and log directories
 .utmp/
 .claude/
 .log/
