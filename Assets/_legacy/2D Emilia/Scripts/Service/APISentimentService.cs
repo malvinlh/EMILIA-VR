@@ -64,6 +64,59 @@ public class APISentimentService : MonoBehaviour
         Action<SentimentResponse> onSuccess,
         Action<string> onError = null)
     {
+        // === STUB MODE: scene + journal-index auto-routed =============
+        var sm = ServiceManager.Instance;
+        var scene = sm != null ? sm.CurrentStubScene : ServiceManager.StubScene.Beach;
+        int journalIndex = sm != null ? sm.JournalIndexInScene : 0;
+        bool sad = journalIndex >= 1;
+        Debug.Log($"[STUB] APISentimentService.AnalyzeJournal scene={scene} journalIndex={journalIndex} sad={sad}");
+
+        yield return new WaitForSeconds(7f);
+
+        SentimentResponse result;
+        if (scene == ServiceManager.StubScene.Bedroom && sad)
+        {
+            result = new SentimentResponse
+            {
+                decision = "buang",
+                tone     = "negatif",
+                reason   = "Kamu sudah berani menuangkan beban itu ke halaman ini, dan itu sudah merupakan langkah. Biarkan halaman ini yang menyimpannya, bukan kepalamu. Lepaskan, ya."
+            };
+        }
+        else if (scene == ServiceManager.StubScene.Bedroom)
+        {
+            result = new SentimentResponse
+            {
+                decision = "simpan",
+                tone     = "positif",
+                reason   = "Kamu memberi ruang untuk rasa cukup hari ini, dan rasa seperti itu tidak datang setiap hari. Simpan tulisan ini, supaya kelak kamu bisa diingatkan bahwa rasa cukup itu pernah hadir."
+            };
+        }
+        else if (sad)
+        {
+            result = new SentimentResponse
+            {
+                decision = "buang",
+                tone     = "negatif",
+                reason   = "Kamu sudah berani menuangkan pikiran yang berat ini ke dalam tulisan, dan langkah itu sendiri sudah keberanian. Untuk yang sudah terlalu lama berputar, biarkan lepas saja. Kamu sudah cukup membawanya hari ini."
+            };
+        }
+        else
+        {
+            result = new SentimentResponse
+            {
+                decision = "simpan",
+                tone     = "positif",
+                reason   = "Kamu sudah meluangkan waktu untuk menangkap momen kecil yang menenangkanmu hari ini, dan itu menunjukkan kamu peduli dengan dirimu sendiri. Simpan tulisan ini, supaya suatu hari nanti kamu bisa kembali ke rasa yang sama saat kamu paling membutuhkannya."
+            };
+        }
+
+        onSuccess?.Invoke(result);
+        if (sm != null) sm.NotifyJournalSentimentConsumed();
+        yield break;
+        // ==============================================================
+
+        /*  ORIGINAL HTTP IMPLEMENTATION, kept for re-enable
         if (string.IsNullOrWhiteSpace(journalContent))
         {
             onError?.Invoke("Journal content kosong.");
@@ -112,6 +165,7 @@ public class APISentimentService : MonoBehaviour
                 onError?.Invoke($"Gagal parse JSON: {e.Message}");
             }
         }
+        */
     }
 
     #endregion

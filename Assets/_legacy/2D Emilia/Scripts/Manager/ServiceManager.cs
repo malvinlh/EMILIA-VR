@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Root service locator for the application.
@@ -21,6 +23,48 @@ public class ServiceManager : MonoBehaviour
     /// Global singleton instance of <see cref="ServiceManager"/>.
     /// </summary>
     public static ServiceManager Instance { get; private set; }
+
+    #endregion
+
+    #region Stub Mode (FastAPI unreachable, scene-aware placeholder routing)
+
+    public enum StubScene { Beach, Bedroom, Unknown }
+
+    /// <summary>
+    /// Maps the active Unity scene name to a stub scene flavour. Used by the
+    /// stubbed API services to pick scene-specific placeholder copy.
+    /// </summary>
+    public StubScene CurrentStubScene
+    {
+        get
+        {
+            var n = SceneManager.GetActiveScene().name ?? string.Empty;
+            if (n.IndexOf("Beach",   StringComparison.OrdinalIgnoreCase) >= 0) return StubScene.Beach;
+            if (n.IndexOf("Bedroom", StringComparison.OrdinalIgnoreCase) >= 0) return StubScene.Bedroom;
+            return StubScene.Unknown;
+        }
+    }
+
+    [Header("Stub Mode (auto-routed per scene + action)")]
+    [Tooltip("Counts completed sentiment calls in the currently-loaded scene. " +
+             "1st journal = Happy/KEEP, 2nd+ = Sad/DISCARD. Resets on scene load.")]
+    [SerializeField] private int _journalIndexInScene = 0;
+    public int JournalIndexInScene => _journalIndexInScene;
+
+    /// <summary>
+    /// Set by <see cref="APITranscribeService"/> when it returns a chat-mode
+    /// transcript; consumed by <see cref="APIChatService"/> on the next
+    /// <c>SendPrompt</c> so the chat reply picks the voice flavour.
+    /// </summary>
+    [NonSerialized] public bool PendingChatVoiceFlag = false;
+
+    public void NotifyJournalSentimentConsumed() => _journalIndexInScene++;
+
+    public void ResetSceneStubState()
+    {
+        _journalIndexInScene = 0;
+        PendingChatVoiceFlag = false;
+    }
 
     #endregion
 
@@ -69,6 +113,19 @@ public class ServiceManager : MonoBehaviour
         }
 
         InitializeServices();
+        SceneManager.sceneLoaded += OnSceneLoaded;
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        ResetSceneStubState();
+        Debug.Log($"[STUB] ServiceManager scene loaded '{scene.name}' -> stub state reset.");
     }
 
     #endregion

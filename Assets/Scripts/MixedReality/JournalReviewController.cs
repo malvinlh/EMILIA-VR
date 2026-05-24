@@ -333,7 +333,7 @@ public class JournalReviewController : MonoBehaviour
             : "Hari ini kamu telah mengambil langkah berarti dengan menuangkan pikiranmu ke dalam kata-kata. " +
               "Merefleksikan apa yang kamu tulis dapat membantumu memahami perasaanmu lebih baik " +
               "dan menemukan kejernihan di saat-saat yang penuh ketidakpastian.\n\n" +
-              "Kata-katamu berarti — dan begitu juga dirimu. Aku bangga kamu sudah hadir.";
+              "Kata-katamu berarti, dan begitu juga dirimu. Aku bangga kamu sudah hadir.";
 
             // During the AI comment panel, AZKi should talk in a loop.
             AvatarTalkLoop();
@@ -723,7 +723,7 @@ public class JournalReviewController : MonoBehaviour
         JournalSessionManager.Instance?.AllowLocomotion();
 
         // Guide the player to seal the bottle.
-        ShowDialogue("Sebelum pergi — segel botolmu dengan memasukkan gabus ke dalam leher botol.");
+        ShowDialogue("Sebelum pergi, segel botolmu dengan memasukkan gabus ke dalam leher botol.");
 
         if (bottleNeckZone != null)
             bottleNeckZone.OnCorkSealed += OnCorkSealed;
@@ -750,7 +750,7 @@ public class JournalReviewController : MonoBehaviour
             Debug.Log($"[JournalReview] Cork sealed — state → WaitingForRack. bottleRoot={bottleRoot?.name ?? "NULL"}");
 
             ShowDialogue(
-                "Bawa botol itu ke rak botol di dekatmu — cukup dekatkan dan botol akan beristirahat di sana.");
+                "Bawa botol itu ke rak botol di dekatmu. Cukup dekatkan dan botol akan beristirahat di sana.");
         }
         else
         {
@@ -944,7 +944,7 @@ public class JournalReviewController : MonoBehaviour
 
         Debug.Log("[JournalReview] Bottle disposed (rack). Starting BottleDisposedCoroutine.");
         StartCoroutine(BottleDisposedCoroutine(
-            "Kata-katamu kini aman.\nIstirahatlah — kamu telah hadir untuk dirimu sendiri hari ini.",
+            "Kata-katamu kini aman.\nIstirahatlah, kamu telah hadir untuk dirimu sendiri hari ini.",
             saveJournal: true));
     }
 

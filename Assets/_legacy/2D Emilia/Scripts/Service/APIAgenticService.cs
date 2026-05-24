@@ -61,6 +61,21 @@ public class APIAgenticService : MonoBehaviour
         Action<AgenticResult> onSuccess,
         Action<string> onError = null)
     {
+        // === STUB MODE: FastAPI unreachable ===========================
+        Debug.Log("[STUB] APIAgenticService.Send returning placeholder.");
+
+        yield return new WaitForSeconds(7f);
+
+        onSuccess?.Invoke(new AgenticResult
+        {
+            reasoning = "Aku mencoba memahami apa yang kamu sampaikan dan menyusun jawaban yang menenangkan.",
+            response  = "Aku di sini untukmu. Cerita lagi kalau kamu mau.",
+            summary   = "Sesi demo."
+        });
+        yield break;
+        // ==============================================================
+
+        /*  ORIGINAL HTTP IMPLEMENTATION, kept for re-enable
         var form = new WWWForm();
         form.AddField("user_id",  userId   ?? "");
         form.AddField("username", username ?? "");
@@ -101,6 +116,7 @@ public class APIAgenticService : MonoBehaviour
                 onError?.Invoke($"Gagal parse JSON: {e.Message}");
             }
         }
+        */
     }
 
     /// <summary>Convenience tanpa audio.</summary>

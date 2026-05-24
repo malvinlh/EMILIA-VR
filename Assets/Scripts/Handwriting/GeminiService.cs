@@ -53,6 +53,13 @@ public class GeminiService : MonoBehaviour
     public Coroutine RefineText(string candidatesDescription, string preContext,
                                 Action<string> callback)
     {
+        // === STUB MODE: Gemini disabled, fall back to raw ML Kit candidates.
+        Debug.Log("[STUB] GeminiService.RefineText returning null.");
+        callback?.Invoke(null);
+        return null;
+        // ==============================================================
+
+        /*  ORIGINAL IMPLEMENTATION, kept for re-enable
         if (!IsConfigured) { callback?.Invoke(null); return null; }
 
         string prompt =
@@ -70,6 +77,7 @@ public class GeminiService : MonoBehaviour
             "- Respond with ONLY the corrected text. No explanation, no quotes.";
 
         return StartCoroutine(PostText(textModel, prompt, callback));
+        */
     }
 
     // ==================================================================
@@ -82,6 +90,13 @@ public class GeminiService : MonoBehaviour
     /// </summary>
     public Coroutine TranscribeAudio(byte[] wavBytes, Action<string> callback)
     {
+        // === STUB MODE: Gemini disabled, audio STT is faked via APITranscribeService instead.
+        Debug.Log("[STUB] GeminiService.TranscribeAudio returning null.");
+        callback?.Invoke(null);
+        return null;
+        // ==============================================================
+
+        /*  ORIGINAL IMPLEMENTATION, kept for re-enable
         if (!IsConfigured || wavBytes == null || wavBytes.Length == 0)
         {
             callback?.Invoke(null);
@@ -89,6 +104,7 @@ public class GeminiService : MonoBehaviour
         }
 
         return StartCoroutine(PostAudio(textModel, wavBytes, callback));
+        */
     }
 
     private IEnumerator PostAudio(string model, byte[] wavBytes, Action<string> callback)
@@ -115,6 +131,13 @@ public class GeminiService : MonoBehaviour
     /// </summary>
     public Coroutine RecognizeImage(byte[] pngBytes, Action<string> callback)
     {
+        // === STUB MODE: Gemini disabled, OCR falls back to raw ML Kit candidates.
+        Debug.Log("[STUB] GeminiService.RecognizeImage returning null.");
+        callback?.Invoke(null);
+        return null;
+        // ==============================================================
+
+        /*  ORIGINAL IMPLEMENTATION, kept for re-enable
         if (!IsConfigured || pngBytes == null || pngBytes.Length == 0)
         {
             callback?.Invoke(null);
@@ -126,6 +149,7 @@ public class GeminiService : MonoBehaviour
             "Return ONLY the text content, nothing else. If the text is unclear, give your best guess.";
 
         return StartCoroutine(PostVision(visionModel, prompt, pngBytes, callback));
+        */
     }
 
     // ==================================================================

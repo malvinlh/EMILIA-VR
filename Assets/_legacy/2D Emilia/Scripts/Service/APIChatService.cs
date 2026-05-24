@@ -72,6 +72,35 @@ public class APIChatService : MonoBehaviour
         Action<string> onSuccess,
         Action<string> onError = null)
     {
+        // === STUB MODE: scene + input-method auto-routed ==============
+        // EMILIA does not know which scene she is in, the time of day, or
+        // whether the user typed or spoke. The reply text must stay neutral.
+        var sm = ServiceManager.Instance;
+        var scene = sm != null ? sm.CurrentStubScene : ServiceManager.StubScene.Beach;
+        bool voiceMode = sm != null && sm.PendingChatVoiceFlag;
+        if (sm != null) sm.PendingChatVoiceFlag = false;
+        Debug.Log($"[STUB] APIChatService.SendPrompt scene={scene} voiceMode={voiceMode}");
+
+        yield return new WaitForSeconds(7f);
+
+        string reply;
+        if (scene == ServiceManager.StubScene.Bedroom && voiceMode)
+            reply = "Pertanyaan yang penting, [nickname_saat_login]. Buatku, langkah pertama biasanya bukan mencari cara untuk menghilangkannya, tapi memberi ruang untuk perasaan itu hadir dulu. Coba mulai dengan menamai apa yang kamu rasakan, lalu pelan-pelan cari kegiatan kecil yang bikin lebih ringan, entah jalan kaki, menulis, atau ngobrol seperti ini. Mau ceritain dulu, sedih yang lagi kamu rasakan ini tentang apa?";
+        else if (scene == ServiceManager.StubScene.Bedroom)
+            reply = "Hai [nickname_saat_login]! Namaku Emilia. Senang bisa bertemu hari ini denganmu. Apa yang lagi bikin kamu merasa perlu ngobrol? Ceritain sedikit, yuk.";
+        else if (voiceMode)
+            reply = "Hai [nickname_saat_login], aku turut sedih mendengarnya. Kucing yang setia menemani punya tempat khusus di hati, dan rasa kehilanganmu sah untuk hadir. Ceritain dulu sedikit tentang kucingmu, ya, aku siap mendengarkan.";
+        else
+            reply = "Halo [nickname_saat_login], aku di sini. Tidak perlu buru-buru. Apa yang masih menggantung di pikiranmu?";
+
+        string nickname = string.IsNullOrEmpty(username) ? "kamu" : username;
+        reply = reply.Replace("[nickname_saat_login]", nickname);
+
+        onSuccess?.Invoke(reply);
+        yield break;
+        // ==============================================================
+
+        /*  ORIGINAL HTTP IMPLEMENTATION, kept for re-enable
         var form = new WWWForm();
         form.AddField("username", username ?? "");
         form.AddField("question", question ?? "");
@@ -118,6 +147,7 @@ public class APIChatService : MonoBehaviour
                 onError?.Invoke($"Gagal parse JSON: {e.Message}");
             }
         }
+        */
     }
 
     #endregion

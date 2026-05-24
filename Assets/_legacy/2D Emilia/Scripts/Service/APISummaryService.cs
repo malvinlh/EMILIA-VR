@@ -54,13 +54,19 @@ public class APISummaryService : MonoBehaviour
         Action<string> onSuccess,
         Action<string> onError = null)
     {
+        // === STUB MODE: FastAPI unreachable ===========================
         if (string.IsNullOrWhiteSpace(conversationId))
         {
             onError?.Invoke("conversationId kosong.");
             yield break;
         }
 
-        // Build x-www-form-urlencoded payload
+        Debug.Log("[STUB] APISummaryService.RequestSummary returning placeholder.");
+        onSuccess?.Invoke("Ringkasan placeholder. Backend AI sedang dalam mode demo.");
+        yield break;
+        // ==============================================================
+
+        /*  ORIGINAL HTTP IMPLEMENTATION, kept for re-enable
         var payload = EncodeForm(new (string key, string value)[] {
             ("conv_id", conversationId)
         });
@@ -98,6 +104,7 @@ public class APISummaryService : MonoBehaviour
                 onError?.Invoke($"Gagal parse JSON: {e.Message}");
             }
         }
+        */
     }
 
     #endregion

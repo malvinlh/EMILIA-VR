@@ -55,7 +55,32 @@ public class APITopicService : MonoBehaviour
         Action<string> onSuccess,
         Action<string> onError = null)
     {
-        // Build x-www-form-urlencoded payload
+        // === STUB MODE: content + scene-aware 3-word history label ====
+        string utext = (userText ?? "").ToLowerInvariant();
+        string topic;
+        if (utext.Contains("kucing"))
+        {
+            topic = "Kucingku yang hilang";
+        }
+        else if (utext.Contains("mengelola") || utext.Contains("sedih"))
+        {
+            topic = "Mengelola perasaan sedih";
+        }
+        else
+        {
+            var sm = ServiceManager.Instance;
+            var scene = sm != null ? sm.CurrentStubScene : ServiceManager.StubScene.Beach;
+            topic = (scene == ServiceManager.StubScene.Bedroom)
+                ? "Berkenalan bersama Emilia"
+                : "Perkenalan dengan Emilia";
+        }
+
+        Debug.Log($"[STUB] APITopicService.GetTopic -> '{topic}'");
+        onSuccess?.Invoke(topic);
+        yield break;
+        // ==============================================================
+
+        /*  ORIGINAL HTTP IMPLEMENTATION, kept for re-enable
         var payload = EncodeForm(new (string key, string value)[] {
             ("user", userText ?? ""),
             ("bot",  botText  ?? "")
@@ -94,6 +119,7 @@ public class APITopicService : MonoBehaviour
                 onError?.Invoke($"Gagal parse JSON: {e.Message}");
             }
         }
+        */
     }
 
     #endregion
