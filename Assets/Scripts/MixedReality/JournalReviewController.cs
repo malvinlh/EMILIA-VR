@@ -908,7 +908,7 @@ public class JournalReviewController : MonoBehaviour
         if (bottleRoot != null) DisableBottleComponents();
         _state = ReviewState.Complete;
         StartCoroutine(BottleDisposedCoroutine(
-            "Melepaskan juga butuh keberanian.\nPenghancur akan membawanya — begitu juga kamu.",
+            "Melepaskan juga butuh keberanian.\nPenghancur akan membawanya, begitu juga kamu.",
             saveJournal: false));
     }
 
