@@ -65,3 +65,9 @@ Assets/OpenCVForUnity/
 .utmp/
 .claude/
 .log/
+
+# Ignore utility files
+/guid_map.txt
+/analyze_scripts.txt
+/check_used.sh
+/script_purposes.txt

@@ -1021,7 +1021,6 @@ GameObject:
   m_Component:
   - component: {fileID: 105324488}
   - component: {fileID: 105324487}
-  - component: {fileID: 105324486}
   - component: {fileID: 105324485}
   - component: {fileID: 105324484}
   - component: {fileID: 105324483}
@@ -1110,22 +1109,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   suppressLikelyNoiseTokens: 1
   noiseOnlyMaxLength: 3
---- !u!114 &105324486
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 105324480}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7d91a244413f84f4ba76e6d83b979731, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  apiKey: 
-  textModel: gemini-2.0-flash
-  visionModel: gemini-2.0-flash
-  timeoutSeconds: 10
 --- !u!114 &105324487
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10324,6 +10307,10 @@ PrefabInstance:
     - target: {fileID: 416212770360207628, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
       propertyPath: m_ConstrainProportionsScale
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1039649077116847442, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
+      propertyPath: m_text
+      value: Mic
       objectReference: {fileID: 0}
     - target: {fileID: 1039649077116847442, guid: aea14a44a9ba38645bae2252e78c1fb7, type: 3}
       propertyPath: m_fontColor32.rgba
