@@ -12,7 +12,7 @@ using UnityEngine.AI;
 [DisallowMultipleComponent]
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
-public class AzkiChatWaypointPatrolController : MonoBehaviour
+public class CompanionChatWaypointPatrolController : MonoBehaviour
 {
     [Header("Standing Points")]
     [Tooltip("Parent transform that contains standing points for AZKi patrol.")]
@@ -150,7 +150,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     private NavMeshAgent _agent;
     private Animator _animator;
-    private AzkiBlendShapeExpressionController _blendShapeController;
+    private CompanionBlendShapeExpressionController _blendShapeController;
     private NpcCharacterControllerGravity _gravityController;
     private NavMeshPath _pathBuffer;
 
@@ -172,7 +172,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     private bool _talkLoopStarted;
     private float _preTalkDeadlineTime;
 
-    // Proximity-engagement state (mirrors AzkiIslandRoamingController's API)
+    // Proximity-engagement state (mirrors CompanionIslandRoamingController's API)
     private bool _isInProximityEngagement;
     private Transform _engagementTarget;
 
@@ -246,7 +246,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
             if (!_loggedMissingNavMesh)
             {
                 _loggedMissingNavMesh = true;
-                Debug.LogWarning("[AzkiChatWaypointPatrolController] No NavMesh found for AZKi. Bake NavMesh for 3D_Chat or enable runtime build fallback.", this);
+                Debug.LogWarning("[CompanionChatWaypointPatrolController] No NavMesh found for AZKi. Bake NavMesh for 3D_Chat or enable runtime build fallback.", this);
             }
 
             EnforceAnimation(AnimState.Idle, force: true);
@@ -318,7 +318,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
             EnforceAnimation(AnimState.Walk, force: false);
     }
 
-    // ── Proximity Engagement (mirrors AzkiIslandRoamingController API) ──────
+    // ── Proximity Engagement (mirrors CompanionIslandRoamingController API) ──────
 
     /// <summary>
     /// Pauses patrol at the current position, plays Idle, and continuously
@@ -435,7 +435,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     }
 
     // ── JournalReviewController integration ─────────────────────────────────
-    // Match the call surface of AzkiIslandRoamingController so JRC dispatches
+    // Match the call surface of CompanionIslandRoamingController so JRC dispatches
     // to either controller type without knowing which scene it is in.
 
     public void LockAtAuthoredPose()
@@ -498,7 +498,7 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
 
     // Continuously re-asserts the Cheering state while journal-locked so the controller's
     // auto-exit Cheering->Walk transition cannot escape. Mirrors the CheeringOnce branch
-    // of AzkiIslandRoamingController.HandleLockedMode.
+    // of CompanionIslandRoamingController.HandleLockedMode.
     private void HandleJournalLockedMode()
     {
         if (!_isCheeringPlaying && !_isCheeringPoseHeld) return;
@@ -1291,10 +1291,10 @@ public class AzkiChatWaypointPatrolController : MonoBehaviour
     private void EnsureBlendShapeController()
     {
         if (_blendShapeController == null)
-            _blendShapeController = GetComponent<AzkiBlendShapeExpressionController>();
+            _blendShapeController = GetComponent<CompanionBlendShapeExpressionController>();
 
         if (_blendShapeController == null)
-            _blendShapeController = gameObject.AddComponent<AzkiBlendShapeExpressionController>();
+            _blendShapeController = gameObject.AddComponent<CompanionBlendShapeExpressionController>();
     }
 
     private void CacheAnimatorStateHashes()

@@ -15,9 +15,9 @@ public enum ReviewMode { BeachBottle, BedroomPaper }
 ///
 /// Flow:
 ///   1. Screen fades to black; AZKi is locked to its authored scene position and
-///      the player's camera yaw is snapped to face the avatar invisibly.
+///      the player's camera yaw is snapped to face the companion invisibly.
 ///   2. Screen fades back in; an AI comment appears via VRDialoguePanel.
-///   3. After the comment a "Keep or release?" choice panel appears near the avatar.
+///   3. After the comment a "Keep or release?" choice panel appears near the companion.
 ///   4. Keep/Discard chosen → PreNDuringJournal disabled, PostJournal enabled, locomotion
 ///      unlocked so the player can walk freely.
 ///   5. WaitingForCork — player grabs cork (controller or hand), brings to bottle neck →
@@ -27,8 +27,8 @@ public enum ReviewMode { BeachBottle, BedroomPaper }
 ///      bottle destroyed, groups reset.
 ///
 /// Wire up in Inspector:
-///   • avatarRoot              — AZKi root Transform
-///   • avatarRoamingController — Optional roaming controller (auto-added if omitted)
+///   • companionRoot              — AZKi root Transform
+///   • companionRoamingController — Optional roaming controller (auto-added if omitted)
 ///   • dialoguePanelGO         — VRDialoguePanel root GameObject
 ///   • journalChairTable       — used for ocean Y-threshold only
 ///   • bottleRoot              — PostJournal bottle root Transform
@@ -40,18 +40,18 @@ public enum ReviewMode { BeachBottle, BedroomPaper }
 /// </summary>
 public class JournalReviewController : MonoBehaviour
 {
-    [Header("Avatar")]
-    [Tooltip("Root transform of the AZKi avatar. Review mode locks this avatar back to its authored scene position.")]
-    public Transform avatarRoot;
+    [Header("Companion")]
+    [Tooltip("Root transform of the AZKi companion. Review mode locks this companion back to its authored scene position.")]
+    public Transform companionRoot;
 
-    [Header("Avatar Roaming")]
-    [Tooltip("Optional roaming controller. If missing, one is auto-added to avatarRoot at runtime.")]
-    [SerializeField] private AzkiIslandRoamingController avatarRoamingController;
-    [Tooltip("Bedroom waypoint patrol controller. When set, prevents AzkiIslandRoamingController from being added.")]
-    [SerializeField] private AzkiChatWaypointPatrolController _waypointController;
+    [Header("Companion Roaming")]
+    [Tooltip("Optional roaming controller. If missing, one is auto-added to companionRoot at runtime.")]
+    [SerializeField] private CompanionIslandRoamingController companionRoamingController;
+    [Tooltip("Bedroom waypoint patrol controller. When set, prevents CompanionIslandRoamingController from being added.")]
+    [SerializeField] private CompanionChatWaypointPatrolController _waypointController;
 
     [Tooltip("Enable AZKi roaming as soon as this scene starts.")]
-    [SerializeField] private bool startAvatarRoamingOnAwake = true;
+    [SerializeField] private bool startCompanionRoamingOnAwake = true;
 
     [Header("Dialogue")]
     [Tooltip("VRDialoguePanel root GameObject (contains VRDialoguePanel + VRDialogueFader).")]
@@ -63,11 +63,11 @@ public class JournalReviewController : MonoBehaviour
              "If null, only the camera yaw snap runs (no XZ teleport).")]
     public Transform standPoint;
 
-    [Header("AZKi Review Position")]
+    [Header("Companion Review Position")]
     [Tooltip("AZKi is teleported to this transform when review begins (while screen is black). " +
              "Assign an empty GameObject at the desired review stand position. " +
              "If null, AZKi appears at its current scene position (legacy behaviour).")]
-    [SerializeField] private Transform reviewAvatarStandPoint;
+    [SerializeField] private Transform reviewCompanionStandPoint;
 
     [Header("Scene Objects")]
     [Tooltip("JournalChairTable Transform — used as Y threshold for the ocean bottle detection.")]
@@ -212,9 +212,9 @@ public class JournalReviewController : MonoBehaviour
             _bottleOriginalStored   = true;
         }
 
-        EnsureAvatarRoamingController();
-        if (startAvatarRoamingOnAwake)
-            ResumeAvatarRoaming();
+        EnsureCompanionRoamingController();
+        if (startCompanionRoamingOnAwake)
+            ResumeCompanionRoaming();
 
         LogStateSnapshot("Awake.AfterInit");
     }
@@ -252,11 +252,11 @@ public class JournalReviewController : MonoBehaviour
     /// </summary>
     public void EnterJournalingMode()
     {
-        EnsureAvatarRoamingController();
-        avatarRoamingController?.LockAtAuthoredPose();
+        EnsureCompanionRoamingController();
+        companionRoamingController?.LockAtAuthoredPose();
 
-        if (avatarRoot != null)
-            avatarRoot.gameObject.SetActive(false);
+        if (companionRoot != null)
+            companionRoot.gameObject.SetActive(false);
 
         HideChoicePanel();
         _dialoguePanel?.Hide();
@@ -273,7 +273,7 @@ public class JournalReviewController : MonoBehaviour
     /// </summary>
     public void OnSessionEnded()
     {
-        ResumeAvatarRoaming();
+        ResumeCompanionRoaming();
         LogStateSnapshot("OnSessionEnded");
     }
 
@@ -298,18 +298,18 @@ public class JournalReviewController : MonoBehaviour
         if (whiteboardUIGroup != null) whiteboardUIGroup.SetActive(false);
         else Debug.LogWarning("[JournalReview] whiteboardUIGroup not assigned — whiteboard UI may remain visible during review.");
 
-        // 1. Fade to black — avatar activation and camera snap happen invisibly.
+        // 1. Fade to black — companion activation and camera snap happen invisibly.
         yield return StartCoroutine(FadeScreen(1f, 0.5f));
 
-        // 2. Enable avatar at its authored scene position (no runtime repositioning).
-        EnableAvatar();
+        // 2. Enable companion at its authored scene position (no runtime repositioning).
+        EnableCompanion();
 
         // 3. Teleport player to StandPoint (XZ) at pre-journaling standing height,
-        //    then snap camera yaw to face the avatar — both invisible during blackout.
+        //    then snap camera yaw to face the companion — both invisible during blackout.
         TeleportToStandPoint();
-        SnapCameraToFaceAvatar();
+        SnapCameraToFaceCompanion();
 
-        // 4. Fade back in — player now sees the avatar.
+        // 4. Fade back in — player now sees the companion.
         yield return StartCoroutine(FadeScreen(0f, 0.5f));
 
         // 5. Re-enable the controller far-cast ray.
@@ -336,7 +336,7 @@ public class JournalReviewController : MonoBehaviour
               "Kata-katamu berarti, dan begitu juga dirimu. Aku bangga kamu sudah hadir.";
 
             // During the AI comment panel, AZKi should talk in a loop.
-            AvatarTalkLoop();
+            CompanionTalkLoop();
         ShowDialogue(dialogueText);
 
         // 8. Wait for the typewriter to finish the last page.
@@ -359,7 +359,7 @@ public class JournalReviewController : MonoBehaviour
         yield return new WaitForSeconds(0.6f);
 
         // After the AI comment finishes, stop talking and return to standby idle pose.
-        AvatarLock();
+        CompanionLock();
 
         // 9. Present the keep-or-release choice.
         _state = ReviewState.ShowingChoice;
@@ -391,54 +391,54 @@ public class JournalReviewController : MonoBehaviour
         );
     }
 
-    // ── Avatar ───────────────────────────────────────────────────────────
+    // ── Companion ───────────────────────────────────────────────────────────
 
-    // Dispatch to whichever controller is on the avatar (Beach = Island, Bedroom = Waypoint).
-    private void AvatarLock()         { avatarRoamingController?.LockAtAuthoredPose();  _waypointController?.LockAtAuthoredPose(); }
-    private void AvatarTalkLoop()     { avatarRoamingController?.PlayTalkLoop();         _waypointController?.PlayTalkLoop(); }
-    private void AvatarCheerOnce()    { avatarRoamingController?.PlayCheeringOneShot();  _waypointController?.PlayCheeringOneShot(); }
-    private void AvatarResumePatrol() { avatarRoamingController?.ResumeRoaming();        _waypointController?.ResumeRoaming(); }
+    // Dispatch to whichever controller is on the companion (Beach = Island, Bedroom = Waypoint).
+    private void CompanionLock()         { companionRoamingController?.LockAtAuthoredPose();  _waypointController?.LockAtAuthoredPose(); }
+    private void CompanionTalkLoop()     { companionRoamingController?.PlayTalkLoop();         _waypointController?.PlayTalkLoop(); }
+    private void CompanionCheerOnce()    { companionRoamingController?.PlayCheeringOneShot();  _waypointController?.PlayCheeringOneShot(); }
+    private void CompanionResumePatrol() { companionRoamingController?.ResumeRoaming();        _waypointController?.ResumeRoaming(); }
 
-    private void EnableAvatar()
+    private void EnableCompanion()
     {
-        if (avatarRoot == null) return;
+        if (companionRoot == null) return;
 
         // 1. Move first
-        if (reviewAvatarStandPoint != null)
+        if (reviewCompanionStandPoint != null)
         {
-            avatarRoot.position = reviewAvatarStandPoint.position;
-            avatarRoot.rotation = reviewAvatarStandPoint.rotation;
+            companionRoot.position = reviewCompanionStandPoint.position;
+            companionRoot.rotation = reviewCompanionStandPoint.rotation;
         }
 
-        avatarRoot.gameObject.SetActive(true);
+        companionRoot.gameObject.SetActive(true);
 
         // 2. Ensure controller exists BEFORE capture
-        EnsureAvatarRoamingController();
+        EnsureCompanionRoamingController();
 
         // 3. Now safely capture the new authored pose
-        if (reviewAvatarStandPoint != null)
-            avatarRoamingController?.CaptureAuthoredPose();
+        if (reviewCompanionStandPoint != null)
+            companionRoamingController?.CaptureAuthoredPose();
 
         // 4. Lock to it
-        AvatarLock();
+        CompanionLock();
     }
 
-    private void EnsureAvatarRoamingController()
+    private void EnsureCompanionRoamingController()
     {
-        if (avatarRoot == null) return;
+        if (companionRoot == null) return;
 
-        // Bedroom: prefer the waypoint controller already on the avatar hierarchy.
+        // Bedroom: prefer the waypoint controller already on the companion hierarchy.
         if (_waypointController == null)
-            _waypointController = avatarRoot.GetComponentInChildren<AzkiChatWaypointPatrolController>(true);
+            _waypointController = companionRoot.GetComponentInChildren<CompanionChatWaypointPatrolController>(true);
         if (_waypointController == null)
-            _waypointController = FindFirstObjectByType<AzkiChatWaypointPatrolController>();
+            _waypointController = FindFirstObjectByType<CompanionChatWaypointPatrolController>();
 
         if (_waypointController != null)
         {
-            if (avatarRoamingController != null)
-                avatarRoamingController.enabled = false;
+            if (companionRoamingController != null)
+                companionRoamingController.enabled = false;
 
-            var strayRoamer = avatarRoot.GetComponent<AzkiIslandRoamingController>();
+            var strayRoamer = companionRoot.GetComponent<CompanionIslandRoamingController>();
             if (strayRoamer != null)
                 strayRoamer.enabled = false;
 
@@ -447,24 +447,24 @@ public class JournalReviewController : MonoBehaviour
 
         if (_mode == ReviewMode.BedroomPaper)
         {
-            Debug.LogWarning("[JournalReview] Bedroom mode could not find AzkiChatWaypointPatrolController under avatarRoot or in the scene.");
+            Debug.LogWarning("[JournalReview] Bedroom mode could not find CompanionChatWaypointPatrolController under companionRoot or in the scene.");
             return;
         }
 
         // Beach fallback: free-roam on NavMesh.
-        if (avatarRoamingController == null)
-            avatarRoamingController = avatarRoot.GetComponent<AzkiIslandRoamingController>();
-        if (avatarRoamingController == null)
-            avatarRoamingController = avatarRoot.gameObject.AddComponent<AzkiIslandRoamingController>();
+        if (companionRoamingController == null)
+            companionRoamingController = companionRoot.GetComponent<CompanionIslandRoamingController>();
+        if (companionRoamingController == null)
+            companionRoamingController = companionRoot.gameObject.AddComponent<CompanionIslandRoamingController>();
     }
 
-    private void ResumeAvatarRoaming()
+    private void ResumeCompanionRoaming()
     {
-        if (avatarRoot == null) return;
+        if (companionRoot == null) return;
 
-        avatarRoot.gameObject.SetActive(true);
-        EnsureAvatarRoamingController();
-        AvatarResumePatrol();
+        companionRoot.gameObject.SetActive(true);
+        EnsureCompanionRoamingController();
+        CompanionResumePatrol();
     }
 
     // ── Dialogue ─────────────────────────────────────────────────────────
@@ -485,13 +485,13 @@ public class JournalReviewController : MonoBehaviour
         if (_choicePanel == null)
             _choicePanel = BuildChoicePanel();
 
-        // Position in front of and at comfortable height relative to the avatar's
-        // authored scene position so neither the avatar nor the panel need to move.
-        if (avatarRoot != null)
+        // Position in front of and at comfortable height relative to the companion's
+        // authored scene position so neither the companion nor the panel need to move.
+        if (companionRoot != null)
         {
             _choicePanel.transform.position =
-                avatarRoot.position
-                + avatarRoot.forward * 0.6f   // slightly in front of avatar
+                companionRoot.position
+                + companionRoot.forward * 0.6f   // slightly in front of companion
                 + Vector3.up * choicePanelHeight;          // comfortable chest / reading height
 
             // Billboard toward the player.
@@ -505,7 +505,7 @@ public class JournalReviewController : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[JournalReview] avatarRoot is null — choice panel may be at origin.");
+            Debug.LogWarning("[JournalReview] companionRoot is null — choice panel may be at origin.");
         }
 
         _choicePanel.SetActive(true);
@@ -960,9 +960,9 @@ public class JournalReviewController : MonoBehaviour
         HideChoicePanel();
 
         // During ending dialogue, AZKi plays a one-shot cheering animation.
-        AvatarCheerOnce();
+        CompanionCheerOnce();
 
-        // Avatar says something short and calming.
+        // Companion says something short and calming.
         ShowDialogue(message);
 
         // Wait for the typewriter to finish the message.
@@ -987,10 +987,10 @@ public class JournalReviewController : MonoBehaviour
 
         // Wait until the cheering animation has played fully and AZKi is holding the
         // final pose before we hand control back to EndSessionCoroutine (which calls
-        // ResumeAvatarRoaming). Cap the wait at 5 s to guard against edge cases.
+        // ResumeCompanionRoaming). Cap the wait at 5 s to guard against edge cases.
         float cheerWaitStart = Time.time;
         yield return new WaitUntil(() =>
-            ((avatarRoamingController == null || avatarRoamingController.IsCheeringPoseHeld) &&
+            ((companionRoamingController == null || companionRoamingController.IsCheeringPoseHeld) &&
              (_waypointController     == null || _waypointController.IsCheeringPoseHeld))
             || Time.time - cheerWaitStart > 5f);
 
@@ -1401,12 +1401,12 @@ public class JournalReviewController : MonoBehaviour
     // ================================================================
 
     /// <summary>
-    /// Snaps the XR Origin yaw so the camera faces the avatar.
+    /// Snaps the XR Origin yaw so the camera faces the companion.
     /// Must be called during a screen blackout — the snap is instantaneous.
     /// </summary>
-    private void SnapCameraToFaceAvatar()
+    private void SnapCameraToFaceCompanion()
     {
-        if (avatarRoot == null) return;
+        if (companionRoot == null) return;
 
         if (_xrOriginTransform == null)
         {
@@ -1418,11 +1418,11 @@ public class JournalReviewController : MonoBehaviour
         Camera cam = Camera.main;
         if (cam == null) return;
 
-        Vector3 toAvatar = avatarRoot.position - cam.transform.position;
-        toAvatar.y = 0f;
-        if (toAvatar.sqrMagnitude < 0.001f) return;
+        Vector3 toCompanion = companionRoot.position - cam.transform.position;
+        toCompanion.y = 0f;
+        if (toCompanion.sqrMagnitude < 0.001f) return;
 
-        float targetYaw  = Quaternion.LookRotation(toAvatar).eulerAngles.y;
+        float targetYaw  = Quaternion.LookRotation(toCompanion).eulerAngles.y;
         float currentYaw = cam.transform.eulerAngles.y;
         float yawDelta   = Mathf.DeltaAngle(currentYaw, targetYaw);
 

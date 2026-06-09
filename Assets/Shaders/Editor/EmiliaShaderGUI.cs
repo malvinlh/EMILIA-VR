@@ -3,10 +3,10 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// Custom ShaderGUI for the MiSide/Environment toon shader.
+/// Custom ShaderGUI for the EMILIA/Environment toon shader.
 /// Shows/hides property groups based on feature toggles and auto-manages render queue.
 /// </summary>
-public class MiSideShaderGUI : ShaderGUI
+public class EmiliaShaderGUI : ShaderGUI
 {
     private bool _showToon = true;
     private bool _showNormalMap = true;
@@ -146,12 +146,12 @@ public class MiSideShaderGUI : ShaderGUI
         EditorGUILayout.LabelField("Presets", EditorStyles.boldLabel);
         EditorGUILayout.BeginHorizontal();
 
-        if (GUILayout.Button("Set MiSide Defaults"))
+        if (GUILayout.Button("Set Emilia Defaults"))
         {
             foreach (Object target in materialEditor.targets)
             {
                 Material mat = target as Material;
-                ApplyMiSideDefaults(mat);
+                ApplyEmiliaDefaults(mat);
                 EditorUtility.SetDirty(mat);
             }
         }
@@ -161,7 +161,7 @@ public class MiSideShaderGUI : ShaderGUI
             foreach (Object target in materialEditor.targets)
             {
                 Material mat = target as Material;
-                ApplyMiSideDefaults(mat);
+                ApplyEmiliaDefaults(mat);
                 mat.SetFloat("_EmissionToggle", 1f);
                 mat.EnableKeyword("_EMISSION");
                 EditorUtility.SetDirty(mat);
@@ -173,7 +173,7 @@ public class MiSideShaderGUI : ShaderGUI
             foreach (Object target in materialEditor.targets)
             {
                 Material mat = target as Material;
-                ApplyMiSideDefaults(mat);
+                ApplyEmiliaDefaults(mat);
                 mat.SetFloat("_GlassToggle", 1f);
                 mat.EnableKeyword("_GLASS");
                 mat.SetColor("_GlassColor", new Color(0.85f, 0.92f, 1.0f, 0.15f));
@@ -189,7 +189,7 @@ public class MiSideShaderGUI : ShaderGUI
             foreach (Object target in materialEditor.targets)
             {
                 Material mat = target as Material;
-                ApplyMiSideDefaults(mat);
+                ApplyEmiliaDefaults(mat);
                 mat.SetFloat("_AlphaClip", 1f);
                 mat.EnableKeyword("_ALPHATEST_ON");
                 mat.SetFloat("_Cutoff", 0.5f);
@@ -211,7 +211,7 @@ public class MiSideShaderGUI : ShaderGUI
         }
     }
 
-    private static void ApplyMiSideDefaults(Material mat)
+    private static void ApplyEmiliaDefaults(Material mat)
     {
         mat.SetColor("_ShadowColor", new Color(0.85f, 0.75f, 0.72f, 1f));
         mat.SetFloat("_ShadowStep", 0.5f);

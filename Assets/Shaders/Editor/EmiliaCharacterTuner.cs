@@ -4,14 +4,14 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Batch-converts and tunes all AZKi character materials to MiSide/Character shader.
+/// Batch-converts and tunes all AZKi character materials to EMILIA/Character shader.
 /// Auto-detects material category (skin, hair, eyes, clothing, accessory, special)
 /// using name matching (Japanese and English), texture filename heuristics, and
 /// texture color analysis as fallback.
 ///
-/// Access via: Tools > MiSide > Character Material Tuner
+/// Access via: Tools > Emilia > Character Material Tuner
 /// </summary>
-public class MiSideCharacterTuner : EditorWindow
+public class EmiliaCharacterTuner : EditorWindow
 {
     private const string DefaultMaterialsPath = "Assets/Graphics/3D/Character/AZKi/materials";
 
@@ -30,18 +30,18 @@ public class MiSideCharacterTuner : EditorWindow
     private List<MaterialPreview> _previews = new List<MaterialPreview>();
     private bool _previewGenerated = false;
 
-    [MenuItem("Tools/MiSide/Character Material Tuner")]
+    [MenuItem("Tools/EMILIA/Character Material Tuner")]
     public static void ShowWindow()
     {
-        var window = GetWindow<MiSideCharacterTuner>("Character Material Tuner");
+        var window = GetWindow<EmiliaCharacterTuner>("Character Material Tuner");
         window.minSize = new Vector2(580, 600);
     }
 
     private void OnGUI()
     {
-        EditorGUILayout.LabelField("MiSide Character Material Tuner", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Emilia Character Material Tuner", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Converts all materials in the target folder to MiSide/Character shader.\n" +
+            "Converts all materials in the target folder to EMILIA/Character shader.\n" +
             "Auto-detects category (Skin, Hair, Eyes, Clothing, Accessory, Special)\n" +
             "using material name, texture filename, and texture color analysis.\n\n" +
             "Step 1: Click 'Scan & Preview' to see detected categories.\n" +
@@ -207,10 +207,10 @@ public class MiSideCharacterTuner : EditorWindow
         sb.AppendLine("=== APPLYING CHARACTER PRESETS ===");
         sb.AppendLine($"Source: {_materialsPath}\n");
 
-        Shader charShader = Shader.Find("MiSide/Character");
+        Shader charShader = Shader.Find("EMILIA/Character");
         if (charShader == null)
         {
-            sb.AppendLine("ERROR: Could not find MiSide/Character shader!");
+            sb.AppendLine("ERROR: Could not find EMILIA/Character shader!");
             _logOutput = sb.ToString();
             Repaint();
             return;
@@ -237,7 +237,7 @@ public class MiSideCharacterTuner : EditorWindow
             CharacterCategory category = preview.finalCategory;
             sb.AppendLine($"  [{category.ToString().ToUpper()}] {preview.materialName} ({preview.detectionMethod})");
 
-            Undo.RecordObject(mat, "MiSide Character Tuner");
+            Undo.RecordObject(mat, "Emilia Character Tuner");
 
             // Switch shader — preserve base texture
             if (mat.shader != charShader)

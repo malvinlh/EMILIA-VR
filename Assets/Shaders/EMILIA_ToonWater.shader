@@ -1,4 +1,4 @@
-Shader "MiSide/ToonWater"
+Shader "EMILIA/ToonWater"
 {
     Properties
     {

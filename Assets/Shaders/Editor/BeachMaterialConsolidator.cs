@@ -20,7 +20,7 @@ public class BeachMaterialConsolidator : EditorWindow
     private string _logOutput = "";
     private Dictionary<string, List<Material>> _groups;
 
-    [MenuItem("Tools/MiSide/Consolidate Beach Materials")]
+    [MenuItem("Tools/EMILIA/Consolidate Beach Materials")]
     public static void ShowWindow()
     {
         var window = GetWindow<BeachMaterialConsolidator>("Beach Material Consolidator");

@@ -12871,13 +12871,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JournalReviewController
-  avatarRoot: {fileID: 1377243293}
-  avatarRoamingController: {fileID: 0}
+  companionRoot: {fileID: 1377243293}
+  companionRoamingController: {fileID: 0}
   _waypointController: {fileID: 0}
-  startAvatarRoamingOnAwake: 1
+  startCompanionRoamingOnAwake: 1
   dialoguePanelGO: {fileID: 1755438123}
   standPoint: {fileID: 42013326}
-  reviewAvatarStandPoint: {fileID: 2034049331}
+  reviewCompanionStandPoint: {fileID: 2034049331}
   journalChairTable: {fileID: 1728181134}
   bottleRoot: {fileID: 2120520869}
   wineRack: {fileID: 1235177278}

@@ -12,7 +12,7 @@ using UnityEngine.AI;
 [DisallowMultipleComponent]
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
-public class AzkiIslandRoamingController : MonoBehaviour
+public class CompanionIslandRoamingController : MonoBehaviour
 {
     [Header("Navigation")]
     [Tooltip("Optional NavMeshSurface. If empty, one is auto-found or created at runtime.")]
@@ -135,7 +135,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
     private NavMeshAgent _agent;
     private Animator _animator;
-    private AzkiBlendShapeExpressionController _blendShapeController;
+    private CompanionBlendShapeExpressionController _blendShapeController;
     private NpcCharacterControllerGravity _gravityController;
     private NavMeshPath _pathBuffer;
 
@@ -389,7 +389,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
             if (!_loggedMissingNavMesh)
             {
                 _loggedMissingNavMesh = true;
-                Debug.LogWarning("[AzkiIslandRoamingController] No NavMesh found for AZKi. Bake NavMesh for the scene or enable runtime build fallback.", this);
+                Debug.LogWarning("[CompanionIslandRoamingController] No NavMesh found for AZKi. Bake NavMesh for the scene or enable runtime build fallback.", this);
             }
 
             EnforceAnimation(PatrolAnimation.Idle, force: true);
@@ -471,7 +471,7 @@ public class AzkiIslandRoamingController : MonoBehaviour
 
     /// <summary>
     /// Wires the dialogue panel so Talk/Idle follow response visibility directly,
-    /// matching the bedroom-scene pattern in AzkiChatWaypointPatrolController.
+    /// matching the bedroom-scene pattern in CompanionChatWaypointPatrolController.
     /// </summary>
     public void SetDialoguePanel(VRDialoguePanel panel)
     {
@@ -675,10 +675,10 @@ public class AzkiIslandRoamingController : MonoBehaviour
     private void EnsureBlendShapeController()
     {
         if (_blendShapeController == null)
-            _blendShapeController = GetComponent<AzkiBlendShapeExpressionController>();
+            _blendShapeController = GetComponent<CompanionBlendShapeExpressionController>();
 
         if (_blendShapeController == null)
-            _blendShapeController = gameObject.AddComponent<AzkiBlendShapeExpressionController>();
+            _blendShapeController = gameObject.AddComponent<CompanionBlendShapeExpressionController>();
     }
 
     private void CacheAnimatorStateHashes()

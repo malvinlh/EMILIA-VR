@@ -1,7 +1,7 @@
 // ============================================================
-// MiSide/ToonTerrain — Anime-style toon shader for Unity Terrain
+// EMILIA/ToonTerrain — Anime-style toon shader for Unity Terrain
 //
-// Blends up to 4 terrain layers via splatmap with MiSide-style
+// Blends up to 4 terrain layers via splatmap with Emilia-style
 // toon lighting (half-Lambert, smoothstep ramp, warm shadow).
 // Supports instanced rendering, per-pixel terrain normals,
 // per-layer normal maps, terrain holes, and VR stereo.
@@ -11,7 +11,7 @@
 // component Inspector, NOT from the material Inspector.
 // ============================================================
 
-Shader "MiSide/ToonTerrain"
+Shader "EMILIA/ToonTerrain"
 {
     Properties
     {
@@ -106,8 +106,8 @@ Shader "MiSide/ToonTerrain"
             #pragma multi_compile_instancing
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
-            #include "MiSide_TerrainInput.hlsl"
-            #include "MiSide_Common.hlsl"
+            #include "EMILIA_TerrainInput.hlsl"
+            #include "EMILIA_Common.hlsl"
 
             struct Attributes
             {
@@ -207,7 +207,7 @@ Shader "MiSide/ToonTerrain"
 
                 Light mainLight = GetMainLight(shadowCoord);
 
-                // MiSide-style toon ramp (half-Lambert + smoothstep)
+                // Emilia-style toon ramp (half-Lambert + smoothstep)
                 float NdotL = dot(normalWS, mainLight.direction);
                 float halfLambert = NdotL * 0.5 + 0.5;
                 float toonRamp = smoothstep(
@@ -223,18 +223,18 @@ Shader "MiSide/ToonTerrain"
                 // Baked GI / lightmap
                 half3 bakedGI = SAMPLE_GI(IN.lightmapUV, IN.vertexSH, normalWS);
 
-                // Toon color integration (matches MiSide/Environment)
+                // Toon color integration (matches EMILIA/Environment)
                 half3 litColor    = albedo * (mainLight.color + bakedGI);
                 half3 shadowColor = albedo * _ShadowColor.rgb * saturate(bakedGI + 0.3);
                 half3 finalColor  = lerp(shadowColor, litColor, toonRamp);
 
-                // Additional lights (toon-shaded, from MiSide_Common.hlsl)
-                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, albedo, _ShadowStep, IN.positionCS);
+                // Additional lights (toon-shaded, from EMILIA_Common.hlsl)
+                finalColor += EmiliaAdditionalLights(IN.positionWS, normalWS, albedo, _ShadowStep, IN.positionCS);
 
                 // Optional rim light
                 #ifdef _RIMLIGHT
                     float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
-                    finalColor += MiSideRimLight(viewDir, normalWS, _RimColor, _RimPower, _RimIntensity);
+                    finalColor += EmiliaRimLight(viewDir, normalWS, _RimColor, _RimPower, _RimIntensity);
                 #endif
 
                 // Fog
@@ -266,7 +266,7 @@ Shader "MiSide/ToonTerrain"
             #pragma multi_compile_instancing
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
-            #include "MiSide_TerrainInput.hlsl"
+            #include "EMILIA_TerrainInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
 
             float3 _LightDirection;
@@ -340,7 +340,7 @@ Shader "MiSide/ToonTerrain"
             #pragma multi_compile_instancing
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
-            #include "MiSide_TerrainInput.hlsl"
+            #include "EMILIA_TerrainInput.hlsl"
 
             struct Attributes
             {
@@ -402,7 +402,7 @@ Shader "MiSide/ToonTerrain"
             #pragma multi_compile_instancing
             #pragma instancing_options assumeuniformscaling nomatrices nolightprobe nolightmap
 
-            #include "MiSide_TerrainInput.hlsl"
+            #include "EMILIA_TerrainInput.hlsl"
 
             struct Attributes
             {
@@ -476,7 +476,7 @@ Shader "MiSide/ToonTerrain"
             #pragma vertex MetaVert
             #pragma fragment MetaFrag
 
-            #include "MiSide_TerrainInput.hlsl"
+            #include "EMILIA_TerrainInput.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/MetaInput.hlsl"
 
             struct Attributes
@@ -514,6 +514,6 @@ Shader "MiSide/ToonTerrain"
         }
     }
 
-    CustomEditor "MiSideToonTerrainGUI"
+    CustomEditor "EmiliaToonTerrainGUI"
     FallBack "Universal Render Pipeline/Terrain/Lit"
 }

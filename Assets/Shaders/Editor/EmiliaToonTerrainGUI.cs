@@ -2,11 +2,11 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Custom ShaderGUI for MiSide/ToonTerrain.
+/// Custom ShaderGUI for EMILIA/ToonTerrain.
 /// Shows toon-specific properties in foldout groups. Terrain layers
 /// (splat textures, normals) are configured from the Terrain Inspector.
 /// </summary>
-public class MiSideToonTerrainGUI : ShaderGUI
+public class EmiliaToonTerrainGUI : ShaderGUI
 {
     private bool _showToon = true;
     private bool _showNormals = true;

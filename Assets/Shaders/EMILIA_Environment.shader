@@ -1,4 +1,4 @@
-Shader "MiSide/Environment"
+Shader "EMILIA/Environment"
 {
     Properties
     {
@@ -79,8 +79,8 @@ Shader "MiSide/Environment"
             #pragma target 3.0
 
             // Vertex / Fragment
-            #pragma vertex MiSideVert
-            #pragma fragment MiSideFrag
+            #pragma vertex EmiliaVert
+            #pragma fragment EmiliaFrag
 
             // Material keywords
             #pragma shader_feature_local _ALPHATEST_ON
@@ -102,7 +102,7 @@ Shader "MiSide/Environment"
             #pragma multi_compile _ DOTS_INSTANCING_ON
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "MiSide_Common.hlsl"
+            #include "EMILIA_Common.hlsl"
 
             // -----------------------------------------------------------
             // SRP Batcher compatible CBUFFER
@@ -177,7 +177,7 @@ Shader "MiSide/Environment"
             // -----------------------------------------------------------
             // Vertex Shader
             // -----------------------------------------------------------
-            Varyings MiSideVert(Attributes IN)
+            Varyings EmiliaVert(Attributes IN)
             {
                 Varyings OUT = (Varyings)0;
 
@@ -218,7 +218,7 @@ Shader "MiSide/Environment"
             // -----------------------------------------------------------
             // Fragment Shader
             // -----------------------------------------------------------
-            half4 MiSideFrag(Varyings IN) : SV_Target
+            half4 EmiliaFrag(Varyings IN) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(IN);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
@@ -258,7 +258,7 @@ Shader "MiSide/Environment"
                 float NdotL = dot(normalWS, mainLight.direction);
                 float halfLambert = NdotL * 0.5 + 0.5;
 
-                // Soft 2-step toon ramp (MiSide style)
+                // Soft 2-step toon ramp (Emilia style)
                 float toonRamp = smoothstep(
                     _ShadowStep - _ShadowFeather,
                     _ShadowStep + _ShadowFeather,
@@ -278,12 +278,12 @@ Shader "MiSide/Environment"
                 half3 finalColor  = lerp(shadowColor, litColor, toonRamp);
 
                 // Additional lights (toon-shaded)
-                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _ShadowStep, IN.positionCS);
+                finalColor += EmiliaAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _ShadowStep, IN.positionCS);
 
                 // Optional rim light
                 #ifdef _RIMLIGHT
                     float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
-                    finalColor += MiSideRimLight(viewDir, normalWS, _RimColor, _RimPower, _RimIntensity);
+                    finalColor += EmiliaRimLight(viewDir, normalWS, _RimColor, _RimPower, _RimIntensity);
                 #endif
 
                 // Optional emission
@@ -738,6 +738,6 @@ Shader "MiSide/Environment"
         }
     }
 
-    CustomEditor "MiSideShaderGUI"
+    CustomEditor "EmiliaShaderGUI"
     FallBack "Universal Render Pipeline/Lit"
 }

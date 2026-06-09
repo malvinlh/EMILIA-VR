@@ -3,10 +3,10 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// Custom ShaderGUI for the MiSide/Character toon shader.
+/// Custom ShaderGUI for the EMILIA/Character toon shader.
 /// Provides foldout sections for each feature group and category-based presets.
 /// </summary>
-public class MiSideCharacterShaderGUI : ShaderGUI
+public class EmiliaCharacterShaderGUI : ShaderGUI
 {
     private bool _showBase = true;
     private bool _show1stShade = true;
@@ -253,7 +253,7 @@ public class MiSideCharacterShaderGUI : ShaderGUI
 
     private static void ApplyPreset(Material mat, Category category)
     {
-        Undo.RecordObject(mat, "Apply MiSide Character Preset");
+        Undo.RecordObject(mat, "Apply Emilia Character Preset");
 
         // Common base — HSR-style: rich shadows, color-matched outlines
         mat.SetFloat("_GI_Intensity", 0.35f);

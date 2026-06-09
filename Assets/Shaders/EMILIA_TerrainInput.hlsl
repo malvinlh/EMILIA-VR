@@ -1,9 +1,9 @@
-#ifndef MISIDE_TERRAIN_INPUT_INCLUDED
-#define MISIDE_TERRAIN_INPUT_INCLUDED
+#ifndef EMILIA_TERRAIN_INPUT_INCLUDED
+#define EMILIA_TERRAIN_INPUT_INCLUDED
 
 // ============================================================
-// MiSide Toon Terrain — Shared Input Definitions
-// Included by every pass in MiSide_ToonTerrain.shader
+// Emilia Toon Terrain — Shared Input Definitions
+// Included by every pass in EMILIA_ToonTerrain.shader
 // ============================================================
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -176,4 +176,4 @@ float3x3 GetTerrainTBN(float3 normalWS)
     return float3x3(t, b, normalWS);
 }
 
-#endif // MISIDE_TERRAIN_INPUT_INCLUDED
+#endif // EMILIA_TERRAIN_INPUT_INCLUDED

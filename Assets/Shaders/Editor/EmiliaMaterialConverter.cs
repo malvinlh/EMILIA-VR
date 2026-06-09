@@ -5,11 +5,11 @@ using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
-/// Batch converts environment materials from URP/Lit to MiSide/Environment toon shader.
+/// Batch converts environment materials from URP/Lit to EMILIA/Environment toon shader.
 /// Detects material type (standard, emissive, cutout, water) by name pattern and applies
 /// appropriate presets.
 /// </summary>
-public class MiSideMaterialConverter : EditorWindow
+public class EmiliaMaterialConverter : EditorWindow
 {
     private static readonly string URP_LIT_GUID = "933532a4fcc9baf4fa0491de14d08ed7";
 
@@ -26,23 +26,23 @@ public class MiSideMaterialConverter : EditorWindow
     private Vector2 _scrollPos;
     private string _logOutput = "";
 
-    [MenuItem("Tools/MiSide/Convert Materials to Toon")]
+    [MenuItem("Tools/EMILIA/Convert Materials to Toon")]
     public static void ShowWindow()
     {
-        var window = GetWindow<MiSideMaterialConverter>("MiSide Material Converter");
+        var window = GetWindow<EmiliaMaterialConverter>("Emilia Material Converter");
         window.minSize = new Vector2(550, 450);
     }
 
     private void OnGUI()
     {
-        EditorGUILayout.LabelField("MiSide Material Converter", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Emilia Material Converter", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Converts URP/Lit materials to MiSide/Environment toon shader.\n" +
+            "Converts URP/Lit materials to EMILIA/Environment toon shader.\n" +
             "Detects material type by name and applies appropriate presets:\n" +
-            "• Standard opaque → MiSide/Environment (default toon)\n" +
-            "• Cutout (plants/flowers) → MiSide/Environment + alpha clip\n" +
-            "• Emissive (lamps/monitors) → MiSide/Environment + emission\n" +
-            "• Water (sea/surf) → MiSide/ToonWater",
+            "• Standard opaque → EMILIA/Environment (default toon)\n" +
+            "• Cutout (plants/flowers) → EMILIA/Environment + alpha clip\n" +
+            "• Emissive (lamps/monitors) → EMILIA/Environment + emission\n" +
+            "• Water (sea/surf) → EMILIA/ToonWater",
             MessageType.Info);
 
         EditorGUILayout.Space();
@@ -110,17 +110,17 @@ public class MiSideMaterialConverter : EditorWindow
         sb.AppendLine($"Source folder: {folder}\n");
 
         // Find target shaders
-        Shader toonShader = Shader.Find("MiSide/Environment");
-        Shader waterShader = Shader.Find("MiSide/ToonWater");
+        Shader toonShader = Shader.Find("EMILIA/Environment");
+        Shader waterShader = Shader.Find("EMILIA/ToonWater");
 
         if (toonShader == null)
         {
-            _logOutput = "ERROR: Could not find shader 'MiSide/Environment'. Make sure it's compiled.";
+            _logOutput = "ERROR: Could not find shader 'EMILIA/Environment'. Make sure it's compiled.";
             return;
         }
         if (waterShader == null)
         {
-            sb.AppendLine("WARNING: Could not find shader 'MiSide/ToonWater'. Water materials will use MiSide/Environment instead.\n");
+            sb.AppendLine("WARNING: Could not find shader 'EMILIA/ToonWater'. Water materials will use EMILIA/Environment instead.\n");
         }
 
         // Find URP/Lit shader for comparison

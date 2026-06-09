@@ -17465,7 +17465,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JournalReviewController
-  avatarRoot: {fileID: 6000000002}
+  companionRoot: {fileID: 6000000002}
   avatarTableOffset: {x: -1.6, y: 0, z: 0.4}
   dialoguePanelGO: {fileID: 6000000008}
   journalChairTable: {fileID: 1456161760}

@@ -1,9 +1,9 @@
-#ifndef MISIDE_COMMON_INCLUDED
-#define MISIDE_COMMON_INCLUDED
+#ifndef EMILIA_COMMON_INCLUDED
+#define EMILIA_COMMON_INCLUDED
 
 // ============================================================
-// MiSide Common — Shared toon shading functions
-// Used by MiSide/Environment and MiSide/Character shaders
+// Emilia Common — Shared toon shading functions
+// Used by EMILIA/Environment and EMILIA/Character shaders
 // ============================================================
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
@@ -12,14 +12,14 @@
 // Toon Ramp — smoothstep-based soft step
 // Returns 0 in shadow, 1 in light, smooth transition at step
 // -----------------------------------------------------------
-half MiSideToonRamp(half NdotL, half step, half feather)
+half EmiliaToonRamp(half NdotL, half step, half feather)
 {
     half halfLambert = NdotL * 0.5 + 0.5;
     return smoothstep(step - feather, step + feather, halfLambert);
 }
 
 // Overload taking pre-computed half-lambert
-half MiSideToonRampHL(half halfLambert, half step, half feather)
+half EmiliaToonRampHL(half halfLambert, half step, half feather)
 {
     return smoothstep(step - feather, step + feather, halfLambert);
 }
@@ -27,14 +27,14 @@ half MiSideToonRampHL(half halfLambert, half step, half feather)
 // -----------------------------------------------------------
 // Rim Light — Fresnel-based rim with configurable falloff
 // -----------------------------------------------------------
-half3 MiSideRimLight(float3 viewDir, float3 normalWS, half4 rimColor, half power, half intensity)
+half3 EmiliaRimLight(float3 viewDir, float3 normalWS, half4 rimColor, half power, half intensity)
 {
     half rim = pow(1.0 - saturate(dot(viewDir, normalWS)), power);
     return rimColor.rgb * rim * intensity;
 }
 
 // Rim light with inside mask (for character shader — UTS-compatible)
-half3 MiSideRimLightMasked(float3 viewDir, float3 normalWS, half4 rimColor, half power, half insideMask)
+half3 EmiliaRimLightMasked(float3 viewDir, float3 normalWS, half4 rimColor, half power, half insideMask)
 {
     half NdotV = saturate(dot(viewDir, normalWS));
     half rim = pow(1.0 - NdotV, power);
@@ -49,7 +49,7 @@ half3 MiSideRimLightMasked(float3 viewDir, float3 normalWS, half4 rimColor, half
 // Applies a simplified single-step toon ramp per light
 // Supports both standard Forward and Forward+ rendering paths
 // -----------------------------------------------------------
-half3 MiSideAdditionalLights(float3 positionWS, float3 normalWS, half3 baseColor, half shadowStep, float4 positionCS)
+half3 EmiliaAdditionalLights(float3 positionWS, float3 normalWS, half3 baseColor, half shadowStep, float4 positionCS)
 {
     half3 additionalColor = half3(0, 0, 0);
 
@@ -75,4 +75,4 @@ half3 MiSideAdditionalLights(float3 positionWS, float3 normalWS, half3 baseColor
     return additionalColor;
 }
 
-#endif // MISIDE_COMMON_INCLUDED
+#endif // EMILIA_COMMON_INCLUDED

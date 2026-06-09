@@ -7,6 +7,7 @@ using EMILIA.Data;
 using UnityEngine;
 using UnityEngine.AI;
 using UnityEngine.SceneManagement;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Orchestrates the VR chat experience in the 3D_Chat scene.
@@ -27,12 +28,12 @@ public class VRChatBridge : MonoBehaviour
     [Header("VR Dialogue")]
     [SerializeField] private VRDialoguePanel _dialoguePanel;
 
-    [Header("AZKi")]
+    [Header("Companion")]
     [Tooltip("Used in 3D_Journal_Bedroom scene.")]
-    [SerializeField] private AzkiChatWaypointPatrolController _azkiPatrol;
+    [SerializeField, FormerlySerializedAs("_azkiPatrol")] private CompanionChatWaypointPatrolController _companionPatrol;
 
     [Tooltip("Used in 3D_Journal_Beach scene.")]
-    [SerializeField] private AzkiIslandRoamingController _azkiRoaming;
+    [SerializeField, FormerlySerializedAs("_azkiRoaming")] private CompanionIslandRoamingController _companionRoaming;
 
     [Header("Audio Recording")]
     [SerializeField] private RecordAudio _recorder;
@@ -109,12 +110,12 @@ public class VRChatBridge : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(this); return; }
         Instance = this;
         _isReasoningMode = _startInReasoningMode;
-        EnsureAzkiPatrol();
+        EnsureCompanionPatrol();
     }
 
     private void Start()
     {
-        EnsureAzkiPatrol();
+        EnsureCompanionPatrol();
         _userId = PlayerPrefs.GetString(PrefKeyNickname, "");
         FetchConversationIds();
     }
@@ -832,7 +833,7 @@ public class VRChatBridge : MonoBehaviour
     private const string BeachSceneName   = "3D_Journal_Beach";
     private const string BedroomSceneName = "3D_Journal_Bedroom";
 
-    private void EnsureAzkiPatrol()
+    private void EnsureCompanionPatrol()
     {
         if (_dialoguePanel == null)
             _dialoguePanel = FindFirstObjectByType<VRDialoguePanel>();
@@ -841,48 +842,48 @@ public class VRChatBridge : MonoBehaviour
 
         if (currentScene.Contains(BeachSceneName))
         {
-            // ── Beach scene: use AzkiIslandRoamingController ──────────────
-            EnsureAzkiRoaming();
+            // ── Beach scene: use CompanionIslandRoamingController ──────────────
+            EnsureCompanionRoaming();
         }
         else
         {
-            // ── Bedroom (and any other) scene: use AzkiChatWaypointPatrolController ──
-            EnsureAzkiWaypointPatrol();
+            // ── Bedroom (and any other) scene: use CompanionChatWaypointPatrolController ──
+            EnsureCompanionWaypointPatrol();
         }
     }
 
     // ── Beach-scene helper ────────────────────────────────────────────────
 
-    private void EnsureAzkiRoaming()
+    private void EnsureCompanionRoaming()
     {
-        if (_azkiRoaming == null)
-            _azkiRoaming = FindFirstObjectByType<AzkiIslandRoamingController>();
+        if (_companionRoaming == null)
+            _companionRoaming = FindFirstObjectByType<CompanionIslandRoamingController>();
 
-        if (_azkiRoaming == null)
+        if (_companionRoaming == null)
         {
             // Try to find AZKi host and attach the controller.
-            GameObject azkiHost = FindPreferredAzkiHostObject();
-            if (azkiHost != null)
-                _azkiRoaming = azkiHost.AddComponent<AzkiIslandRoamingController>();
+            GameObject companionHost = FindPreferredCompanionHostObject();
+            if (companionHost != null)
+                _companionRoaming = companionHost.AddComponent<CompanionIslandRoamingController>();
         }
 
-        if (_azkiRoaming != null && _dialoguePanel != null)
-            _azkiRoaming.SetDialoguePanel(_dialoguePanel);
+        if (_companionRoaming != null && _dialoguePanel != null)
+            _companionRoaming.SetDialoguePanel(_dialoguePanel);
     }
 
     // ── Bedroom-scene helper (existing logic, extracted for clarity) ──────
 
-    private void EnsureAzkiWaypointPatrol()
+    private void EnsureCompanionWaypointPatrol()
     {
-        GameObject azkiHost = FindPreferredAzkiHostObject();
-        if (azkiHost != null)
+        GameObject companionHost = FindPreferredCompanionHostObject();
+        if (companionHost != null)
         {
-            var hostPatrol = azkiHost.GetComponent<AzkiChatWaypointPatrolController>();
+            var hostPatrol = companionHost.GetComponent<CompanionChatWaypointPatrolController>();
             if (hostPatrol == null)
-                hostPatrol = azkiHost.AddComponent<AzkiChatWaypointPatrolController>();
+                hostPatrol = companionHost.AddComponent<CompanionChatWaypointPatrolController>();
 
             // Keep the parent-hosted controller as the active one.
-            var existingControllers = FindObjectsOfType<AzkiChatWaypointPatrolController>(true);
+            var existingControllers = FindObjectsOfType<CompanionChatWaypointPatrolController>(true);
             foreach (var controller in existingControllers)
             {
                 if (controller == null || controller == hostPatrol)
@@ -891,18 +892,18 @@ public class VRChatBridge : MonoBehaviour
                 controller.enabled = false;
             }
 
-            _azkiPatrol = hostPatrol;
+            _companionPatrol = hostPatrol;
         }
-        else if (_azkiPatrol == null)
+        else if (_companionPatrol == null)
         {
-            _azkiPatrol = FindFirstObjectByType<AzkiChatWaypointPatrolController>();
+            _companionPatrol = FindFirstObjectByType<CompanionChatWaypointPatrolController>();
         }
 
-        if (_azkiPatrol != null && _dialoguePanel != null)
-            _azkiPatrol.SetDialoguePanel(_dialoguePanel);
+        if (_companionPatrol != null && _dialoguePanel != null)
+            _companionPatrol.SetDialoguePanel(_dialoguePanel);
     }
 
-    private GameObject FindPreferredAzkiHostObject()
+    private GameObject FindPreferredCompanionHostObject()
     {
         Transform bestAnimatorTransform = null;
         int bestAnimatorDepth = int.MaxValue;
@@ -961,14 +962,14 @@ public class VRChatBridge : MonoBehaviour
         {
             Transform parent = current.parent;
 
-            bool parentLooksLikeAzki =
+            bool parentLooksLikeCompanion =
                 parent.name.IndexOf("azki", StringComparison.OrdinalIgnoreCase) >= 0;
             bool parentHasCoreComponents =
                 parent.GetComponent<Animator>() != null ||
                 parent.GetComponent<NavMeshAgent>() != null ||
                 parent.GetComponent<CharacterController>() != null;
 
-            if (!parentLooksLikeAzki && !parentHasCoreComponents)
+            if (!parentLooksLikeCompanion && !parentHasCoreComponents)
                 break;
 
             current = parent;

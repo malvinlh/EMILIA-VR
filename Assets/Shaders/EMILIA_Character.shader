@@ -1,4 +1,4 @@
-Shader "MiSide/Character"
+Shader "EMILIA/Character"
 {
     Properties
     {
@@ -106,7 +106,7 @@ Shader "MiSide/Character"
             #pragma multi_compile _ DOTS_INSTANCING_ON
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "MiSide_Common.hlsl"
+            #include "EMILIA_Common.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -282,7 +282,7 @@ Shader "MiSide/Character"
                 half3 finalColor = lerp(shadowColor, litColor, ramp1);
 
                 // Additional lights (toon-shaded, matching environment contribution)
-                finalColor += MiSideAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step, IN.positionCS) * 0.85;
+                finalColor += EmiliaAdditionalLights(IN.positionWS, normalWS, baseColor.rgb, _1st_ShadeColor_Step, IN.positionCS) * 0.85;
 
                 float3 viewDir = normalize(GetCameraPositionWS() - IN.positionWS);
 
@@ -325,7 +325,7 @@ Shader "MiSide/Character"
                 // Rim light
                 #ifdef _RIMLIGHT_ON
                 {
-                    finalColor += MiSideRimLightMasked(viewDir, normalWS,
+                    finalColor += EmiliaRimLightMasked(viewDir, normalWS,
                         _RimLightColor, _RimLight_Power, _RimLight_InsideMask);
                 }
                 #endif
@@ -897,6 +897,6 @@ Shader "MiSide/Character"
         }
     }
 
-    CustomEditor "MiSideCharacterShaderGUI"
+    CustomEditor "EmiliaCharacterShaderGUI"
     FallBack "Universal Render Pipeline/Lit"
 }

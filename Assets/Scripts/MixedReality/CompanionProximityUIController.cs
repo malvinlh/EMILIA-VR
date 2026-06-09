@@ -6,8 +6,8 @@ using UnityEngine;
 /// Attach to the AZKi root GameObject (or any persistent scene object).
 ///
 /// Works in two scene configurations:
-///   - Beach: AZKi uses <see cref="AzkiIslandRoamingController"/> for free roaming.
-///   - Bedroom: AZKi uses <see cref="AzkiChatWaypointPatrolController"/> for standing-point patrol.
+///   - Beach: AZKi uses <see cref="CompanionIslandRoamingController"/> for free roaming.
+///   - Bedroom: AZKi uses <see cref="CompanionChatWaypointPatrolController"/> for standing-point patrol.
 ///
 /// The controller auto-detects which movement component is present at Start() and
 /// routes proximity-engagement calls accordingly. No scene-name checks are needed.
@@ -22,7 +22,7 @@ using UnityEngine;
 /// Dialogue-driven Talk and waiting-idle behavior are owned by the movement controllers.
 /// </summary>
 [DisallowMultipleComponent]
-public class AzkiProximityUIController : MonoBehaviour
+public class CompanionProximityUIController : MonoBehaviour
 {
     [Header("Chat UI")]
     [Tooltip("Root GameObject of the Chat UI to show/hide based on proximity.")]
@@ -33,11 +33,11 @@ public class AzkiProximityUIController : MonoBehaviour
     [SerializeField] private float proximityRadius = 3f;
 
     [Header("AZKi - Movement Controllers")]
-    [Tooltip("AzkiIslandRoamingController on the AZKi root (Beach scene). Auto-found if empty.")]
-    [SerializeField] private AzkiIslandRoamingController roamingController;
+    [Tooltip("CompanionIslandRoamingController on the AZKi root (Beach scene). Auto-found if empty.")]
+    [SerializeField] private CompanionIslandRoamingController roamingController;
 
-    [Tooltip("AzkiChatWaypointPatrolController on the AZKi root (Bedroom scene). Auto-found if empty.")]
-    [SerializeField] private AzkiChatWaypointPatrolController patrolController;
+    [Tooltip("CompanionChatWaypointPatrolController on the AZKi root (Bedroom scene). Auto-found if empty.")]
+    [SerializeField] private CompanionChatWaypointPatrolController patrolController;
 
     [Header("Dialogue")]
     [Tooltip("VRDialoguePanel in the scene. Kept for scene compatibility.")]
@@ -52,14 +52,14 @@ public class AzkiProximityUIController : MonoBehaviour
         SetChatUIVisible(false);
 
         if (roamingController == null)
-            roamingController = GetComponentInParent<AzkiIslandRoamingController>();
+            roamingController = GetComponentInParent<CompanionIslandRoamingController>();
         if (roamingController == null)
-            roamingController = FindFirstObjectByType<AzkiIslandRoamingController>();
+            roamingController = FindFirstObjectByType<CompanionIslandRoamingController>();
 
         if (patrolController == null)
-            patrolController = GetComponentInParent<AzkiChatWaypointPatrolController>();
+            patrolController = GetComponentInParent<CompanionChatWaypointPatrolController>();
         if (patrolController == null)
-            patrolController = FindFirstObjectByType<AzkiChatWaypointPatrolController>();
+            patrolController = FindFirstObjectByType<CompanionChatWaypointPatrolController>();
 
         if (dialoguePanel == null)
             dialoguePanel = FindFirstObjectByType<VRDialoguePanel>();

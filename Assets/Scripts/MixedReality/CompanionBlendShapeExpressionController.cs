@@ -8,10 +8,10 @@ using UnityEngine;
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Animator))]
-public class AzkiBlendShapeExpressionController : MonoBehaviour
+public class CompanionBlendShapeExpressionController : MonoBehaviour
 {
     [Header("Renderer")]
-    [Tooltip("Optional explicit face renderer. If null, auto-finds a SkinnedMeshRenderer under this avatar.")]
+    [Tooltip("Optional explicit face renderer. If null, auto-finds a SkinnedMeshRenderer under this companion.")]
     [SerializeField] private SkinnedMeshRenderer faceRenderer;
 
     [Tooltip("Used when auto-finding the face renderer by object name.")]

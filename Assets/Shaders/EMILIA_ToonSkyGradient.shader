@@ -1,4 +1,4 @@
-Shader "MiSide/ToonSkyGradient"
+Shader "EMILIA/ToonSkyGradient"
 {
     Properties
     {

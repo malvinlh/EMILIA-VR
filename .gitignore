@@ -71,3 +71,7 @@ Assets/OpenCVForUnity/
 /analyze_scripts.txt
 /check_used.sh
 /script_purposes.txt
+
+# Ignore documentation folder and miscellaneous files
+/docs/
+/misc/

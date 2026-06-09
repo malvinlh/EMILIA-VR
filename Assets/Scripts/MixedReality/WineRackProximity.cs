@@ -5,7 +5,7 @@ using UnityEngine;
 ///
 /// When the journal bottle enters the trigger zone during the keep-journal path
 /// (WaitingForRack state), the bottle is immediately hidden and destroyed, then the
-/// avatar delivers a short closing dialogue before the session ends.
+/// companion delivers a short closing dialogue before the session ends.
 ///
 /// Bottle is identified by tag (default "JournalBottle") — walk up the parent hierarchy
 /// from the entering collider so any child collider on the bottle is matched correctly.
