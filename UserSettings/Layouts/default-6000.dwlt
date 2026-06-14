@@ -19,7 +19,7 @@ MonoBehaviour:
     width: 2048
     height: 1060.8
   m_ShowMode: 4
-  m_Title: Hierarchy
+  m_Title: Scene
   m_RootView: {fileID: 2}
   m_MinSize: {x: 875, y: 300}
   m_MaxSize: {x: 10000, y: 10000}
@@ -119,7 +119,7 @@ MonoBehaviour:
   m_MinSize: {x: 300, y: 112}
   m_MaxSize: {x: 24288, y: 16192}
   vertical: 0
-  controlID: 52
+  controlID: 51
   draggingID: 0
 --- !u!114 &6
 MonoBehaviour:
@@ -145,7 +145,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 112}
   m_MaxSize: {x: 16192, y: 16192}
   vertical: 1
-  controlID: 53
+  controlID: 52
   draggingID: 0
 --- !u!114 &7
 MonoBehaviour:
@@ -171,7 +171,7 @@ MonoBehaviour:
   m_MinSize: {x: 200, y: 56}
   m_MaxSize: {x: 16192, y: 8096}
   vertical: 0
-  controlID: 54
+  controlID: 53
   draggingID: 0
 --- !u!114 &8
 MonoBehaviour:
@@ -305,7 +305,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 43.2
+    y: 0
     width: 2048
     height: 36
   m_SerializedDataModeController:
@@ -598,8 +598,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Scene\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 605.60004
-    y: 79.200005
+    x: 606.6
+    y: 24
     width: 800.4
     height: 433.2
   m_SerializedDataModeController:
@@ -1270,9 +1270,9 @@ MonoBehaviour:
   m_AudioPlay: 0
   m_DebugDrawModesUseInteractiveLightBakingData: 0
   m_Position:
-    m_Target: {x: -19.85743, y: 3.3280106, z: -30.556576}
+    m_Target: {x: 1.9458935, y: 13.558635, z: 9.454758}
     speed: 2
-    m_Value: {x: -19.85743, y: 3.3280106, z: -30.556576}
+    m_Value: {x: 1.9458935, y: 13.558635, z: 9.454758}
   m_RenderMode: 0
   m_CameraMode:
     drawMode: 0
@@ -1318,13 +1318,13 @@ MonoBehaviour:
     m_GridAxis: 1
     m_gridOpacity: 0.5
   m_Rotation:
-    m_Target: {x: -0.0016626104, y: 0.9608197, z: -0.0057649096, w: -0.27712065}
+    m_Target: {x: 0.0033427337, y: 0.97664654, z: -0.21429868, w: 0.015233209}
     speed: 2
-    m_Value: {x: -0.0016626066, y: 0.9608166, z: -0.005764898, w: -0.27711976}
+    m_Value: {x: 0.0033427337, y: 0.97664654, z: -0.21429867, w: 0.015233208}
   m_Size:
-    m_Target: 20.52191
+    m_Target: 0.27358618
     speed: 2
-    m_Value: 20.52191
+    m_Value: 0.27358618
   m_Ortho:
     m_Target: 0
     speed: 2
@@ -1380,7 +1380,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 79.200005
+    y: 24
     width: 604.6
     height: 433.2
   m_SerializedDataModeController:
@@ -1399,14 +1399,14 @@ MonoBehaviour:
   m_SceneHierarchy:
     m_TreeViewState:
       scrollPos: {x: 0, y: 0}
-      m_SelectedIDs:
-      - m_Data: 73368
+      m_SelectedIDs: []
       m_LastClickedID:
-        m_Data: 73368
+        m_Data: 0
       m_ExpandedIDs:
-      - m_Data: -5846
-      - m_Data: -1322
-      - m_Data: 71822
+      - m_Data: -12656
+      - m_Data: -12650
+      - m_Data: -12408
+      - m_Data: -1352
       m_RenameOverlay:
         m_UserAcceptedRename: 0
         m_Name: 
@@ -1665,9 +1665,9 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 559.2
+    y: 538.4
     width: 1407
-    height: 546.80005
+    height: 519.60004
   m_SerializedDataModeController:
     m_DataMode: 0
     m_PreferredDataMode: 0
@@ -1692,7 +1692,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Graphics/Videos
+    - Assets/Scenes
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1702,23 +1702,23 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets/Graphics/Videos
+  - Assets/Scenes
   m_LastFoldersGridSize: 16
   m_LastProjectPath: C:\Users\Malvin Leonardo\Documents\UnityProjects\penting\Tugas_Akhir\EMILIA-VR
   m_LockTracker:
     m_IsLocked: 0
   m_LastLocalAssetsSearchArea: 1
   m_FolderTreeState:
-    scrollPos: {x: 0, y: 433.19995}
+    scrollPos: {x: 0, y: 127}
     m_SelectedIDs:
-    - m_Data: 85824
+    - m_Data: 100144
     m_LastClickedID:
-      m_Data: 85824
+      m_Data: 100144
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 71128
-    - m_Data: 71130
-    - m_Data: 71132
+    - m_Data: 71834
+    - m_Data: 71836
+    - m_Data: 71838
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1751,9 +1751,9 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 71128
-    - m_Data: 71130
-    - m_Data: 71132
+    - m_Data: 71834
+    - m_Data: 71836
+    - m_Data: 71838
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1780,8 +1780,9 @@ MonoBehaviour:
       m_Icon: {fileID: 0}
       m_ResourceFile: 
   m_ListAreaState:
-    m_SelectedInstanceIDs: []
-    m_LastClickedInstanceID: 0
+    m_SelectedInstanceIDs:
+    - m_Data: 102346
+    m_LastClickedInstanceID: 102346
     m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs:
     - m_Data: 126064
@@ -1844,7 +1845,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 538.4
+    y: 483.2
     width: 1407
     height: 519.60004
   m_SerializedDataModeController:
@@ -1871,7 +1872,7 @@ MonoBehaviour:
     m_SkipHidden: 0
     m_SearchArea: 1
     m_Folders:
-    - Assets/Graphics/3D/Character/AZKi/materials
+    - Assets/Graphics/3D/Character/Meshy_AI_Azure_Archivist_0614081454_texture_fbx
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
@@ -1881,7 +1882,7 @@ MonoBehaviour:
   m_ViewMode: 1
   m_StartGridSize: 16
   m_LastFolders:
-  - Assets/Graphics/3D/Character/AZKi/materials
+  - Assets/Graphics/3D/Character/Meshy_AI_Azure_Archivist_0614081454_texture_fbx
   m_LastFoldersGridSize: -1
   m_LastProjectPath: C:\Users\Malvin Leonardo\Documents\UnityProjects\penting\Tugas_Akhir\EMILIA-VR
   m_LockTracker:
@@ -1890,20 +1891,14 @@ MonoBehaviour:
   m_FolderTreeState:
     scrollPos: {x: 0, y: 17.199951}
     m_SelectedIDs:
-    - m_Data: 101820
+    - m_Data: 102356
     m_LastClickedID:
-      m_Data: 101820
+      m_Data: 102356
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 71128
-    - m_Data: 71130
-    - m_Data: 71132
-    - m_Data: 71406
-    - m_Data: 71444
-    - m_Data: 101790
-    - m_Data: 101800
-    - m_Data: 101816
-    - m_Data: 1000000000
+    - m_Data: 71834
+    - m_Data: 71836
+    - m_Data: 71838
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1936,9 +1931,9 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 71128
-    - m_Data: 71130
-    - m_Data: 71132
+    - m_Data: 71834
+    - m_Data: 71836
+    - m_Data: 71838
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -1966,8 +1961,8 @@ MonoBehaviour:
       m_ResourceFile: 
   m_ListAreaState:
     m_SelectedInstanceIDs:
-    - m_Data: 73368
-    m_LastClickedInstanceID: 73368
+    - m_Data: -25086
+    m_LastClickedInstanceID: -25086
     m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs:
     - m_Data: 91164
@@ -1978,6 +1973,7 @@ MonoBehaviour:
     - m_Data: 236216
     - m_Data: 493366
     - m_Data: 63860
+    - m_Data: 100848
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2046,7 +2042,7 @@ MonoBehaviour:
     m_OverlaysVisible: 1
     m_DynamicPanelBehavior: 0
   m_SearchFilter:
-    m_NameFilter: mtoon
+    m_NameFilter: 
     m_ClassNames: []
     m_AssetLabels: []
     m_AssetBundleNames: []
@@ -2060,7 +2056,7 @@ MonoBehaviour:
     m_Globs: []
     m_ProductIds: 
     m_AnyWithAssetOrigin: 0
-    m_OriginalText: mtoon
+    m_OriginalText: 
     m_ImportLogFlags: 0
     m_FilterByTypeIntersection: 0
   m_ViewMode: 1
@@ -2075,18 +2071,14 @@ MonoBehaviour:
   m_FolderTreeState:
     scrollPos: {x: 0, y: 76.39996}
     m_SelectedIDs:
-    - m_Data: 71132
+    - m_Data: 100146
     m_LastClickedID:
-      m_Data: 71132
+      m_Data: 100146
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 71128
-    - m_Data: 71130
-    - m_Data: 71132
-    - m_Data: 71406
-    - m_Data: 71410
-    - m_Data: 71412
-    - m_Data: 1000000000
+    - m_Data: 71834
+    - m_Data: 71836
+    - m_Data: 71838
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2119,9 +2111,9 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 71128
-    - m_Data: 71130
-    - m_Data: 71132
+    - m_Data: 71834
+    - m_Data: 71836
+    - m_Data: 71838
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -2149,9 +2141,9 @@ MonoBehaviour:
       m_ResourceFile: 
   m_ListAreaState:
     m_SelectedInstanceIDs:
-    - m_Data: -11976
-    m_LastClickedInstanceID: -11976
-    m_HadKeyboardFocusLastEvent: 0
+    - m_Data: 102346
+    m_LastClickedInstanceID: 102346
+    m_HadKeyboardFocusLastEvent: 1
     m_ExpandedInstanceIDs:
     - m_Data: 212884
     - m_Data: 62804
@@ -2245,8 +2237,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "Inspector\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 1408
-    y: 79.200005
+    x: 1409
+    y: 24
     width: 639
     height: 978.80005
   m_SerializedDataModeController:
