@@ -6552,6 +6552,87 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 685557107}
   m_CullTransparentMesh: 1
+--- !u!1001 &688620204
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1.2
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -1.32
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 2.047
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.61
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7660445
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.6427876
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 80
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_Name
+      value: Meshy_AI_EMILIA_3D_Quad_Remesh_Rigged
+      objectReference: {fileID: 0}
+    - target: {fileID: 5866666021909216657, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_Avatar
+      value: 
+      objectReference: {fileID: 9000000, guid: d0eb1a01757fc0749b470d52a1e1c5a7, type: 3}
+    - target: {fileID: 5866666021909216657, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
+      propertyPath: m_Controller
+      value: 
+      objectReference: {fileID: 9100000, guid: 499754ac82c53e04a85d484eca7bb490, type: 2}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 85321de821e8afc4a9058e9cc2177c0f, type: 3}
 --- !u!1 &695768022
 GameObject:
   m_ObjectHideFlags: 0
@@ -20319,8 +20400,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VRChatBridge
   _dialoguePanel: {fileID: 6000000007}
-  _azkiPatrol: {fileID: 0}
-  _azkiRoaming: {fileID: 0}
+  _companionPatrol: {fileID: 0}
+  _companionRoaming: {fileID: 0}
   _recorder: {fileID: 210936538}
   _startInReasoningMode: 0
 --- !u!4 &1974298959
@@ -185537,6 +185618,7 @@ SceneRoots:
   - {fileID: 1372208763}
   - {fileID: 1404106334}
   - {fileID: 195504140}
+  - {fileID: 688620204}
   - {fileID: 2065372731}
   - {fileID: 832575519}
   - {fileID: 1266719956}
