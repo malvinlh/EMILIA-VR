@@ -1,28 +1,28 @@
 using UnityEngine;
 
 /// <summary>
-/// Manages Chat UI visibility and AZKi NPC-style engagement.
+/// Manages Chat UI visibility and EMILIA NPC-style engagement.
 ///
-/// Attach to the AZKi root GameObject (or any persistent scene object).
+/// Attach to the EMILIA root GameObject (or any persistent scene object).
 ///
 /// Works in two scene configurations:
-///   - Beach: AZKi uses <see cref="CompanionIslandRoamingController"/> for free roaming.
-///   - Bedroom: AZKi uses <see cref="CompanionChatWaypointPatrolController"/> for standing-point patrol.
+///   - Beach: EMILIA uses <see cref="AvatarIslandRoamingController"/> for free roaming.
+///   - Bedroom: EMILIA uses <see cref="AvatarChatWaypointPatrolController"/> for standing-point patrol.
 ///
 /// The controller auto-detects which movement component is present at Start() and
 /// routes proximity-engagement calls accordingly. No scene-name checks are needed.
 ///
 /// Behaviour (same in both scenes):
 /// - While the player is outside <see cref="proximityRadius"/>, Chat UI is hidden and
-///   AZKi moves normally.
-/// - When the player enters the radius: Chat UI is shown, AZKi pauses, plays Idle, and
+///   EMILIA moves normally.
+/// - When the player enters the radius: Chat UI is shown, EMILIA pauses, plays Idle, and
 ///   continuously faces the player.
-/// - When the player leaves the radius: Chat UI is hidden and AZKi resumes movement.
+/// - When the player leaves the radius: Chat UI is hidden and EMILIA resumes movement.
 ///
 /// Dialogue-driven Talk and waiting-idle behavior are owned by the movement controllers.
 /// </summary>
 [DisallowMultipleComponent]
-public class CompanionProximityUIController : MonoBehaviour
+public class AvatarProximityUIController : MonoBehaviour
 {
     [Header("Chat UI")]
     [Tooltip("Root GameObject of the Chat UI to show/hide based on proximity.")]
@@ -32,12 +32,12 @@ public class CompanionProximityUIController : MonoBehaviour
     [Min(0.1f)]
     [SerializeField] private float proximityRadius = 3f;
 
-    [Header("AZKi - Movement Controllers")]
-    [Tooltip("CompanionIslandRoamingController on the AZKi root (Beach scene). Auto-found if empty.")]
-    [SerializeField] private CompanionIslandRoamingController roamingController;
+    [Header("EMILIA - Movement Controllers")]
+    [Tooltip("AvatarIslandRoamingController on the EMILIA root (Beach scene). Auto-found if empty.")]
+    [SerializeField] private AvatarIslandRoamingController roamingController;
 
-    [Tooltip("CompanionChatWaypointPatrolController on the AZKi root (Bedroom scene). Auto-found if empty.")]
-    [SerializeField] private CompanionChatWaypointPatrolController patrolController;
+    [Tooltip("AvatarChatWaypointPatrolController on the EMILIA root (Bedroom scene). Auto-found if empty.")]
+    [SerializeField] private AvatarChatWaypointPatrolController patrolController;
 
     [Header("Dialogue")]
     [Tooltip("VRDialoguePanel in the scene. Kept for scene compatibility.")]
@@ -52,14 +52,14 @@ public class CompanionProximityUIController : MonoBehaviour
         SetChatUIVisible(false);
 
         if (roamingController == null)
-            roamingController = GetComponentInParent<CompanionIslandRoamingController>();
+            roamingController = GetComponentInParent<AvatarIslandRoamingController>();
         if (roamingController == null)
-            roamingController = FindFirstObjectByType<CompanionIslandRoamingController>();
+            roamingController = FindFirstObjectByType<AvatarIslandRoamingController>();
 
         if (patrolController == null)
-            patrolController = GetComponentInParent<CompanionChatWaypointPatrolController>();
+            patrolController = GetComponentInParent<AvatarChatWaypointPatrolController>();
         if (patrolController == null)
-            patrolController = FindFirstObjectByType<CompanionChatWaypointPatrolController>();
+            patrolController = FindFirstObjectByType<AvatarChatWaypointPatrolController>();
 
         if (dialoguePanel == null)
             dialoguePanel = FindFirstObjectByType<VRDialoguePanel>();

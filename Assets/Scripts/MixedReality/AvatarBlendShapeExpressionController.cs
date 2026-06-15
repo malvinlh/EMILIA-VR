@@ -3,19 +3,19 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Drives AZKi facial blend-shapes based on the current base-layer animation state.
+/// Drives optional avatar facial blend-shapes based on the current base-layer animation state.
 /// Supports Japanese blend-shape names and graceful fallback when a shape is missing.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Animator))]
-public class CompanionBlendShapeExpressionController : MonoBehaviour
+public class AvatarBlendShapeExpressionController : MonoBehaviour
 {
     [Header("Renderer")]
-    [Tooltip("Optional explicit face renderer. If null, auto-finds a SkinnedMeshRenderer under this companion.")]
+    [Tooltip("Optional explicit face renderer. If null, auto-finds a SkinnedMeshRenderer under this avatar.")]
     [SerializeField] private SkinnedMeshRenderer faceRenderer;
 
     [Tooltip("Used when auto-finding the face renderer by object name.")]
-    [SerializeField] private string faceMeshNameHint = "AZKi_mesh";
+    [SerializeField] private string faceMeshNameHint = "Face";
 
     [Header("State Names")]
     [SerializeField] private string idleStateName = "Base Layer.Idle";

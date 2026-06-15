@@ -2,7 +2,7 @@ using UnityEngine;
 
 /// <summary>
 /// Adds simple gravity behavior to a CharacterController-driven NPC.
-/// This keeps the companion grounded like a typical game NPC without requiring a Rigidbody.
+/// This keeps the avatar grounded like a typical game NPC without requiring a Rigidbody.
 /// </summary>
 [RequireComponent(typeof(CharacterController))]
 public class NpcCharacterControllerGravity : MonoBehaviour

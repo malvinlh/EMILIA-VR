@@ -155,10 +155,10 @@ public static class EmiliaSceneSetup
             if (modeProp != null && modeProp.enumValueIndex != (int)ReviewMode.BedroomPaper)
             { modeProp.enumValueIndex = (int)ReviewMode.BedroomPaper; wired++; }
 
-            // companionRoot via AZKi_dialogue_anchor parent
-            var anchor = GameObject.Find("AZKi_dialogue_anchor");
-            if (anchor != null) wired += SetIfNull(so, "companionRoot", anchor.transform.parent);
-            else Debug.LogWarning("[EmiliaSceneSetup] 'AZKi_dialogue_anchor' not found — companionRoot not wired.");
+            // avatarRoot via EMILIA_dialogue_anchor parent
+            var anchor = GameObject.Find("EMILIA_dialogue_anchor");
+            if (anchor != null) wired += SetIfNull(so, "avatarRoot", anchor.transform.parent);
+            else Debug.LogWarning("[EmiliaSceneSetup] 'EMILIA_dialogue_anchor' not found — avatarRoot not wired.");
 
             // standPoint
             var sp = GameObject.Find("StandPoint1");
@@ -167,19 +167,19 @@ public static class EmiliaSceneSetup
                 sp = new GameObject("StandPoint1");
                 Undo.RegisterCreatedObjectUndo(sp, "Create StandPoint1");
                 created++;
-                Debug.LogWarning("[EmiliaSceneSetup] Created StandPoint1 at origin — move it in front of AZKi.");
+                Debug.LogWarning("[EmiliaSceneSetup] Created StandPoint1 at origin — move it in front of EMILIA.");
             }
             wired += SetIfNull(so, "standPoint", sp.transform);
 
-            // _waypointController from companionRoot
-            var companionRootProp = so.FindProperty("companionRoot");
-            if (companionRootProp?.objectReferenceValue is Transform companionXf)
+            // _waypointController from avatarRoot
+            var avatarRootProp = so.FindProperty("avatarRoot");
+            if (avatarRootProp?.objectReferenceValue is Transform avatarXf)
             {
-                var wp = companionXf.GetComponent<CompanionChatWaypointPatrolController>();
+                var wp = avatarXf.GetComponent<AvatarChatWaypointPatrolController>();
                 if (wp == null)
-                    wp = companionXf.GetComponentInChildren<CompanionChatWaypointPatrolController>(true);
+                    wp = avatarXf.GetComponentInChildren<AvatarChatWaypointPatrolController>(true);
                 if (wp == null)
-                    wp = Object.FindFirstObjectByType<CompanionChatWaypointPatrolController>();
+                    wp = Object.FindFirstObjectByType<AvatarChatWaypointPatrolController>();
                 if (wp != null) wired += SetIfNull(so, "_waypointController", wp);
             }
 

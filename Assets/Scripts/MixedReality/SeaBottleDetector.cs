@@ -4,7 +4,7 @@ using UnityEngine;
 /// Attach to the Sea GameObject (which has a Mesh Collider).
 ///
 /// When the journal bottle contacts the sea surface during the discard path
-/// (WaitingForBottle state), the bottle is destroyed and the companion delivers a short
+/// (WaitingForBottle state), the bottle is destroyed and the avatar delivers a short
 /// closing dialogue before the session ends.
 ///
 /// Bottle is identified by tag (default "JournalBottle") — set this tag on the PostJournal

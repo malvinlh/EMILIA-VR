@@ -14,7 +14,7 @@ using UnityEngine;
 public class DialoguePanelPositioner : MonoBehaviour
 {
     [Header("References")]
-    [Tooltip("Transform near the character's chest (e.g., AZKiDialogueAnchor). Billboard origin.")]
+    [Tooltip("Transform near the character's chest (e.g., EMILIA_dialogue_anchor). Billboard origin.")]
     [SerializeField] private Transform _characterAnchor;
     [Tooltip("XR Camera (Main Camera). Auto-resolved if null.")]
     [SerializeField] private Transform _camera;

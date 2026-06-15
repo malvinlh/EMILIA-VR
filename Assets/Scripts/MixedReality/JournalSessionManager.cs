@@ -965,7 +965,7 @@ public class JournalSessionManager : MonoBehaviour
         _penEnabled = true;
         ApplyPenEnabled(true);
 
-        // During writing, keep AZKi hidden and non-locomoting until review begins.
+        // During writing, keep EMILIA hidden and non-locomoting until review begins.
         reviewController?.EnterJournalingMode();
 
         // Re-lock canvas orientation now that the player is at SeatPoint facing the
@@ -1113,7 +1113,7 @@ public class JournalSessionManager : MonoBehaviour
         CurrentState = SessionState.Idle;
         Debug.Log("[JournalSession] Session ended. Book re-enabled.");
 
-        // Resume companion locomotion last so the cheer pose is held until
+        // Resume avatar locomotion last so the cheer pose is held until
         // the start button and portal are already visible to the player.
         reviewController?.OnSessionEnded();
     }

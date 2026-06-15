@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.AI;
 
 /// <summary>
-/// Roaming controller for AZKi.
+/// Roaming controller for EMILIA.
 ///
 /// - Captures the authored scene pose once and can lock back to it for review moments.
 /// - Builds/uses a NavMeshSurface at runtime and drives random patrol movement.
@@ -12,17 +12,17 @@ using UnityEngine.AI;
 [DisallowMultipleComponent]
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
-public class CompanionIslandRoamingController : MonoBehaviour
+public class AvatarIslandRoamingController : MonoBehaviour
 {
     [Header("Navigation")]
     [Tooltip("Optional NavMeshSurface. If empty, one is auto-found or created at runtime.")]
     [SerializeField] private NavMeshSurface navMeshSurface;
 
-    [Tooltip("Radius (meters) from the authored AZKi position used for patrol destinations.")]
+    [Tooltip("Radius (meters) from the authored EMILIA position used for patrol destinations.")]
     [Min(0.5f)]
     [SerializeField] private float patrolRadius = 100f;
 
-    [Tooltip("How close AZKi must be to consider a destination reached.")]
+    [Tooltip("How close EMILIA must be to consider a destination reached.")]
     [Min(0.05f)]
     [SerializeField] private float destinationReachedDistance = 0.45f;
 
@@ -41,7 +41,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
     [Tooltip("Runtime fallback only. Keep disabled when scene navmesh is pre-baked.")]
     [SerializeField] private bool buildNavMeshOnStart = false;
 
-    [Tooltip("Skip runtime build when a usable NavMesh is already available near AZKi.")]
+    [Tooltip("Skip runtime build when a usable NavMesh is already available near EMILIA.")]
     [SerializeField] private bool skipRuntimeBuildIfNavMeshPresent = true;
 
     [Tooltip("Geometry source for runtime build fallback. PhysicsColliders avoids mesh read-access warnings in player builds.")]
@@ -135,7 +135,6 @@ public class CompanionIslandRoamingController : MonoBehaviour
 
     private NavMeshAgent _agent;
     private Animator _animator;
-    private CompanionBlendShapeExpressionController _blendShapeController;
     private NpcCharacterControllerGravity _gravityController;
     private NavMeshPath _pathBuffer;
 
@@ -189,7 +188,6 @@ public class CompanionIslandRoamingController : MonoBehaviour
     {
         _agent = GetComponent<NavMeshAgent>();
         _animator = GetComponent<Animator>();
-        EnsureBlendShapeController();
         _gravityController = GetComponent<NpcCharacterControllerGravity>();
         _pathBuffer = new NavMeshPath();
 
@@ -286,7 +284,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
     }
 
     /// <summary>
-    /// Freezes AZKi at the authored scene pose and keeps patrol animation idle.
+    /// Freezes EMILIA at the authored scene pose and keeps patrol animation idle.
     /// </summary>
     public void LockAtAuthoredPose()
     {
@@ -330,7 +328,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
     }
 
     /// <summary>
-    /// Plays the Talk animation in a forced loop while AZKi remains locked at authored pose.
+    /// Plays the Talk animation in a forced loop while EMILIA remains locked at authored pose.
     /// </summary>
     public void PlayTalkLoop()
     {
@@ -340,7 +338,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
     }
 
     /// <summary>
-    /// Plays the Cheering animation once while AZKi remains locked at authored pose.
+    /// Plays the Cheering animation once while EMILIA remains locked at authored pose.
     /// </summary>
     public void PlayCheeringOneShot()
     {
@@ -352,7 +350,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
     }
 
     /// <summary>
-    /// True once the cheering animation has played fully and AZKi is holding the final pose.
+    /// True once the cheering animation has played fully and EMILIA is holding the final pose.
     /// Poll this to know when it is safe to resume roaming after a cheering one-shot.
     /// </summary>
     public bool IsCheeringPoseHeld => _isCheeringPoseHeld;
@@ -389,7 +387,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
             if (!_loggedMissingNavMesh)
             {
                 _loggedMissingNavMesh = true;
-                Debug.LogWarning("[CompanionIslandRoamingController] No NavMesh found for AZKi. Bake NavMesh for the scene or enable runtime build fallback.", this);
+                Debug.LogWarning("[AvatarIslandRoamingController] No NavMesh found for EMILIA. Bake NavMesh for the scene or enable runtime build fallback.", this);
             }
 
             EnforceAnimation(PatrolAnimation.Idle, force: true);
@@ -450,7 +448,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
     }
 
     /// <summary>
-    /// While in proximity engagement, switches AZKi to Talk loop
+    /// While in proximity engagement, switches EMILIA to Talk loop
     /// (e.g. when a chat response is displayed).
     /// </summary>
     public void PlayTalkWhileEngaged()
@@ -460,7 +458,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
     }
 
     /// <summary>
-    /// While in proximity engagement, returns AZKi to Idle
+    /// While in proximity engagement, returns EMILIA to Idle
     /// (e.g. when dialogue is dismissed).
     /// </summary>
     public void ReturnToIdleWhileEngaged()
@@ -471,7 +469,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
 
     /// <summary>
     /// Wires the dialogue panel so Talk/Idle follow response visibility directly,
-    /// matching the bedroom-scene pattern in CompanionChatWaypointPatrolController.
+    /// matching the bedroom-scene pattern in AvatarChatWaypointPatrolController.
     /// </summary>
     public void SetDialoguePanel(VRDialoguePanel panel)
     {
@@ -644,7 +642,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
     // ─────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Captures the scene-authored AZKi pose used during review standby.
+    /// Captures the scene-authored EMILIA pose used during review standby.
     /// </summary>
     public void CaptureAuthoredPose()
     {
@@ -659,7 +657,6 @@ public class CompanionIslandRoamingController : MonoBehaviour
             _agent = GetComponent<NavMeshAgent>();
         if (_animator == null)
             _animator = GetComponent<Animator>();
-        EnsureBlendShapeController();
         if (_gravityController == null)
             _gravityController = GetComponent<NpcCharacterControllerGravity>();
         if (_pathBuffer == null)
@@ -670,15 +667,6 @@ public class CompanionIslandRoamingController : MonoBehaviour
 
         if (_idleHash == 0 || _idleBHash == 0 || _walkHash == 0 || _talkHash == 0 || _cheeringHash == 0)
             CacheAnimatorStateHashes();
-    }
-
-    private void EnsureBlendShapeController()
-    {
-        if (_blendShapeController == null)
-            _blendShapeController = GetComponent<CompanionBlendShapeExpressionController>();
-
-        if (_blendShapeController == null)
-            _blendShapeController = gameObject.AddComponent<CompanionBlendShapeExpressionController>();
     }
 
     private void CacheAnimatorStateHashes()
@@ -707,7 +695,7 @@ public class CompanionIslandRoamingController : MonoBehaviour
 
         if (navMeshSurface == null)
         {
-            var surfaceGo = new GameObject("__AZKi_NavMeshSurfaceRuntime");
+            var surfaceGo = new GameObject("__EMILIA_NavMeshSurfaceRuntime");
             navMeshSurface = surfaceGo.AddComponent<NavMeshSurface>();
             navMeshSurface.collectObjects = CollectObjects.All;
         }

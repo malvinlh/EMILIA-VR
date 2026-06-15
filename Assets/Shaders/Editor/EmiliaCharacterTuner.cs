@@ -4,7 +4,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// Batch-converts and tunes all AZKi character materials to EMILIA/Character shader.
+/// Batch-converts and tunes EMILIA character materials to EMILIA/Character shader.
 /// Auto-detects material category (skin, hair, eyes, clothing, accessory, special)
 /// using name matching (Japanese and English), texture filename heuristics, and
 /// texture color analysis as fallback.
@@ -13,7 +13,7 @@ using UnityEngine;
 /// </summary>
 public class EmiliaCharacterTuner : EditorWindow
 {
-    private const string DefaultMaterialsPath = "Assets/Graphics/3D/Character/AZKi/materials";
+    private const string DefaultMaterialsPath = "Assets/Graphics/3D/Character/EMILIA/rigged_materials";
 
     // User-configurable path
     private string _materialsPath = DefaultMaterialsPath;

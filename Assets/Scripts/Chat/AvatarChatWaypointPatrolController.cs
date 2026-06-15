@@ -5,17 +5,17 @@ using UnityEngine;
 using UnityEngine.AI;
 
 /// <summary>
-/// Waypoint patrol controller for AZKi in 3D_Chat.
+/// Waypoint patrol controller for EMILIA in 3D_Chat.
 /// Walks between fixed standing points, idles at each stop, and plays Talk
 /// while assistant response text is visible in the dialogue panel.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
-public class CompanionChatWaypointPatrolController : MonoBehaviour
+public class AvatarChatWaypointPatrolController : MonoBehaviour
 {
     [Header("Standing Points")]
-    [Tooltip("Parent transform that contains standing points for AZKi patrol.")]
+    [Tooltip("Parent transform that contains standing points for EMILIA patrol.")]
     [SerializeField] private Transform standingPointsRoot;
 
     [Tooltip("Auto-find/create root object with this name when reference is empty.")]
@@ -41,7 +41,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
     [Tooltip("Runtime fallback only. Keep disabled when scene navmesh is pre-baked.")]
     [SerializeField] private bool buildNavMeshOnStart = false;
 
-    [Tooltip("Skip runtime build when NavMesh is already available near AZKi or patrol points.")]
+    [Tooltip("Skip runtime build when NavMesh is already available near EMILIA or patrol points.")]
     [SerializeField] private bool skipRuntimeBuildIfNavMeshPresent = true;
 
     [Tooltip("Geometry source for runtime NavMesh build. PhysicsColliders avoids mesh read-access warnings in player builds.")]
@@ -93,7 +93,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
     [SerializeField] private float stopTurnSpeed = 360f;
 
     [Header("Talk Facing")]
-    [Tooltip("Smoothly align AZKi toward the player before starting Talk animation.")]
+    [Tooltip("Smoothly align EMILIA toward the player before starting Talk animation.")]
     [SerializeField] private bool useHybridPreTalkAlignment = true;
 
     [Min(1f)]
@@ -150,7 +150,6 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
 
     private NavMeshAgent _agent;
     private Animator _animator;
-    private CompanionBlendShapeExpressionController _blendShapeController;
     private NpcCharacterControllerGravity _gravityController;
     private NavMeshPath _pathBuffer;
 
@@ -172,7 +171,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
     private bool _talkLoopStarted;
     private float _preTalkDeadlineTime;
 
-    // Proximity-engagement state (mirrors CompanionIslandRoamingController's API)
+    // Proximity-engagement state (mirrors AvatarIslandRoamingController's API)
     private bool _isInProximityEngagement;
     private Transform _engagementTarget;
 
@@ -207,7 +206,6 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
         _gravityController = GetComponent<NpcCharacterControllerGravity>();
         _pathBuffer = new NavMeshPath();
 
-        EnsureBlendShapeController();
         CacheAnimatorStateHashes();
 
         if (_animator != null)
@@ -246,7 +244,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
             if (!_loggedMissingNavMesh)
             {
                 _loggedMissingNavMesh = true;
-                Debug.LogWarning("[CompanionChatWaypointPatrolController] No NavMesh found for AZKi. Bake NavMesh for 3D_Chat or enable runtime build fallback.", this);
+                Debug.LogWarning("[AvatarChatWaypointPatrolController] No NavMesh found for EMILIA. Bake NavMesh for 3D_Chat or enable runtime build fallback.", this);
             }
 
             EnforceAnimation(AnimState.Idle, force: true);
@@ -318,7 +316,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
             EnforceAnimation(AnimState.Walk, force: false);
     }
 
-    // ── Proximity Engagement (mirrors CompanionIslandRoamingController API) ──────
+    // ── Proximity Engagement (mirrors AvatarIslandRoamingController API) ──────
 
     /// <summary>
     /// Pauses patrol at the current position, plays Idle, and continuously
@@ -356,7 +354,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
     }
 
     /// <summary>
-    /// While in proximity engagement, switches AZKi to Talk loop
+    /// While in proximity engagement, switches EMILIA to Talk loop
     /// (e.g. when a chat response is displayed).
     /// </summary>
     public void PlayTalkWhileEngaged()
@@ -366,7 +364,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
     }
 
     /// <summary>
-    /// While in proximity engagement, returns AZKi to Idle
+    /// While in proximity engagement, returns EMILIA to Idle
     /// (e.g. when dialogue is dismissed).
     /// </summary>
     public void ReturnToIdleWhileEngaged()
@@ -435,7 +433,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
     }
 
     // ── JournalReviewController integration ─────────────────────────────────
-    // Match the call surface of CompanionIslandRoamingController so JRC dispatches
+    // Match the call surface of AvatarIslandRoamingController so JRC dispatches
     // to either controller type without knowing which scene it is in.
 
     public void LockAtAuthoredPose()
@@ -498,7 +496,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
 
     // Continuously re-asserts the Cheering state while journal-locked so the controller's
     // auto-exit Cheering->Walk transition cannot escape. Mirrors the CheeringOnce branch
-    // of CompanionIslandRoamingController.HandleLockedMode.
+    // of AvatarIslandRoamingController.HandleLockedMode.
     private void HandleJournalLockedMode()
     {
         if (!_isCheeringPlaying && !_isCheeringPoseHeld) return;
@@ -1130,7 +1128,7 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
 
         if (navMeshSurface == null)
         {
-            var surfaceObject = new GameObject("__AZKi_Chat_NavMeshSurfaceRuntime");
+            var surfaceObject = new GameObject("__EMILIA_Chat_NavMeshSurfaceRuntime");
             navMeshSurface = surfaceObject.AddComponent<NavMeshSurface>();
             navMeshSurface.collectObjects = CollectObjects.All;
         }
@@ -1286,15 +1284,6 @@ public class CompanionChatWaypointPatrolController : MonoBehaviour
         }
 
         _standingPoints.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
-    }
-
-    private void EnsureBlendShapeController()
-    {
-        if (_blendShapeController == null)
-            _blendShapeController = GetComponent<CompanionBlendShapeExpressionController>();
-
-        if (_blendShapeController == null)
-            _blendShapeController = gameObject.AddComponent<CompanionBlendShapeExpressionController>();
     }
 
     private void CacheAnimatorStateHashes()

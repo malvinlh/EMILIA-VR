@@ -28,12 +28,14 @@ public class VRChatBridge : MonoBehaviour
     [Header("VR Dialogue")]
     [SerializeField] private VRDialoguePanel _dialoguePanel;
 
-    [Header("Companion")]
+    [Header("Avatar")]
     [Tooltip("Used in 3D_Journal_Bedroom scene.")]
-    [SerializeField, FormerlySerializedAs("_azkiPatrol")] private CompanionChatWaypointPatrolController _companionPatrol;
+    [FormerlySerializedAs("_companionPatrol")]
+    [SerializeField] private AvatarChatWaypointPatrolController _avatarPatrol;
 
     [Tooltip("Used in 3D_Journal_Beach scene.")]
-    [SerializeField, FormerlySerializedAs("_azkiRoaming")] private CompanionIslandRoamingController _companionRoaming;
+    [FormerlySerializedAs("_companionRoaming")]
+    [SerializeField] private AvatarIslandRoamingController _avatarRoaming;
 
     [Header("Audio Recording")]
     [SerializeField] private RecordAudio _recorder;
@@ -110,12 +112,12 @@ public class VRChatBridge : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(this); return; }
         Instance = this;
         _isReasoningMode = _startInReasoningMode;
-        EnsureCompanionPatrol();
+        EnsureAvatarPatrol();
     }
 
     private void Start()
     {
-        EnsureCompanionPatrol();
+        EnsureAvatarPatrol();
         _userId = PlayerPrefs.GetString(PrefKeyNickname, "");
         FetchConversationIds();
     }
@@ -833,7 +835,7 @@ public class VRChatBridge : MonoBehaviour
     private const string BeachSceneName   = "3D_Journal_Beach";
     private const string BedroomSceneName = "3D_Journal_Bedroom";
 
-    private void EnsureCompanionPatrol()
+    private void EnsureAvatarPatrol()
     {
         if (_dialoguePanel == null)
             _dialoguePanel = FindFirstObjectByType<VRDialoguePanel>();
@@ -842,48 +844,48 @@ public class VRChatBridge : MonoBehaviour
 
         if (currentScene.Contains(BeachSceneName))
         {
-            // ── Beach scene: use CompanionIslandRoamingController ──────────────
-            EnsureCompanionRoaming();
+            // ── Beach scene: use AvatarIslandRoamingController ──────────────
+            EnsureAvatarRoaming();
         }
         else
         {
-            // ── Bedroom (and any other) scene: use CompanionChatWaypointPatrolController ──
-            EnsureCompanionWaypointPatrol();
+            // ── Bedroom (and any other) scene: use AvatarChatWaypointPatrolController ──
+            EnsureAvatarWaypointPatrol();
         }
     }
 
     // ── Beach-scene helper ────────────────────────────────────────────────
 
-    private void EnsureCompanionRoaming()
+    private void EnsureAvatarRoaming()
     {
-        if (_companionRoaming == null)
-            _companionRoaming = FindFirstObjectByType<CompanionIslandRoamingController>();
+        if (_avatarRoaming == null)
+            _avatarRoaming = FindFirstObjectByType<AvatarIslandRoamingController>();
 
-        if (_companionRoaming == null)
+        if (_avatarRoaming == null)
         {
-            // Try to find AZKi host and attach the controller.
-            GameObject companionHost = FindPreferredCompanionHostObject();
-            if (companionHost != null)
-                _companionRoaming = companionHost.AddComponent<CompanionIslandRoamingController>();
+            // Try to find EMILIA host and attach the controller.
+            GameObject avatarHost = FindPreferredAvatarHostObject();
+            if (avatarHost != null)
+                _avatarRoaming = avatarHost.AddComponent<AvatarIslandRoamingController>();
         }
 
-        if (_companionRoaming != null && _dialoguePanel != null)
-            _companionRoaming.SetDialoguePanel(_dialoguePanel);
+        if (_avatarRoaming != null && _dialoguePanel != null)
+            _avatarRoaming.SetDialoguePanel(_dialoguePanel);
     }
 
     // ── Bedroom-scene helper (existing logic, extracted for clarity) ──────
 
-    private void EnsureCompanionWaypointPatrol()
+    private void EnsureAvatarWaypointPatrol()
     {
-        GameObject companionHost = FindPreferredCompanionHostObject();
-        if (companionHost != null)
+        GameObject avatarHost = FindPreferredAvatarHostObject();
+        if (avatarHost != null)
         {
-            var hostPatrol = companionHost.GetComponent<CompanionChatWaypointPatrolController>();
+            var hostPatrol = avatarHost.GetComponent<AvatarChatWaypointPatrolController>();
             if (hostPatrol == null)
-                hostPatrol = companionHost.AddComponent<CompanionChatWaypointPatrolController>();
+                hostPatrol = avatarHost.AddComponent<AvatarChatWaypointPatrolController>();
 
             // Keep the parent-hosted controller as the active one.
-            var existingControllers = FindObjectsOfType<CompanionChatWaypointPatrolController>(true);
+            var existingControllers = FindObjectsOfType<AvatarChatWaypointPatrolController>(true);
             foreach (var controller in existingControllers)
             {
                 if (controller == null || controller == hostPatrol)
@@ -892,18 +894,18 @@ public class VRChatBridge : MonoBehaviour
                 controller.enabled = false;
             }
 
-            _companionPatrol = hostPatrol;
+            _avatarPatrol = hostPatrol;
         }
-        else if (_companionPatrol == null)
+        else if (_avatarPatrol == null)
         {
-            _companionPatrol = FindFirstObjectByType<CompanionChatWaypointPatrolController>();
+            _avatarPatrol = FindFirstObjectByType<AvatarChatWaypointPatrolController>();
         }
 
-        if (_companionPatrol != null && _dialoguePanel != null)
-            _companionPatrol.SetDialoguePanel(_dialoguePanel);
+        if (_avatarPatrol != null && _dialoguePanel != null)
+            _avatarPatrol.SetDialoguePanel(_dialoguePanel);
     }
 
-    private GameObject FindPreferredCompanionHostObject()
+    private GameObject FindPreferredAvatarHostObject()
     {
         Transform bestAnimatorTransform = null;
         int bestAnimatorDepth = int.MaxValue;
@@ -914,7 +916,7 @@ public class VRChatBridge : MonoBehaviour
             if (animator == null)
                 continue;
 
-            if (animator.name.IndexOf("azki", StringComparison.OrdinalIgnoreCase) < 0)
+            if (animator.name.IndexOf("emilia", StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
 
             int depth = GetTransformDepth(animator.transform);
@@ -937,7 +939,7 @@ public class VRChatBridge : MonoBehaviour
             if (t == null)
                 continue;
 
-            if (t.name.IndexOf("azki", StringComparison.OrdinalIgnoreCase) < 0)
+            if (t.name.IndexOf("emilia", StringComparison.OrdinalIgnoreCase) < 0)
                 continue;
 
             int depth = GetTransformDepth(t);
@@ -962,14 +964,14 @@ public class VRChatBridge : MonoBehaviour
         {
             Transform parent = current.parent;
 
-            bool parentLooksLikeCompanion =
-                parent.name.IndexOf("azki", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool parentLooksLikeAvatar =
+                parent.name.IndexOf("emilia", StringComparison.OrdinalIgnoreCase) >= 0;
             bool parentHasCoreComponents =
                 parent.GetComponent<Animator>() != null ||
                 parent.GetComponent<NavMeshAgent>() != null ||
                 parent.GetComponent<CharacterController>() != null;
 
-            if (!parentLooksLikeCompanion && !parentHasCoreComponents)
+            if (!parentLooksLikeAvatar && !parentHasCoreComponents)
                 break;
 
             current = parent;
