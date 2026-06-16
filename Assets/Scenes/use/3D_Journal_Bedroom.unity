@@ -11539,7 +11539,7 @@ MonoBehaviour:
   whiteboardUIGroup: {fileID: 78799590}
   vintageMicrophone: {fileID: 1760708232}
   bottlePreDuringProp: {fileID: 0}
-  choicePanelHeight: 3.15
+  choicePanelHeight: 2.85
   bottleNeckZone: {fileID: 0}
   _placeholderRenderers:
   - {fileID: 0}
@@ -13728,7 +13728,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AzkiProximityUIController
   chatUIRoot: {fileID: 2142015301}
-  proximityRadius: 3
+  proximityRadius: 3.5
   roamingController: {fileID: 0}
   patrolController: {fileID: 0}
   dialoguePanel: {fileID: 1755438122}
