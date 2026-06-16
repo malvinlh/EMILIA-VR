@@ -246,7 +246,10 @@ public class JournalStampDoneButton : MonoBehaviour
 
     private void EnsureGrabSetup()
     {
-        _rb = GetComponent<Rigidbody>() ?? gameObject.AddComponent<Rigidbody>();
+        _rb = GetComponent<Rigidbody>();
+        if (_rb == null)
+            _rb = gameObject.AddComponent<Rigidbody>();
+        
         _rb.useGravity  = true;
         _rb.isKinematic = false;
 
