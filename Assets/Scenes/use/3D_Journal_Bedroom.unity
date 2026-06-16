@@ -2868,7 +2868,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 3.55
+      value: 3.65
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode
@@ -11512,7 +11512,7 @@ MonoBehaviour:
   whiteboardUIGroup: {fileID: 78799590}
   vintageMicrophone: {fileID: 1760708232}
   bottlePreDuringProp: {fileID: 0}
-  choicePanelHeight: 3.15
+  choicePanelHeight: 2.85
   bottleNeckZone: {fileID: 0}
   _placeholderRenderers:
   - {fileID: 0}
@@ -12405,7 +12405,7 @@ MonoBehaviour:
   proximityRadius: 3
   roamingController: {fileID: 0}
   patrolController: {fileID: 0}
-  dialoguePanel: {fileID: 0}
+  dialoguePanel: {fileID: 1755438122}
 --- !u!195 &1955129061
 NavMeshAgent:
   m_ObjectHideFlags: 0
