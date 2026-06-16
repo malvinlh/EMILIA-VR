@@ -14341,7 +14341,7 @@ MonoBehaviour:
   proximityRadius: 3
   roamingController: {fileID: 0}
   patrolController: {fileID: 0}
-  dialoguePanel: {fileID: 0}
+  dialoguePanel: {fileID: 6000000007}
 --- !u!1001 &1446149845
 PrefabInstance:
   m_ObjectHideFlags: 0

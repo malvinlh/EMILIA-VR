@@ -2885,7 +2885,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_CameraYOffset
-      value: 3.75
+      value: 3.65
       objectReference: {fileID: 0}
     - target: {fileID: 1820897918385990095, guid: d6878e1999eb4b44a9f5a263af86c185, type: 3}
       propertyPath: m_RequestedTrackingOriginMode
@@ -13731,7 +13731,7 @@ MonoBehaviour:
   proximityRadius: 3
   roamingController: {fileID: 0}
   patrolController: {fileID: 0}
-  dialoguePanel: {fileID: 0}
+  dialoguePanel: {fileID: 1755438122}
 --- !u!195 &2142015303
 NavMeshAgent:
   m_ObjectHideFlags: 0
