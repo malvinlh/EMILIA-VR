@@ -13728,7 +13728,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AzkiProximityUIController
   chatUIRoot: {fileID: 2142015301}
-  proximityRadius: 3.5
+  proximityRadius: 3
   roamingController: {fileID: 0}
   patrolController: {fileID: 0}
   dialoguePanel: {fileID: 1755438122}
