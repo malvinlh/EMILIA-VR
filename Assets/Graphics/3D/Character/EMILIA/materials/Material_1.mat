@@ -366,7 +366,7 @@ Material:
     - _HeightMapParametrization: 0
     - _HeightOffset: 0
     - _HighColor_Feather: 0.05
-    - _HighColor_Power: 0
+    - _HighColor_Power: 0.023
     - _HighColor_Step: 0.55
     - _HighlightOverridden: 0
     - _HighlightVisible: 1
