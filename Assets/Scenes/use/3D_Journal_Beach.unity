@@ -10406,6 +10406,11 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: -4488266975990590275, guid: 61814d276c8af20439a8e6850998a406, type: 3}
+--- !u!4 &1120533397 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 3852616433082410385, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
+  m_PrefabInstance: {fileID: 3226466563547401618}
+  m_PrefabAsset: {fileID: 0}
 --- !u!64 &1126179714
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -21894,7 +21899,7 @@ PrefabInstance:
     - target: {fileID: 8942195436895523852, guid: da071b08d1472444da871d7de1add6d4, type: 3}
       propertyPath: _characterAnchor
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1120533397}
     - target: {fileID: 9141490612460933616, guid: da071b08d1472444da871d7de1add6d4, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -71281,7 +71286,7 @@ PrefabInstance:
     - target: {fileID: 4489851565612840679, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: _chatBridge
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1974298958}
     - target: {fileID: 4833001232707801936, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -71317,7 +71322,7 @@ PrefabInstance:
     - target: {fileID: 5620952158719981601, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: _chatBridge
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1974298958}
     - target: {fileID: 6193008797416263904, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -71353,7 +71358,7 @@ PrefabInstance:
     - target: {fileID: 6584690177989652165, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: _chatBridge
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1974298958}
     - target: {fileID: 7323759165303625841, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: m_SizeDelta.y
       value: 0

@@ -12213,7 +12213,7 @@ PrefabInstance:
     - target: {fileID: 4489851565612840679, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: _chatBridge
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1326230199}
     - target: {fileID: 4833001232707801936, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -12249,7 +12249,7 @@ PrefabInstance:
     - target: {fileID: 5620952158719981601, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: _chatBridge
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1326230199}
     - target: {fileID: 6193008797416263904, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -12285,7 +12285,7 @@ PrefabInstance:
     - target: {fileID: 6584690177989652165, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: _chatBridge
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 1326230199}
     - target: {fileID: 7323759165303625841, guid: a9cb99fb85ef29f4d8a94a9cceef4a6d, type: 3}
       propertyPath: m_SizeDelta.y
       value: 0
