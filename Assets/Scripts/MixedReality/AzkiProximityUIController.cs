@@ -86,8 +86,12 @@ public class AzkiProximityUIController : MonoBehaviour
         if (player == null)
             return;
 
-        float sqrDist = (transform.position - player.position).sqrMagnitude;
-        bool inRange = sqrDist <= proximityRadius * proximityRadius;
+        // Horizontal (XZ) distance only — the player's head height must not affect "is the player near
+        // the NPC". This matters in scaled scenes (e.g. Bedroom is ~2.25x): the head can sit several
+        // metres above the avatar's base, and a full 3D distance would never fall within the radius.
+        Vector3 planar = transform.position - player.position;
+        planar.y = 0f;
+        bool inRange = planar.sqrMagnitude <= proximityRadius * proximityRadius;
 
         if (inRange && !_playerInProximity)
             OnPlayerEnterProximity(player);
@@ -143,9 +147,12 @@ public class AzkiProximityUIController : MonoBehaviour
 
     private Transform ResolvePlayerTransform()
     {
-        if (_playerTransform != null)
-            return _playerTransform;
-
+        // Always prefer the live head camera. Re-check every call instead of caching the first
+        // result permanently: on a Quest build the XR head camera (MainCamera) comes up after
+        // MR/passthrough init, so an early call would otherwise lock onto a wrong fallback camera
+        // for the whole session (proximity then measures distance to the wrong camera and never
+        // triggers). The Editor/XR Device Simulator has Camera.main ready immediately, which is
+        // why this only manifested in the device build.
         Camera mainCam = Camera.main;
         if (mainCam != null)
         {
@@ -153,14 +160,13 @@ public class AzkiProximityUIController : MonoBehaviour
             return _playerTransform;
         }
 
-        Camera anyCam = FindFirstObjectByType<Camera>();
-        if (anyCam != null)
-        {
-            _playerTransform = anyCam.transform;
+        // Head camera not ready yet: keep the last known-good transform if we have one.
+        if (_playerTransform != null)
             return _playerTransform;
-        }
 
-        return null;
+        // Transient fallback only — do NOT cache, so we still upgrade to Camera.main once it exists.
+        Camera anyCam = FindFirstObjectByType<Camera>();
+        return anyCam != null ? anyCam.transform : null;
     }
 
 #if UNITY_EDITOR
