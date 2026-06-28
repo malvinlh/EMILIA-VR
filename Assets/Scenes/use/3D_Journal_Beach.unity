@@ -22340,7 +22340,7 @@ MonoBehaviour:
   whiteboardUIGroup: {fileID: 3000000021}
   vintageMicrophone: {fileID: 1543201649}
   bottlePreDuringProp: {fileID: 1446149847}
-  choicePanelHeight: 1.2
+  choicePanelHeight: 1.26
   bottleNeckZone: {fileID: 1286493200}
   _placeholderRenderers:
   - {fileID: 6574632737274784373}
