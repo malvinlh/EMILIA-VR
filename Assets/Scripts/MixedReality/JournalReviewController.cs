@@ -830,7 +830,7 @@ public class JournalReviewController : MonoBehaviour
         }
         Debug.Log("[JournalReview] Bottle disposed (sea). Starting BottleDisposedCoroutine.");
         StartCoroutine(BottleDisposedCoroutine(
-            "Melepaskan juga butuh keberanian.\nLaut akan membawanya — begitu juga kamu.",
+            "Melepaskan juga butuh keberanian.\nLaut akan membawanya, begitu juga kamu.",
             saveJournal: false));
     }
 
