@@ -499,6 +499,15 @@ public class AvatarChatWaypointPatrolController : MonoBehaviour
     // of AvatarIslandRoamingController.HandleLockedMode.
     private void HandleJournalLockedMode()
     {
+        // Review Talk loop: while journal-locked, keep the Talk animation looping and face the player
+        // (parity with AvatarIslandRoamingController's TalkLoop override on Beach). HandleTalkMode already
+        // keeps the agent stopped, re-asserts Talk, and replays it when it finishes.
+        if (_talkActive)
+        {
+            HandleTalkMode();
+            return;
+        }
+
         if (!_isCheeringPlaying && !_isCheeringPoseHeld) return;
         if (_animator == null) return;
 

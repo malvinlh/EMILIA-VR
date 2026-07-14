@@ -585,7 +585,7 @@ public class JournalReviewController : MonoBehaviour
         rowRect.offsetMin = rowRect.offsetMax = Vector2.zero;
 
         // "Yes, keep it" — save → bottle rack path
-        var keepBtn = MakeButton("Simpan", s_BtnKeep, s_TextDark,
+        var keepBtn = MakeButton("Simpan", s_BtnKeep, Color.white,
             row.transform, new Vector2(0f, 0f), new Vector2(0.44f, 1f));
         keepBtn.onClick.AddListener(OnKeepChosen);
 

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.Events;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -270,6 +271,12 @@ public class PortalSceneTransition : MonoBehaviour
     private bool IsPlayerTrigger(Collider other)
     {
         if (other == null) return false;
+
+        // The NPC avatar carries a NavMeshAgent (the player's XR Origin does not). Reject it up front
+        // so it can never trigger the portal — even though it has a CharacterController (for NPC gravity)
+        // that would otherwise pass the allowCharacterControllerTrigger check below.
+        if (other.GetComponentInParent<NavMeshAgent>() != null)
+            return false;
 
         if (IsTagMatch(other.transform))
             return true;

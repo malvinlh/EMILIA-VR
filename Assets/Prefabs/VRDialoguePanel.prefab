@@ -75,6 +75,10 @@ MonoBehaviour:
   _followDistance: 1.8
   _followDownAngle: 17
   _gazeThreshold: 0.55
+  _checkOcclusion: 1
+  _occlusionMask:
+    serializedVersion: 2
+    m_Bits: 1
   _blendSpeed: 2.5
   _positionSmoothTime: 0.35
   _rotationSmoothSpeed: 5

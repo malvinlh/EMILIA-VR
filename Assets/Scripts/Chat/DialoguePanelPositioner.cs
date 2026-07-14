@@ -33,6 +33,14 @@ public class DialoguePanelPositioner : MonoBehaviour
     [Tooltip("Dot-product threshold for 'looking at character'. 0.55 ≈ 56° half-cone.")]
     [SerializeField, Range(0f, 1f)] private float _gazeThreshold = 0.55f;
 
+    [Header("Occlusion")]
+    [Tooltip("If the player faces the character but the view is blocked by a building/obstacle, drift the " +
+             "panel to the soft-follow position (same as looking away).")]
+    [SerializeField] private bool _checkOcclusion = true;
+    [Tooltip("Layers that count as view blockers (buildings/environment). Defaults to Everything; the " +
+             "character's own colliders are ignored automatically.")]
+    [SerializeField] private LayerMask _occlusionMask = ~0;
+
     [Header("Smoothing")]
     [SerializeField] private float _blendSpeed = 2.5f;     // mode blend per second
     [SerializeField] private float _positionSmoothTime = 0.35f;
@@ -55,8 +63,19 @@ public class DialoguePanelPositioner : MonoBehaviour
         Vector3 toCharacter = (_characterAnchor.position - _camera.position).normalized;
         float dot = Vector3.Dot(_camera.forward, toCharacter);
 
+        // --- Line-of-sight: if facing the character but a building/obstacle blocks the view,
+        //     treat it like "not facing" so the panel drifts to the readable soft-follow position. ---
+        bool blocked = false;
+        if (_checkOcclusion && dot >= _gazeThreshold &&
+            Physics.Linecast(_camera.position, _characterAnchor.position, out RaycastHit hit,
+                             _occlusionMask, QueryTriggerInteraction.Ignore) &&
+            !hit.transform.IsChildOf(_characterAnchor.root))   // ignore the character's own colliders
+        {
+            blocked = true;
+        }
+
         // --- Blend factor: 0 = anchored, 1 = follow ---
-        float targetBlend = dot >= _gazeThreshold ? 0f : 1f;
+        float targetBlend = (dot >= _gazeThreshold && !blocked) ? 0f : 1f;
         _blendFactor = Mathf.MoveTowards(_blendFactor, targetBlend, _blendSpeed * Time.deltaTime);
 
         // --- Compute target positions for each mode ---
