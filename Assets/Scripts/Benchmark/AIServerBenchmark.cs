@@ -30,8 +30,8 @@ public class AIServerBenchmark : MonoBehaviour
     [SerializeField] private int trials = 30;
     [Tooltip("Discarded warmup calls per service (absorbs Ollama/Whisper cold load).")]
     [SerializeField] private int warmup = 2;
-    [Tooltip("Which services to test, comma-separated: transcribe,sentiment,chat")]
-    [SerializeField] private string services = "transcribe,sentiment,chat";
+    [Tooltip("Which services to test, comma-separated. Chat is first so the slowest/most-wanted batch is captured earliest.")]
+    [SerializeField] private string services = "chat,sentiment,transcribe";
     [Tooltip("Idle delay between calls (seconds).")]
     [SerializeField] private float interCallDelay = 0.1f;
 
@@ -81,6 +81,11 @@ public class AIServerBenchmark : MonoBehaviour
         if (_running) yield break;
         _running = true;
 
+        // Defensive (BenchmarkRunner also sets these): keep the headset awake so the
+        // idle-sleep timeout can't pause the app and freeze this coroutine mid-run.
+        Screen.sleepTimeout = SleepTimeout.NeverSleep;
+        Application.runInBackground = true;
+
         var svc = new List<string>();
         foreach (var s in services.Split(','))
         {
@@ -121,8 +126,18 @@ public class AIServerBenchmark : MonoBehaviour
         Log(preOk ? $"Preflight OK ({preMs / 1000.0:0.000}s)."
                   : $"Preflight: server reachable but first call failed/slow ({preMs / 1000.0:0.000}s, {preErr}) — proceeding.");
 
-        var csv = new StringBuilder();
-        csv.AppendLine("service,phase,trial,latency_ms,ok,error");
+        // Open the CSV up front and flush every row as it happens, so a run that is
+        // interrupted (e.g. the headset sleeps) still leaves all completed trials on disk.
+        string ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        string path = Path.Combine(Application.persistentDataPath, $"aiserver_bench_{ts}.csv");
+        StreamWriter writer = null;
+        try
+        {
+            writer = new StreamWriter(path, false, new UTF8Encoding(false));
+            WriteLine(writer, "service,phase,trial,latency_ms,ok,error");
+            Log($"CSV (incremental): {path}");
+        }
+        catch (Exception e) { Log($"CSV open failed: {e.Message}"); writer = null; }
 
         var summaries = new List<(string name, Stats st, int fails, double coldMs)>();
 
@@ -147,7 +162,7 @@ public class AIServerBenchmark : MonoBehaviour
                 string tag = isWarmup ? "warmup" : $"trial {trialNo}";
                 Log($"{name} [{tag}] {res.latencyMs / 1000.0:0.000}s {(res.ok ? "OK" : "FAIL: " + res.err)}");
 
-                csv.AppendLine(string.Join(",", new[]
+                WriteLine(writer, string.Join(",", new[]
                 {
                     Csv(name),
                     isWarmup ? "warmup" : "measured",
@@ -170,15 +185,15 @@ public class AIServerBenchmark : MonoBehaviour
         }
 
         // ── Summary ───────────────────────────────────────────────
-        csv.AppendLine();
-        csv.AppendLine("service,n,mean_ms,sd_ms,min_ms,max_ms,median_ms,cold_start_ms,failures");
+        WriteLine(writer, "");
+        WriteLine(writer, "service,n,mean_ms,sd_ms,min_ms,max_ms,median_ms,cold_start_ms,failures");
         Log("================ SUMMARY (seconds) ================");
         foreach (var (name, st, fails, coldMs) in summaries)
         {
             Log($"{name}: n={st.N} mean={st.Mean / 1000.0:0.000} sd={st.Sd / 1000.0:0.000} " +
                 $"min={st.Min / 1000.0:0.000} max={st.Max / 1000.0:0.000} median={st.Median / 1000.0:0.000} " +
                 $"cold={(coldMs >= 0 ? (coldMs / 1000.0).ToString("0.000") : "-")} fails={fails}");
-            csv.AppendLine(string.Join(",", new[]
+            WriteLine(writer, string.Join(",", new[]
             {
                 Csv(name), st.N.ToString(),
                 st.Mean.ToString("F2", CultureInfo.InvariantCulture),
@@ -192,14 +207,18 @@ public class AIServerBenchmark : MonoBehaviour
         }
         Log("==================================================");
 
-        // ── Write CSV ─────────────────────────────────────────────
-        string ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        string path = Path.Combine(Application.persistentDataPath, $"aiserver_bench_{ts}.csv");
-        try { File.WriteAllText(path, csv.ToString()); Log($"CSV written: {path}"); }
-        catch (Exception e) { Log($"CSV write failed: {e.Message}"); }
+        try { writer?.Dispose(); } catch { }
+        if (writer != null) Log($"CSV written: {path}");
 
         Log("DONE.");
         _running = false;
+    }
+
+    /// <summary>Write one CSV line and flush immediately (durable against interruption).</summary>
+    private static void WriteLine(StreamWriter w, string line)
+    {
+        if (w == null) return;
+        try { w.WriteLine(line); w.Flush(); } catch { }
     }
 
     private struct CallResult { public double latencyMs; public bool ok; public string err; }

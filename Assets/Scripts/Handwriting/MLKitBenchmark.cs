@@ -105,6 +105,11 @@ public class MLKitBenchmark : MonoBehaviour
     {
         _running = true;
 
+        // Defensive (BenchmarkRunner also sets these): keep the headset awake so the
+        // idle-sleep timeout can't pause the app and freeze this coroutine mid-run.
+        Screen.sleepTimeout = SleepTimeout.NeverSleep;
+        Application.runInBackground = true;
+
         if (bridge == null) bridge = DigitalInkBridge.Instance;
         if (bridge == null)
         {
@@ -143,8 +148,18 @@ public class MLKitBenchmark : MonoBehaviour
         var perSampleHits = new Dictionary<string, int>();
         var perSampleScored = new Dictionary<string, int>();
 
-        var csv = new StringBuilder();
-        csv.AppendLine("sample,phase,trial,latency_ms,recognized,ground_truth,match");
+        // Open the CSV up front and flush every row as it happens, so a run that is
+        // interrupted (e.g. the headset sleeps) still leaves all completed trials on disk.
+        string ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        string path = Path.Combine(Application.persistentDataPath, $"mlkit_bench_{ts}.csv");
+        StreamWriter writer = null;
+        try
+        {
+            writer = new StreamWriter(path, false, new UTF8Encoding(false));
+            WriteLine(writer, "sample,phase,trial,latency_ms,recognized,ground_truth,match");
+            Log($"CSV (incremental): {path}");
+        }
+        catch (Exception e) { Log($"CSV open failed: {e.Message}"); writer = null; }
 
         var overall = new List<double>();
 
@@ -170,7 +185,7 @@ public class MLKitBenchmark : MonoBehaviour
                     recognized.Trim(), s.groundTruth.Trim(),
                     StringComparison.OrdinalIgnoreCase);
 
-                csv.AppendLine(string.Join(",", new[]
+                WriteLine(writer, string.Join(",", new[]
                 {
                     Csv(s.label),
                     isWarmup ? "warmup" : "measured",
@@ -199,8 +214,8 @@ public class MLKitBenchmark : MonoBehaviour
         }
 
         // ── Summary ───────────────────────────────────────────────
-        csv.AppendLine();
-        csv.AppendLine("sample,n,mean_ms,sd_ms,min_ms,max_ms,median_ms,accuracy_pct");
+        WriteLine(writer, "");
+        WriteLine(writer, "sample,n,mean_ms,sd_ms,min_ms,max_ms,median_ms,accuracy_pct");
         Log("================ SUMMARY (ms) ================");
         foreach (var s in samples)
         {
@@ -211,7 +226,7 @@ public class MLKitBenchmark : MonoBehaviour
                 : "n/a";
             Log($"{s.label}: n={st.N} mean={st.Mean:F1} sd={st.Sd:F1} " +
                 $"min={st.Min:F1} max={st.Max:F1} median={st.Median:F1} acc={acc}%");
-            csv.AppendLine(string.Join(",", new[]
+            WriteLine(writer, string.Join(",", new[]
             {
                 Csv(s.label), st.N.ToString(),
                 st.Mean.ToString("F2", CultureInfo.InvariantCulture),
@@ -226,18 +241,8 @@ public class MLKitBenchmark : MonoBehaviour
         Log($"OVERALL: n={o.N} mean={o.Mean:F1} sd={o.Sd:F1} min={o.Min:F1} max={o.Max:F1} median={o.Median:F1}");
         Log("=============================================");
 
-        // ── Write CSV ─────────────────────────────────────────────
-        string ts = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        string path = Path.Combine(Application.persistentDataPath, $"mlkit_bench_{ts}.csv");
-        try
-        {
-            File.WriteAllText(path, csv.ToString());
-            Log($"CSV written: {path}");
-        }
-        catch (Exception e)
-        {
-            Log($"CSV write failed: {e.Message}");
-        }
+        try { writer?.Dispose(); } catch { }
+        if (writer != null) Log($"CSV written: {path}");
 
         Log("DONE.");
         _running = false;
@@ -389,6 +394,13 @@ public class MLKitBenchmark : MonoBehaviour
     }
 
     private static void Log(string msg) => Debug.Log("MLKIT_BENCH|" + msg);
+
+    /// <summary>Write one CSV line and flush immediately (durable against interruption).</summary>
+    private static void WriteLine(StreamWriter w, string line)
+    {
+        if (w == null) return;
+        try { w.WriteLine(line); w.Flush(); } catch { }
+    }
 
     // ── Small stats helper (sample SD, matches the Python harness meaning) ──
     private struct Stats

@@ -31,7 +31,7 @@ Quest 3 hitting the actual backend over WiFi.
 
 ## One-time Editor setup (AI server OFF)
 
-1. Create a scene, e.g. `Assets/Scenes/Benchmark.unity`. Add **one** GameObject
+1. Create a scene, e.g. `Assets/Scenes/use/benchmark.unity`. Add **one** GameObject
    (`BenchmarkManager`) with these components:
    - `DigitalInkBridge`  (set its `Language Tag` to your journaling language)
    - `MLKitBenchmark`     (set its `Language Tag` to match; leave `Run On Start` — the
@@ -44,7 +44,7 @@ Quest 3 hitting the actual backend over WiFi.
    > GameObject and set their `baseUrl` in the Inspector — `AIServerBenchmark` will reuse
    > those instead of creating defaults.
 
-2. `File → Build Settings → Android`. Add the Benchmark scene and drag it to the **top**
+2. `File → Build Settings → Android`. Add `use/benchmark.unity` and drag it to the **top**
    (index 0). Build the APK. (Remove it again for a normal build.)
 
 ### Config knobs
@@ -54,7 +54,7 @@ Quest 3 hitting the actual backend over WiFi.
 | BenchmarkRunner | Run Mlkit / Run Ai Server | true | Toggle either suite |
 | MLKitBenchmark | Trials / Warmup | 30 / 1 | ML Kit iterations |
 | AIServerBenchmark | Trials / Warmup | 30 / 2 | Server calls per service |
-| AIServerBenchmark | Services | transcribe,sentiment,chat | Which endpoints |
+| AIServerBenchmark | Services | chat,sentiment,transcribe | Which endpoints (chat first on purpose) |
 
 ## Run order
 
@@ -68,16 +68,31 @@ Quest 3 hitting the actual backend over WiFi.
    ```
    (Skip this only if you want the ML Kit suite alone — the AI suite will preflight and
    skip.)
-4. Connect the Quest via **USB-3**; `adb devices` shows it. Keep it awake on the desk:
-   ```
-   adb shell am broadcast -a com.oculus.vrpowermanager.prox_close
-   ```
+4. Connect the Quest via **USB-3**; `adb devices` shows it. **Keep the headset awake for the
+   entire run — see the section below; this is the #1 cause of a truncated run.**
 5. **Install & launch:**
    ```
    adb install -r path\to\EMILIA-VR.apk
    adb shell monkey -p com.MiLeonStudio.EMILIAVR -c android.intent.category.LAUNCHER 1
    ```
    Both suites run automatically.
+
+## Keep the headset awake (IMPORTANT)
+
+An automated benchmark has no head/controller movement, so the Quest hits its **idle-sleep
+timeout** and Android **pauses the app** — freezing the benchmark mid-run (this is what
+truncated the earlier run: it stopped at sentiment trial 5 and the chat batch never ran).
+
+Two layers of protection:
+- **In-app (automatic):** the benchmark now sets `Screen.sleepTimeout = NeverSleep` and
+  `Application.runInBackground = true` at start. This alone usually prevents the idle sleep.
+- **Belt-and-suspenders (recommended):** **cover/tape the proximity sensor** — the small
+  sensor inside the headset, top-center near the nose bridge. With it covered the Quest
+  believes it is being worn and will not sleep. (The `prox_close` adb broadcast does **not**
+  reliably persist, so don't rely on it.)
+
+You do not need to wear it — a piece of tape or a folded sticky note over the sensor is
+enough. Alternatively, just leave the headset on your head while it runs.
 
 ## Monitor on the PC
 
@@ -98,6 +113,12 @@ adb logcat -s Unity | findstr BENCH
 adb pull /sdcard/Android/data/com.MiLeonStudio.EMILIAVR/files/
 ```
 Grab `mlkit_bench_<ts>.csv` and `aiserver_bench_<ts>.csv`.
+
+> **The CSV is the source of truth, not logcat.** logcat is a fixed-size ring buffer, so a
+> saved logcat snippet will look truncated even on a perfectly healthy run (early lines roll
+> off). The CSVs are written **incrementally** — each trial is flushed to disk as it happens —
+> so even if a run is interrupted, every completed trial is already saved. Always read results
+> from the pulled CSV.
 
 ## Reading the AI-server numbers
 

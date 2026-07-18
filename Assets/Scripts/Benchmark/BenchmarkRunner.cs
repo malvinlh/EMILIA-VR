@@ -49,7 +49,13 @@ public class BenchmarkRunner : MonoBehaviour
 
     private IEnumerator RunAll()
     {
-        Debug.Log("BENCH|=== Benchmark suite starting ===");
+        // Keep the headset awake for the whole run: an automated (motionless) benchmark
+        // otherwise trips the Quest idle-sleep timeout, which pauses Unity and freezes
+        // the coroutine mid-run. (Also cover the proximity sensor — see BENCHMARK_README.)
+        Screen.sleepTimeout = SleepTimeout.NeverSleep;
+        Application.runInBackground = true;
+
+        Debug.Log("BENCH|=== Benchmark suite starting (sleep disabled) ===");
 
         if (runMlkit)
         {
