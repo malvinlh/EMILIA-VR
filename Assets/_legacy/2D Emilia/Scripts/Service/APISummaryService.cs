@@ -28,7 +28,7 @@ public class APISummaryService : MonoBehaviour
     #region Inspector
 
     [Header("API")]
-    [SerializeField] private string baseUrl    = "http://192.168.31.70:8000";
+    [SerializeField] private string baseUrl    = "http://192.168.31.69:8000";
     [SerializeField] private string endpoint   = "/summary";
     [SerializeField] private int    timeoutSec = 20;
 
