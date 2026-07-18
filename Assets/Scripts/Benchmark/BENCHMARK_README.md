@@ -79,20 +79,31 @@ Quest 3 hitting the actual backend over WiFi.
 
 ## Keep the headset awake (IMPORTANT)
 
-An automated benchmark has no head/controller movement, so the Quest hits its **idle-sleep
-timeout** and Android **pauses the app** — freezing the benchmark mid-run (this is what
-truncated the earlier run: it stopped at sentiment trial 5 and the chat batch never ran).
+An automated benchmark has no head/controller movement, so the Quest can sleep mid-run and
+Android **pauses the app**, freezing the benchmark (this is what truncated the earlier run:
+it stopped at sentiment trial 5 and the chat batch never ran).
 
-Two layers of protection:
-- **In-app (automatic):** the benchmark now sets `Screen.sleepTimeout = NeverSleep` and
-  `Application.runInBackground = true` at start. This alone usually prevents the idle sleep.
-- **Belt-and-suspenders (recommended):** **cover/tape the proximity sensor** — the small
-  sensor inside the headset, top-center near the nose bridge. With it covered the Quest
-  believes it is being worn and will not sleep. (The `prox_close` adb broadcast does **not**
-  reliably persist, so don't rely on it.)
+The Quest sleeps for **two independent reasons**; know which one you're fighting:
+- **Idle/inactivity timeout** (Android PowerManager). This is what the earlier log showed
+  (`PowerGroup ... reason=timeout`). **The code now handles this automatically** —
+  `Screen.sleepTimeout = NeverSleep` + `Application.runInBackground = true` are set at run
+  start, which is exactly the flag that suppresses the idle timeout. So in most cases you
+  need to do nothing.
+- **Proximity sensor** (headset removed → standby). Handled by the OS/VR runtime and **cannot**
+  be overridden by the app. Only relevant if the headset is off your face with the sensor
+  uncovered.
 
-You do not need to wear it — a piece of tape or a folded sticky note over the sensor is
-enough. Alternatively, just leave the headset on your head while it runs.
+Low-maintenance ladder (do the least that works — tape is the last resort):
+1. **Nothing** — rely on the in-app anti-sleep above. Try a run first; it likely just works.
+2. **One-time, persistent, no tape:** Quest **Settings → Power → "Auto Sleep Headset" → the
+   longest option**. Raises/removes the idle timeout system-wide for every run.
+3. **Simplest human option:** keep the headset on your head, or rest it so the sensor stays
+   covered, for the few-minute run.
+4. **Last resort:** tape / a folded sticky note over the proximity sensor (small sensor inside,
+   top-center near the nose bridge). Only needed if a run still logs `APP_CMD_PAUSE`.
+
+Whichever you pick, the **incremental CSV** means even a run that does nap keeps every trial
+completed up to that point — you never lose the whole run again.
 
 ## Monitor on the PC
 
