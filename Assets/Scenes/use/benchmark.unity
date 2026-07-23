@@ -202,7 +202,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BenchmarkRunner
   runOnStart: 1
   runMlkit: 1
-  runAiServer: 1
+  runAiServer: 0
   mlkit: {fileID: 0}
   aiServer: {fileID: 0}
 --- !u!114 &72855229

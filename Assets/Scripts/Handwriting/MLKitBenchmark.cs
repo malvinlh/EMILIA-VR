@@ -45,6 +45,35 @@ public class MLKitBenchmark : MonoBehaviour
     [Tooltip("BCP-47 language tag; should match the journaling language and the DigitalInkBridge model.")]
     [SerializeField] private string languageTag = "en-US";
 
+    [Header("Samples")]
+    [Tooltip("GroundTruthWords: render real words as letter strokes (accuracy IS measured).\n" +
+             "Synthetic: meaningless zig-zags, latency only (accuracy = n/a).\n" +
+             "A pushed mlkit_samples.json always overrides this.")]
+    [SerializeField] private SampleSource sampleSource = SampleSource.GroundTruthWords;
+    [Tooltip("Words rendered for the GroundTruthWords source. Edit freely — no code change needed.")]
+    [SerializeField] private WordSample[] words =
+    {
+        new WordSample { label = "word-short",  text = "aku" },
+        new WordSample { label = "word-medium", text = "tenang" },
+        new WordSample { label = "word-long",   text = "hari ini tenang" },
+    };
+
+    [Header("Stroke rendering (GroundTruthWords)")]
+    [Tooltip("Ascender-to-baseline height of a tall letter, in ML Kit px. ~40 px = a 4 cm finger-written letter.")]
+    [SerializeField] private float letterHeightPx = 40f;
+    [Tooltip("Floor for the shrink-to-one-line fit. Below this a long phrase wraps to a second line " +
+             "instead of shrinking into implausibly tiny handwriting.")]
+    [SerializeField] private float minLetterHeightPx = 22f;
+    [Tooltip("Extra gap between letters (px).")]
+    [SerializeField] private float letterSpacingPx = 4f;
+    [Tooltip("Gap between words (px).")]
+    [SerializeField] private float wordSpacingPx = 16f;
+    [Tooltip("Hand-wobble amplitude (px). 0 = perfect vectors, which is unrealistically clean.")]
+    [SerializeField] private float jitterPx = 0.8f;
+    [Tooltip("Seed for the wobble. Fixed => every trial of a sample feeds identical ink, so latency " +
+             "variance measures the recognizer rather than the input.")]
+    [SerializeField] private int strokeSeed = 12345;
+
     [Header("Timeouts (seconds)")]
     [Tooltip("How long to wait for the ML Kit model to become ready before aborting.")]
     [SerializeField] private float modelReadyTimeout = 60f;
@@ -52,6 +81,25 @@ public class MLKitBenchmark : MonoBehaviour
     [SerializeField] private float recognizeTimeout = 15f;
     [Tooltip("Idle delay between trials, lets the frame-polled bridge settle.")]
     [SerializeField] private float interTrialDelay = 0.05f;
+
+    /// <summary>Where the benchmark's ink comes from.</summary>
+    public enum SampleSource
+    {
+        /// <summary>Real words drawn as letter strokes by MLKitStrokeFont — accuracy is measured.</summary>
+        GroundTruthWords,
+        /// <summary>Meaningless zig-zags — valid latency, accuracy n/a.</summary>
+        Synthetic,
+    }
+
+    /// <summary>One inspector-editable word to render and score.</summary>
+    [Serializable]
+    public class WordSample
+    {
+        [Tooltip("CSV/log label for this sample.")]
+        public string label;
+        [Tooltip("The word(s) to render AND the ground truth to score against.")]
+        public string text;
+    }
 
     // ── One benchmark sample: ground-truth text + strokes in 300x200 px space ──
     private class Sample
@@ -139,7 +187,7 @@ public class MLKitBenchmark : MonoBehaviour
             }
             yield return new WaitForSeconds(0.25f);
         }
-        Log($"Model ready. trials={trials} warmup={warmup} lang={languageTag}");
+        Log($"Model ready. trials={trials} warmup={warmup} lang={languageTag} source={sampleSource}");
 
         List<Sample> samples = LoadSamples();
         Log($"Loaded {samples.Count} sample(s).");
@@ -147,6 +195,7 @@ public class MLKitBenchmark : MonoBehaviour
         var perSampleLatencies = new Dictionary<string, List<double>>();
         var perSampleHits = new Dictionary<string, int>();
         var perSampleScored = new Dictionary<string, int>();
+        var perSampleCer = new Dictionary<string, List<double>>();
 
         // Open the CSV up front and flush every row as it happens, so a run that is
         // interrupted (e.g. the headset sleeps) still leaves all completed trials on disk.
@@ -156,7 +205,7 @@ public class MLKitBenchmark : MonoBehaviour
         try
         {
             writer = new StreamWriter(path, false, new UTF8Encoding(false));
-            WriteLine(writer, "sample,phase,trial,latency_ms,recognized,ground_truth,match");
+            WriteLine(writer, "sample,phase,trial,latency_ms,recognized,ground_truth,match,cer");
             Log($"CSV (incremental): {path}");
         }
         catch (Exception e) { Log($"CSV open failed: {e.Message}"); writer = null; }
@@ -168,6 +217,7 @@ public class MLKitBenchmark : MonoBehaviour
             perSampleLatencies[s.label] = new List<double>();
             perSampleHits[s.label] = 0;
             perSampleScored[s.label] = 0;
+            perSampleCer[s.label] = new List<double>();
 
             int totalIter = warmup + trials;
             for (int i = 0; i < totalIter; i++)
@@ -181,9 +231,13 @@ public class MLKitBenchmark : MonoBehaviour
 
                 string recognized = _lastResult ?? "";
                 bool scored = !string.IsNullOrEmpty(s.groundTruth);
-                bool match = scored && string.Equals(
-                    recognized.Trim(), s.groundTruth.Trim(),
-                    StringComparison.OrdinalIgnoreCase);
+
+                // Compare on normalised text: exact-match alone reports a harsh 0% for a
+                // one-character slip, so also record the character error rate.
+                string normGot = Normalize(recognized);
+                string normWant = Normalize(s.groundTruth);
+                bool match = scored && normGot == normWant;
+                double cer = scored ? CharErrorRate(normWant, normGot) : -1;
 
                 WriteLine(writer, string.Join(",", new[]
                 {
@@ -193,7 +247,8 @@ public class MLKitBenchmark : MonoBehaviour
                     latencyMs.ToString("F2", CultureInfo.InvariantCulture),
                     Csv(recognized),
                     Csv(s.groundTruth),
-                    scored ? (match ? "1" : "0") : ""
+                    scored ? (match ? "1" : "0") : "",
+                    scored ? cer.ToString("F4", CultureInfo.InvariantCulture) : ""
                 }));
 
                 string tag = isWarmup ? "warmup" : $"trial {trialNo}";
@@ -208,6 +263,7 @@ public class MLKitBenchmark : MonoBehaviour
                     {
                         perSampleScored[s.label]++;
                         if (match) perSampleHits[s.label]++;
+                        perSampleCer[s.label].Add(cer);
                     }
                 }
             }
@@ -215,7 +271,7 @@ public class MLKitBenchmark : MonoBehaviour
 
         // ── Summary ───────────────────────────────────────────────
         WriteLine(writer, "");
-        WriteLine(writer, "sample,n,mean_ms,sd_ms,min_ms,max_ms,median_ms,accuracy_pct");
+        WriteLine(writer, "sample,n,mean_ms,sd_ms,min_ms,max_ms,median_ms,accuracy_pct,mean_cer_pct");
         Log("================ SUMMARY (ms) ================");
         foreach (var s in samples)
         {
@@ -224,8 +280,12 @@ public class MLKitBenchmark : MonoBehaviour
             string acc = perSampleScored[s.label] > 0
                 ? (100.0 * perSampleHits[s.label] / perSampleScored[s.label]).ToString("F1", CultureInfo.InvariantCulture)
                 : "n/a";
+            var cerSt = Stats.Of(perSampleCer[s.label]);
+            string cer = cerSt.N > 0
+                ? (100.0 * cerSt.Mean).ToString("F1", CultureInfo.InvariantCulture)
+                : "n/a";
             Log($"{s.label}: n={st.N} mean={st.Mean:F1} sd={st.Sd:F1} " +
-                $"min={st.Min:F1} max={st.Max:F1} median={st.Median:F1} acc={acc}%");
+                $"min={st.Min:F1} max={st.Max:F1} median={st.Median:F1} acc={acc}% cer={cer}%");
             WriteLine(writer, string.Join(",", new[]
             {
                 Csv(s.label), st.N.ToString(),
@@ -234,7 +294,7 @@ public class MLKitBenchmark : MonoBehaviour
                 st.Min.ToString("F2", CultureInfo.InvariantCulture),
                 st.Max.ToString("F2", CultureInfo.InvariantCulture),
                 st.Median.ToString("F2", CultureInfo.InvariantCulture),
-                acc
+                acc, cer
             }));
         }
         var o = Stats.Of(overall);
@@ -298,17 +358,80 @@ public class MLKitBenchmark : MonoBehaviour
     // ==================================================================
     private List<Sample> LoadSamples()
     {
+        // Real captured strokes always win — highest-fidelity accuracy source.
         var fromFile = TryLoadJsonSamples();
-        if (fromFile != null && fromFile.Count > 0) return fromFile;
+        if (fromFile != null && fromFile.Count > 0)
+        {
+            Log("Using mlkit_samples.json (real captured strokes).");
+            return fromFile;
+        }
 
-        Log("No mlkit_samples.json found; using built-in synthetic strokes " +
-            "(latency is representative; accuracy is N/A for synthetic).");
+        if (sampleSource == SampleSource.GroundTruthWords)
+        {
+            var rendered = MakeWordSamples();
+            if (rendered.Count > 0)
+            {
+                Log("Using procedurally rendered word strokes — accuracy IS measured, but note " +
+                    "these are machine-drawn letterforms, not human handwriting.");
+                return rendered;
+            }
+            Log("WARN: no renderable words configured; falling back to synthetic strokes.");
+        }
+
+        Log("Using built-in synthetic strokes (latency is representative; accuracy is N/A).");
         return new List<Sample>
         {
             MakeSynthetic("synthetic-short",  strokeCount: 2, pointsPerStroke: 18),
             MakeSynthetic("synthetic-medium", strokeCount: 4, pointsPerStroke: 24),
             MakeSynthetic("synthetic-long",   strokeCount: 6, pointsPerStroke: 30),
         };
+    }
+
+    /// <summary>Render each configured word into strokes via <see cref="MLKitStrokeFont"/>.</summary>
+    private List<Sample> MakeWordSamples()
+    {
+        var result = new List<Sample>();
+        if (words == null) return result;
+
+        foreach (var w in words)
+        {
+            if (w == null || string.IsNullOrWhiteSpace(w.text)) continue;
+
+            if (!MLKitStrokeFont.CanRender(w.text))
+            {
+                Log($"WARN: '{w.text}' contains characters with no glyph; skipping this sample.");
+                continue;
+            }
+
+            var opt = new MLKitStrokeFont.LayoutOptions
+            {
+                areaW = AREA_W,
+                areaH = AREA_H,
+                letterHeightPx = letterHeightPx,
+                minLetterHeightPx = minLetterHeightPx,
+                letterSpacingPx = letterSpacingPx,
+                wordSpacingPx = wordSpacingPx,
+                jitterPx = jitterPx,
+                // Vary the seed per sample so the words don't share identical wobble,
+                // but keep it fixed across trials of the same sample.
+                seed = strokeSeed + result.Count * 977,
+            };
+
+            var strokes = MLKitStrokeFont.Layout(w.text, opt);
+            if (strokes.Count == 0)
+            {
+                Log($"WARN: '{w.text}' produced no strokes; skipping.");
+                continue;
+            }
+
+            int points = 0;
+            foreach (var s in strokes) points += s.Count;
+            string label = string.IsNullOrWhiteSpace(w.label) ? w.text : w.label;
+            Log($"{label}: \"{w.text}\" -> {strokes.Count} strokes, {points} points.");
+
+            result.Add(new Sample { label = label, groundTruth = w.text, strokes = strokes });
+        }
+        return result;
     }
 
     private List<Sample> TryLoadJsonSamples()
@@ -382,6 +505,61 @@ public class MLKitBenchmark : MonoBehaviour
             strokes.Add(pts);
         }
         return new Sample { label = label, groundTruth = "", strokes = strokes };
+    }
+
+    // ==================================================================
+    // SCORING
+    // ==================================================================
+
+    /// <summary>
+    /// Canonical form for comparison: lowercase, punctuation stripped, whitespace
+    /// collapsed. ML Kit likes to add trailing periods and stray capitals; those are
+    /// not recognition errors for our purposes.
+    /// </summary>
+    private static string Normalize(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        var sb = new StringBuilder(s.Length);
+        bool pendingSpace = false;
+        foreach (char c in s.Trim().ToLowerInvariant())
+        {
+            if (char.IsWhiteSpace(c)) { pendingSpace = sb.Length > 0; continue; }
+            if (!char.IsLetterOrDigit(c)) continue;   // drop punctuation
+            if (pendingSpace) { sb.Append(' '); pendingSpace = false; }
+            sb.Append(c);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Levenshtein distance / reference length, clamped to [0,1]. 0 = perfect.</summary>
+    private static double CharErrorRate(string reference, string got)
+    {
+        if (string.IsNullOrEmpty(reference)) return string.IsNullOrEmpty(got) ? 0.0 : 1.0;
+        int dist = Levenshtein(reference, got);
+        return Math.Min(1.0, (double)dist / reference.Length);
+    }
+
+    /// <summary>Edit distance, two-row DP (O(min) memory).</summary>
+    private static int Levenshtein(string a, string b)
+    {
+        if (string.IsNullOrEmpty(a)) return b?.Length ?? 0;
+        if (string.IsNullOrEmpty(b)) return a.Length;
+
+        var prev = new int[b.Length + 1];
+        var curr = new int[b.Length + 1];
+        for (int j = 0; j <= b.Length; j++) prev[j] = j;
+
+        for (int i = 1; i <= a.Length; i++)
+        {
+            curr[0] = i;
+            for (int j = 1; j <= b.Length; j++)
+            {
+                int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                curr[j] = Math.Min(Math.Min(curr[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
+            }
+            var swap = prev; prev = curr; curr = swap;
+        }
+        return prev[b.Length];
     }
 
     // ==================================================================
